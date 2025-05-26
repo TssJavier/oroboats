@@ -5,11 +5,17 @@ import { createContext, useContext, useState } from "react"
 
 type Language = "es" | "en"
 
+interface User {
+  id: string
+  name: string
+  email: string
+}
+
 interface AppContextType {
   language: Language
   setLanguage: (lang: Language) => void
-  user: any
-  setUser: (user: any) => void
+  user: User | null
+  setUser: (user: User | null) => void
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -24,7 +30,7 @@ export function useApp() {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>("es")
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<User | null>(null)
 
   return <AppContext.Provider value={{ language, setLanguage, user, setUser }}>{children}</AppContext.Provider>
 }
