@@ -4,7 +4,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { User, Calendar, Clock, MapPin, Phone, Mail, Edit } from "lucide-react"
+import Image from "next/image"
 import { useApp } from "@/components/providers"
+
+interface Booking {
+  id: number
+  vehicleName: string
+  date: string
+  time: string
+  status: "confirmed" | "pending" | "completed" | "cancelled"
+  price: number
+  location: string
+}
+
+interface Translations {
+  title: string
+  subtitle: string
+  personalInfo: string
+  bookings: string
+  upcoming: string
+  past: string
+  edit: string
+  noBookings: string
+  bookNow: string
+  status: {
+    confirmed: string
+    pending: string
+    completed: string
+    cancelled: string
+  }
+}
 
 const translations = {
   es: {
@@ -51,7 +80,7 @@ const mockUser = {
   avatar: "/placeholder.svg?height=100&width=100&query=professional avatar",
 }
 
-const mockBookings = [
+const mockBookings: Booking[] = [
   {
     id: 1,
     vehicleName: "OroYacht Prestige",
@@ -79,7 +108,7 @@ export function ProfileSection() {
   const upcomingBookings = mockBookings.filter((booking) => new Date(booking.date) > new Date())
   const pastBookings = mockBookings.filter((booking) => new Date(booking.date) <= new Date())
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Booking["status"]) => {
     switch (status) {
       case "confirmed":
         return "bg-green-600"
@@ -114,9 +143,11 @@ export function ProfileSection() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="text-center">
-                  <img
+                  <Image
                     src={mockUser.avatar || "/placeholder.svg"}
                     alt={mockUser.name}
+                    width={96}
+                    height={96}
                     className="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-gold"
                   />
                   <h3 className="text-xl font-semibold text-white">{mockUser.name}</h3>
@@ -198,14 +229,16 @@ function BookingCard({
   booking,
   t,
   getStatusColor,
-}: { booking: any; t: any; getStatusColor: (status: string) => string }) {
+}: {
+  booking: Booking
+  t: Translations
+  getStatusColor: (status: Booking["status"]) => string
+}) {
   return (
     <div className="bg-white/5 rounded-lg p-4 border border-white/10 hover:border-gold/30 transition-all duration-300">
       <div className="flex justify-between items-start mb-3">
         <h4 className="text-lg font-semibold text-white">{booking.vehicleName}</h4>
-        <Badge className={`${getStatusColor(booking.status)} text-white`}>
-          {t.status[booking.status as keyof typeof t.status]}
-        </Badge>
+        <Badge className={`${getStatusColor(booking.status)} text-white`}>{t.status[booking.status]}</Badge>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">

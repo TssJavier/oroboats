@@ -7,7 +7,33 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Crown, Zap, Users, Gauge, Calendar } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { useApp } from "@/components/providers"
+
+interface Vehicle {
+  id: number
+  name: string
+  image: string
+  price: number
+  capacity: number
+  length?: string
+  power: string
+  description: string
+}
+
+interface Translations {
+  title: string
+  subtitle: string
+  boats: string
+  jetskis: string
+  reserve: string
+  from: string
+  hour: string
+  capacity: string
+  power: string
+  length: string
+  available: string
+}
 
 const translations = {
   es: {
@@ -38,7 +64,7 @@ const translations = {
   },
 }
 
-const boats = [
+const boats: Vehicle[] = [
   {
     id: 1,
     name: "OroYacht Prestige",
@@ -71,7 +97,7 @@ const boats = [
   },
 ]
 
-const jetskis = [
+const jetskis: Vehicle[] = [
   {
     id: 4,
     name: "OroJet Supreme",
@@ -105,8 +131,6 @@ export function BoatsSection() {
   const { language } = useApp()
   const t = translations[language]
   const [activeTab, setActiveTab] = useState("boats")
-
-  const currentItems = activeTab === "boats" ? boats : jetskis
 
   return (
     <section className="py-24 bg-gradient-to-b from-black to-gray-900 min-h-screen">
@@ -155,13 +179,15 @@ export function BoatsSection() {
   )
 }
 
-function VehicleCard({ vehicle, type, t }: { vehicle: any; type: string; t: any }) {
+function VehicleCard({ vehicle, type, t }: { vehicle: Vehicle; type: string; t: Translations }) {
   return (
     <Card className="bg-black/50 border-white/10 hover:border-gold/50 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl hover:shadow-gold/10 group overflow-hidden">
       <div className="relative">
-        <img
+        <Image
           src={vehicle.image || "/placeholder.svg"}
           alt={vehicle.name}
+          width={400}
+          height={300}
           className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
         />
         <Badge className="absolute top-4 right-4 bg-gradient-to-r from-gold to-yellow-500 text-black font-semibold">
@@ -194,7 +220,7 @@ function VehicleCard({ vehicle, type, t }: { vehicle: any; type: string; t: any 
             <span className="text-white">{vehicle.power}</span>
           </div>
 
-          {type === "boat" && (
+          {type === "boat" && vehicle.length && (
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center text-white/60">
                 <Crown className="h-4 w-4 mr-2 text-gold" />
