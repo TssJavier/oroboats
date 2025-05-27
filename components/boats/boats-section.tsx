@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,8 @@ interface Vehicle {
   includes: string[]
   fuelIncluded: boolean
   description: string
+  type: string
+  available: boolean
 }
 
 interface Translations {
@@ -38,10 +40,8 @@ interface Translations {
   includes: string
   available: string
   fuelSeparate: string
-  min30: string
-  hour1: string
-  halfDay: string
-  fullDay: string
+  noVehicles: string
+  loading: string
 }
 
 const translations = {
@@ -56,10 +56,8 @@ const translations = {
     includes: "Incluye",
     available: "Disponible",
     fuelSeparate: "Gasolina aparte",
-    min30: "30 min",
-    hour1: "1 hora",
-    halfDay: "Medio día",
-    fullDay: "Todo el día",
+    noVehicles: "No hay vehículos disponibles",
+    loading: "Cargando...",
   },
   en: {
     title: "Our Fleet",
@@ -72,62 +70,60 @@ const translations = {
     includes: "Includes",
     available: "Available",
     fuelSeparate: "Fuel separate",
-    min30: "30 min",
-    hour1: "1 hour",
-    halfDay: "Half day",
-    fullDay: "Full day",
+    noVehicles: "No vehicles available",
+    loading: "Loading...",
   },
 }
-
-const jetskis: Vehicle[] = [
-  {
-    id: 1,
-    name: "GTX 130",
-    image: "/assets/motos/moto1.png",
-    capacity: 2,
-    pricing: [
-      { duration: "30min", price: 99, label: "30 min" },
-      { duration: "1hour", price: 180, label: "1 hora" },
-    ],
-    includes: ["Gasolina", "Chalecos", "IVA", "Fotos"],
-    fuelIncluded: true,
-    description: "Moto de agua premium con excelente estabilidad y potencia",
-  },
-  {
-    id: 2,
-    name: "SPARK TRIXX 120 RS",
-    image: "/assets/motos/moto2.png",
-    capacity: 2,
-    pricing: [
-      { duration: "30min", price: 110, label: "30 min" },
-      { duration: "1hour", price: 199, label: "1 hora" },
-    ],
-    includes: ["Gasolina", "Chalecos", "IVA", "Fotos"],
-    fuelIncluded: true,
-    description: "Moto deportiva con características acrobáticas únicas",
-  },
-]
-
-const boats: Vehicle[] = [
-  {
-    id: 3,
-    name: "INVICTUS FX 190",
-    image: "/assets/barcos/barco1.png",
-    capacity: 8,
-    pricing: [
-      { duration: "halfday", price: 390, label: "Medio día" },
-      { duration: "fullday", price: 590, label: "Todo el día" },
-    ],
-    includes: ["Chalecos", "IVA", "Fotos"],
-    fuelIncluded: false,
-    description: "Barco espacioso perfecto para grupos, ideal para excursiones",
-  },
-]
 
 export function BoatsSection() {
   const { language } = useApp()
   const t = translations[language]
   const [activeTab, setActiveTab] = useState("jetskis")
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchVehicles()
+  }, [])
+
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch("/api/vehicles")
+      const data = await response.json()
+      setVehicles(data)
+    } catch (error) {
+      console.error("Error fetching vehicles:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const jetskis = vehicles.filter((v) => v.type === "jetski")
+  const boats = vehicles.filter((v) => v.type === "boat")
+
+  if (loading) {
+    return (
+      <section className="py-24 bg-white min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
+            <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.loading}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <div className="h-72 bg-gray-200"></div>
+                <CardHeader>
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-24 bg-white min-h-screen">
@@ -138,7 +134,6 @@ export function BoatsSection() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          {/* Tabs más grandes y prominentes */}
           <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-2 mb-16 bg-gray-100 border border-gray-200 h-16 p-2">
             <TabsTrigger
               value="jetskis"
@@ -157,19 +152,33 @@ export function BoatsSection() {
           </TabsList>
 
           <TabsContent value="jetskis" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-              {jetskis.map((jetski) => (
-                <VehicleCard key={jetski.id} vehicle={jetski} t={t} />
-              ))}
-            </div>
+            {jetskis.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+                {jetskis.map((jetski) => (
+                  <VehicleCard key={jetski.id} vehicle={jetski} t={t} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Zap className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">{t.noVehicles}</p>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="boats" className="mt-0">
-            <div className="grid grid-cols-1 gap-8 max-w-3xl mx-auto">
-              {boats.map((boat) => (
-                <VehicleCard key={boat.id} vehicle={boat} t={t} />
-              ))}
-            </div>
+            {boats.length > 0 ? (
+              <div className="grid grid-cols-1 gap-8 max-w-3xl mx-auto">
+                {boats.map((boat) => (
+                  <VehicleCard key={boat.id} vehicle={boat} t={t} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Ship className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">{t.noVehicles}</p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -185,7 +194,6 @@ function VehicleCard({ vehicle, t }: { vehicle: Vehicle; t: Translations }) {
   return (
     <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden">
       <div className="relative">
-        {/* Contenedor de imagen más alto y con mejor ajuste */}
         <div className="w-full h-72 bg-gray-50 flex items-center justify-center overflow-hidden">
           <Image
             src={vehicle.image || "/placeholder.svg"}
