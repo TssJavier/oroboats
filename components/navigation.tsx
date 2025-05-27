@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, Globe, Crown, Ship } from "lucide-react"
+import { Menu, X, User, Globe, Ship } from "lucide-react"
 import { useApp } from "@/components/providers"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
