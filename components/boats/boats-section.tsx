@@ -5,19 +5,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Ship, Zap, Users, Gauge, Calendar } from "lucide-react"
+import { Ship, Zap, Users, Clock, Calendar, Fuel } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
+
+interface PricingOption {
+  duration: string
+  price: number
+  label: string
+}
 
 interface Vehicle {
   id: number
   name: string
   image: string
-  price: number
   capacity: number
-  length?: string
-  power: string
+  pricing: PricingOption[]
+  includes: string[]
+  fuelIncluded: boolean
   description: string
 }
 
@@ -28,109 +34,100 @@ interface Translations {
   jetskis: string
   reserve: string
   from: string
-  hour: string
   capacity: string
-  power: string
-  length: string
+  includes: string
   available: string
+  fuelSeparate: string
+  min30: string
+  hour1: string
+  halfDay: string
+  fullDay: string
 }
 
 const translations = {
   es: {
-    title: "Nuestra Flota Premium",
-    subtitle: "Barcos y motos de agua de lujo para experiencias inolvidables",
+    title: "Nuestra Flota",
+    subtitle: "Motos de agua y barcos para experiencias inolvidables",
     boats: "Barcos",
     jetskis: "Motos de Agua",
     reserve: "Reservar",
     from: "Desde",
-    hour: "/hora",
     capacity: "Capacidad",
-    power: "Potencia",
-    length: "Eslora",
+    includes: "Incluye",
     available: "Disponible",
+    fuelSeparate: "Gasolina aparte",
+    min30: "30 min",
+    hour1: "1 hora",
+    halfDay: "Medio día",
+    fullDay: "Todo el día",
   },
   en: {
-    title: "Our Premium Fleet",
-    subtitle: "Luxury boats and jet skis for unforgettable experiences",
+    title: "Our Fleet",
+    subtitle: "Jet skis and boats for unforgettable experiences",
     boats: "Boats",
     jetskis: "Jet Skis",
     reserve: "Reserve",
     from: "From",
-    hour: "/hour",
     capacity: "Capacity",
-    power: "Power",
-    length: "Length",
+    includes: "Includes",
     available: "Available",
+    fuelSeparate: "Fuel separate",
+    min30: "30 min",
+    hour1: "1 hour",
+    halfDay: "Half day",
+    fullDay: "Full day",
   },
 }
 
-const boats: Vehicle[] = [
+const jetskis: Vehicle[] = [
   {
     id: 1,
-    name: "OroYacht Prestige",
-    image: "/placeholder.svg?height=300&width=400&query=luxury yacht white gold details",
-    price: 450,
-    capacity: 12,
-    length: "15m",
-    power: "2x 350HP",
-    description: "Yate de lujo con acabados dorados y tecnología de vanguardia",
+    name: "GTX 130",
+    image: "/assets/motos/moto1.png",
+    capacity: 2,
+    pricing: [
+      { duration: "30min", price: 99, label: "30 min" },
+      { duration: "1hour", price: 180, label: "1 hora" },
+    ],
+    includes: ["Gasolina", "Chalecos", "IVA", "Fotos"],
+    fuelIncluded: true,
+    description: "Moto de agua premium con excelente estabilidad y potencia",
   },
   {
     id: 2,
-    name: "Golden Navigator",
-    image: "/placeholder.svg?height=300&width=400&query=premium boat golden accents",
-    price: 320,
-    capacity: 8,
-    length: "12m",
-    power: "2x 250HP",
-    description: "Barco premium perfecto para grupos medianos",
-  },
-  {
-    id: 3,
-    name: "Elite Cruiser",
-    image: "/placeholder.svg?height=300&width=400&query=elegant boat black gold design",
-    price: 280,
-    capacity: 6,
-    length: "10m",
-    power: "1x 300HP",
-    description: "Elegancia y potencia en perfecta armonía",
+    name: "SPARK TRIXX 120 RS",
+    image: "/assets/motos/moto2.png",
+    capacity: 2,
+    pricing: [
+      { duration: "30min", price: 110, label: "30 min" },
+      { duration: "1hour", price: 199, label: "1 hora" },
+    ],
+    includes: ["Gasolina", "Chalecos", "IVA", "Fotos"],
+    fuelIncluded: true,
+    description: "Moto deportiva con características acrobáticas únicas",
   },
 ]
 
-const jetskis: Vehicle[] = [
+const boats: Vehicle[] = [
   {
-    id: 4,
-    name: "OroJet Supreme",
-    image: "/placeholder.svg?height=300&width=400&query=luxury jet ski gold black",
-    price: 120,
-    capacity: 2,
-    power: "300HP",
-    description: "Moto de agua de alta gama con detalles dorados",
-  },
-  {
-    id: 5,
-    name: "Golden Wave",
-    image: "/placeholder.svg?height=300&width=400&query=premium jet ski golden design",
-    price: 95,
-    capacity: 2,
-    power: "250HP",
-    description: "Adrenalina pura con estilo premium",
-  },
-  {
-    id: 6,
-    name: "Elite Racer",
-    image: "/placeholder.svg?height=300&width=400&query=sport jet ski black gold racing",
-    price: 85,
-    capacity: 1,
-    power: "200HP",
-    description: "Para los amantes de la velocidad extrema",
+    id: 3,
+    name: "INVICTUS FX 190",
+    image: "/assets/barcos/barco1.png",
+    capacity: 8,
+    pricing: [
+      { duration: "halfday", price: 390, label: "Medio día" },
+      { duration: "fullday", price: 590, label: "Todo el día" },
+    ],
+    includes: ["Chalecos", "IVA", "Fotos"],
+    fuelIncluded: false,
+    description: "Barco espacioso perfecto para grupos, ideal para excursiones",
   },
 ]
 
 export function BoatsSection() {
   const { language } = useApp()
   const t = translations[language]
-  const [activeTab, setActiveTab] = useState("boats")
+  const [activeTab, setActiveTab] = useState("jetskis")
 
   return (
     <section className="py-24 bg-white min-h-screen">
@@ -141,35 +138,36 @@ export function BoatsSection() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-12 bg-gray-100 border border-gray-200">
-            <TabsTrigger
-              value="boats"
-              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors"
-            >
-              <Ship className="h-4 w-4 mr-2" />
-              {t.boats}
-            </TabsTrigger>
+          {/* Tabs más grandes y prominentes */}
+          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-2 mb-16 bg-gray-100 border border-gray-200 h-16 p-2">
             <TabsTrigger
               value="jetskis"
-              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors"
+              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
             >
-              <Zap className="h-4 w-4 mr-2" />
+              <Zap className="h-5 w-5 mr-3" />
               {t.jetskis}
+            </TabsTrigger>
+            <TabsTrigger
+              value="boats"
+              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
+            >
+              <Ship className="h-5 w-5 mr-3" />
+              {t.boats}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="boats" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {boats.map((boat) => (
-                <VehicleCard key={boat.id} vehicle={boat} type="boat" t={t} />
+          <TabsContent value="jetskis" className="mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+              {jetskis.map((jetski) => (
+                <VehicleCard key={jetski.id} vehicle={jetski} type="jetski" t={t} />
               ))}
             </div>
           </TabsContent>
 
-          <TabsContent value="jetskis" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {jetskis.map((jetski) => (
-                <VehicleCard key={jetski.id} vehicle={jetski} type="jetski" t={t} />
+          <TabsContent value="boats" className="mt-0">
+            <div className="grid grid-cols-1 gap-8 max-w-3xl mx-auto">
+              {boats.map((boat) => (
+                <VehicleCard key={boat.id} vehicle={boat} type="boat" t={t} />
               ))}
             </div>
           </TabsContent>
@@ -180,71 +178,92 @@ export function BoatsSection() {
 }
 
 function VehicleCard({ vehicle, type, t }: { vehicle: Vehicle; type: string; t: Translations }) {
+  const getLowestPrice = () => {
+    return Math.min(...vehicle.pricing.map((p) => p.price))
+  }
+
   return (
     <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden">
       <div className="relative">
-        <Image
-          src={vehicle.image || "/placeholder.svg"}
-          alt={vehicle.name}
-          width={400}
-          height={300}
-          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        {/* Contenedor de imagen más alto y con mejor ajuste */}
+        <div className="w-full h-72 bg-gray-50 flex items-center justify-center overflow-hidden">
+          <Image
+            src={vehicle.image || "/placeholder.svg"}
+            alt={vehicle.name}
+            width={500}
+            height={300}
+            className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300 p-4"
+            style={{
+              filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.1))",
+            }}
+          />
+        </div>
         <Badge className="absolute top-4 right-4 bg-gold text-black font-semibold">{t.available}</Badge>
+        {!vehicle.fuelIncluded && (
+          <Badge className="absolute top-4 left-4 bg-orange-500 text-white font-semibold">
+            <Fuel className="h-3 w-3 mr-1" />
+            {t.fuelSeparate}
+          </Badge>
+        )}
       </div>
 
-      <CardHeader>
-        <CardTitle className="text-xl font-bold text-black group-hover:text-gold transition-colors">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-2xl font-bold text-black group-hover:text-gold transition-colors">
           {vehicle.name}
         </CardTitle>
-        <CardDescription className="text-gray-600">{vehicle.description}</CardDescription>
+        <CardDescription className="text-gray-600 text-base">{vehicle.description}</CardDescription>
       </CardHeader>
 
       <CardContent>
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center text-gray-500">
-              <Users className="h-4 w-4 mr-2 text-gold" />
+        <div className="space-y-4 mb-6">
+          <div className="flex items-center justify-between text-base">
+            <span className="flex items-center text-gray-500 font-medium">
+              <Users className="h-5 w-5 mr-2 text-gold" />
               {t.capacity}
             </span>
-            <span className="text-black font-medium">{vehicle.capacity} personas</span>
+            <span className="text-black font-semibold">{vehicle.capacity} personas</span>
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center text-gray-500">
-              <Gauge className="h-4 w-4 mr-2 text-gold" />
-              {t.power}
+          <div className="space-y-3">
+            <span className="flex items-center text-gray-500 text-base font-medium">
+              <Clock className="h-5 w-5 mr-2 text-gold" />
+              Precios:
             </span>
-            <span className="text-black font-medium">{vehicle.power}</span>
+            <div className="grid grid-cols-2 gap-3">
+              {vehicle.pricing.map((option, index) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-4 text-center border border-gray-200">
+                  <div className="text-xl font-bold text-gold">€{option.price}</div>
+                  <div className="text-sm text-gray-600 font-medium">{option.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {type === "boat" && vehicle.length && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center text-gray-500">
-                <Ship className="h-4 w-4 mr-2 text-gold" />
-                {t.length}
-              </span>
-              <span className="text-black font-medium">{vehicle.length}</span>
+          <div className="space-y-3">
+            <span className="text-gray-500 text-base font-medium">{t.includes}:</span>
+            <div className="flex flex-wrap gap-2">
+              {vehicle.includes.map((item, index) => (
+                <Badge key={index} variant="outline" className="text-sm py-1 px-3">
+                  {item}
+                </Badge>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <span className="text-gray-500 text-sm">{t.from}</span>
-            <div className="text-2xl font-bold text-gold">
-              €{vehicle.price}
-              <span className="text-sm text-gray-500">{t.hour}</span>
-            </div>
+            <span className="text-gray-500 text-base">{t.from}</span>
+            <div className="text-3xl font-bold text-gold">€{getLowestPrice()}</div>
           </div>
         </div>
 
         <Button
           asChild
-          className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium"
+          className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg py-3 h-12"
         >
           <Link href={`/reservar/${vehicle.id}`}>
-            <Calendar className="h-4 w-4 mr-2" />
+            <Calendar className="h-5 w-5 mr-2" />
             {t.reserve}
           </Link>
         </Button>
