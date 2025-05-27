@@ -32,16 +32,10 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background with gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black"></div>
+      {/* Background with white overlay */}
+      <div className="absolute inset-0 bg-white"></div>
 
-      {/* Animated background elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-2 h-2 bg-gold rounded-full animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-1 h-1 bg-gold/60 rounded-full animate-ping"></div>
-        <div className="absolute bottom-40 left-20 w-1.5 h-1.5 bg-gold/80 rounded-full animate-pulse delay-1000"></div>
-        <div className="absolute bottom-20 right-10 w-2 h-2 bg-gold/40 rounded-full animate-ping delay-500"></div>
-      </div>
+      {/* Animated background elements - removed for clean look */}
 
       {/* Main content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -49,7 +43,7 @@ export function HeroSection() {
         <Anchor className="h-16 w-16 text-gold mx-auto mb-6 animate-pulse" />
         </div>
 
-        <h1 className="text-5xl md:text-7xl lg:text-8xl font-playfair font-bold text-white mb-4 animate-slide-up">
+        <h1 className="text-5xl md:text-7xl lg:text-8xl font-playfair font-bold text-black mb-4 animate-slide-up">
           {t.title}
         </h1>
 
@@ -57,7 +51,7 @@ export function HeroSection() {
           {t.subtitle}
         </h2>
 
-        <p className="text-xl md:text-2xl text-white/80 mb-12 max-w-4xl mx-auto leading-relaxed animate-slide-up delay-400">
+        <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed animate-slide-up delay-400">
           {t.description}
         </p>
 
@@ -65,7 +59,7 @@ export function HeroSection() {
           <Button
             asChild
             size="lg"
-            className="bg-gradient-to-r from-gold to-yellow-500 text-black font-bold text-lg px-8 py-4 hover:from-yellow-500 hover:to-gold transition-all duration-500 transform hover:scale-105 hover:shadow-2xl hover:shadow-gold/25"
+            className="bg-black text-white font-bold text-lg px-8 py-4 hover:bg-gold hover:text-black transition-all duration-500 transform hover:scale-105"
           >
             <Link href="/boats">
               {t.rentNow}
@@ -76,7 +70,7 @@ export function HeroSection() {
           <Button
             asChild
             size="lg"
-            className="bg-white text-black font-bold text-lg px-8 py-4 hover:bg-gray-100 transition-all duration-500 transform hover:scale-105 border-2 border-white hover:border-gold"
+            className="bg-white text-black font-bold text-lg px-8 py-4 hover:bg-black hover:text-white transition-all duration-500 transform hover:scale-105 border-2 border-black"
           >
             <Link href="/boats?type=sale">{t.buyNow}</Link>
           </Button>
@@ -84,7 +78,7 @@ export function HeroSection() {
           <Button
             asChild
             size="lg"
-            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg px-8 py-4 hover:from-purple-700 hover:to-pink-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/25"
+            className="bg-white text-gray-600 font-bold text-lg px-8 py-4 hover:bg-gold hover:text-black transition-all duration-500 transform hover:scale-105 border-2 border-gray-300 hover:border-gold"
           >
             <Link href="/fiestas">{t.parties}</Link>
           </Button>
@@ -92,12 +86,12 @@ export function HeroSection() {
 
         {/* Scroll indicator - mejorado */}
         <div className="absolute bottom-18 left-1/2 transform -translate-x-1/2 mt-10">
-          <div className="flex flex-col items-center text-white/60 cursor-pointer group">
+          <div className="flex flex-col items-center text-gray-400 cursor-pointer group">
             <span className="text-sm mb-3 group-hover:text-gold transition-colors duration-300">{t.scroll}</span>
-            <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center group-hover:border-gold/50 transition-colors duration-300">
+            <div className="w-6 h-10 border-2 border-gray-300 rounded-full flex justify-center group-hover:border-gold transition-colors duration-300">
               <div className="w-1 h-3 bg-gold rounded-full mt-2 animate-bounce"></div>
             </div>
-            <ChevronDown className="h-5 w-5 mt-2 animate-bounce text-gold/70" />
+            <ChevronDown className="h-5 w-5 mt-2 animate-bounce text-gold" />
           </div>
         </div>
       </div>
