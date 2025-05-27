@@ -1,17 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getVehicleById, updateVehicle, deleteVehicle } from "@/lib/db/queries"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+interface RouteParams {
+  params: Promise<{ id: string }>
+}
+
+export async function GET(request: NextRequest, context: RouteParams) {
   try {
-    console.log(`🚗 API: Fetching vehicle ${params.id}...`)
-    const vehicle = await getVehicleById(Number.parseInt(params.id))
+    const { id } = await context.params
+    console.log(`🚗 API: Fetching vehicle ${id}...`)
+    const vehicle = await getVehicleById(Number.parseInt(id))
     if (!vehicle) {
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 })
     }
-    console.log(`✅ API: Vehicle ${params.id} found`)
+    console.log(`✅ API: Vehicle ${id} found`)
     return NextResponse.json(vehicle)
   } catch (error) {
-    console.error(`❌ API Error fetching vehicle ${params.id}:`, error)
+    console.error(`❌ API Error fetching vehicle:`, error)
     return NextResponse.json(
       {
         error: "Failed to fetch vehicle",
@@ -22,15 +27,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, context: RouteParams) {
   try {
-    console.log(`🚗 API: Updating vehicle ${params.id}...`)
+    const { id } = await context.params
+    console.log(`🚗 API: Updating vehicle ${id}...`)
     const body = await request.json()
-    const vehicle = await updateVehicle(Number.parseInt(params.id), body)
-    console.log(`✅ API: Vehicle ${params.id} updated`)
+    const vehicle = await updateVehicle(Number.parseInt(id), body)
+    console.log(`✅ API: Vehicle ${id} updated`)
     return NextResponse.json(vehicle[0])
   } catch (error) {
-    console.error(`❌ API Error updating vehicle ${params.id}:`, error)
+    console.error(`❌ API Error updating vehicle:`, error)
     return NextResponse.json(
       {
         error: "Failed to update vehicle",
@@ -41,10 +47,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: RouteParams) {
   try {
-    console.log(`🗑️ API: Deleting vehicle ${params.id}...`)
-    const vehicleId = Number.parseInt(params.id)
+    const { id } = await context.params
+    console.log(`🗑️ API: Deleting vehicle ${id}...`)
+    const vehicleId = Number.parseInt(id)
 
     if (isNaN(vehicleId)) {
       return NextResponse.json({ error: "Invalid vehicle ID" }, { status: 400 })
@@ -57,11 +64,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     await deleteVehicle(vehicleId)
-    console.log(`✅ API: Vehicle ${params.id} deleted successfully`)
+    console.log(`✅ API: Vehicle ${id} deleted successfully`)
 
     return NextResponse.json({ success: true, message: "Vehicle deleted successfully" })
   } catch (error) {
-    console.error(`❌ API Error deleting vehicle ${params.id}:`, error)
+    console.error(`❌ API Error deleting vehicle:`, error)
     return NextResponse.json(
       {
         error: "Failed to delete vehicle",
