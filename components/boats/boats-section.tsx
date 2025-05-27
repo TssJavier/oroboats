@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Crown, Zap, Users, Gauge, Calendar } from "lucide-react"
+import { Ship, Zap, Users, Gauge, Calendar } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -133,25 +133,25 @@ export function BoatsSection() {
   const [activeTab, setActiveTab] = useState("boats")
 
   return (
-    <section className="py-24 bg-gradient-to-b from-black to-gray-900 min-h-screen">
+    <section className="py-24 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-playfair font-bold text-white mb-6">{t.title}</h1>
-          <p className="text-xl md:text-2xl text-white/70 max-w-4xl mx-auto">{t.subtitle}</p>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
+          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-12 bg-black/50 border border-gold/30">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-12 bg-gray-100 border border-gray-200">
             <TabsTrigger
               value="boats"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-gold data-[state=active]:to-yellow-500 data-[state=active]:text-black text-white"
+              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors"
             >
-              <Crown className="h-4 w-4 mr-2" />
+              <Ship className="h-4 w-4 mr-2" />
               {t.boats}
             </TabsTrigger>
             <TabsTrigger
               value="jetskis"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-gold data-[state=active]:to-yellow-500 data-[state=active]:text-black text-white"
+              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors"
             >
               <Zap className="h-4 w-4 mr-2" />
               {t.jetskis}
@@ -181,69 +181,67 @@ export function BoatsSection() {
 
 function VehicleCard({ vehicle, type, t }: { vehicle: Vehicle; type: string; t: Translations }) {
   return (
-    <Card className="bg-black/50 border-white/10 hover:border-gold/50 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl hover:shadow-gold/10 group overflow-hidden">
+    <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden">
       <div className="relative">
         <Image
           src={vehicle.image || "/placeholder.svg"}
           alt={vehicle.name}
           width={400}
           height={300}
-          className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
+          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
         />
-        <Badge className="absolute top-4 right-4 bg-gradient-to-r from-gold to-yellow-500 text-black font-semibold">
-          {t.available}
-        </Badge>
+        <Badge className="absolute top-4 right-4 bg-gold text-black font-semibold">{t.available}</Badge>
       </div>
 
       <CardHeader>
-        <CardTitle className="text-xl font-playfair text-white group-hover:text-gold transition-colors">
+        <CardTitle className="text-xl font-bold text-black group-hover:text-gold transition-colors">
           {vehicle.name}
         </CardTitle>
-        <CardDescription className="text-white/70">{vehicle.description}</CardDescription>
+        <CardDescription className="text-gray-600">{vehicle.description}</CardDescription>
       </CardHeader>
 
       <CardContent>
         <div className="space-y-3 mb-6">
           <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center text-white/60">
+            <span className="flex items-center text-gray-500">
               <Users className="h-4 w-4 mr-2 text-gold" />
               {t.capacity}
             </span>
-            <span className="text-white">{vehicle.capacity} personas</span>
+            <span className="text-black font-medium">{vehicle.capacity} personas</span>
           </div>
 
           <div className="flex items-center justify-between text-sm">
-            <span className="flex items-center text-white/60">
+            <span className="flex items-center text-gray-500">
               <Gauge className="h-4 w-4 mr-2 text-gold" />
               {t.power}
             </span>
-            <span className="text-white">{vehicle.power}</span>
+            <span className="text-black font-medium">{vehicle.power}</span>
           </div>
 
           {type === "boat" && vehicle.length && (
             <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center text-white/60">
-                <Crown className="h-4 w-4 mr-2 text-gold" />
+              <span className="flex items-center text-gray-500">
+                <Ship className="h-4 w-4 mr-2 text-gold" />
                 {t.length}
               </span>
-              <span className="text-white">{vehicle.length}</span>
+              <span className="text-black font-medium">{vehicle.length}</span>
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between mb-4">
           <div>
-            <span className="text-white/60 text-sm">{t.from}</span>
+            <span className="text-gray-500 text-sm">{t.from}</span>
             <div className="text-2xl font-bold text-gold">
               €{vehicle.price}
-              <span className="text-sm text-white/60">{t.hour}</span>
+              <span className="text-sm text-gray-500">{t.hour}</span>
             </div>
           </div>
         </div>
 
         <Button
           asChild
-          className="w-full bg-gradient-to-r from-gold to-yellow-500 text-black font-bold hover:from-yellow-500 hover:to-gold transition-all duration-300 transform hover:scale-105"
+          className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium"
         >
           <Link href={`/reservar/${vehicle.id}`}>
             <Calendar className="h-4 w-4 mr-2" />

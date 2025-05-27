@@ -3,18 +3,18 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { PartyPopper, Users, Music, Sparkles, Calendar, ArrowRight } from "lucide-react"
+import { PartyPopper, Users, Music, Calendar, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useApp } from "@/components/providers"
 
 const translations = {
   es: {
     title: "Fiestas VIP en el Mar",
-    subtitle: "Conecta con PreviApp y organiza la fiesta perfecta en nuestros barcos de lujo",
+    subtitle: "Organiza la fiesta perfecta en nuestros barcos de lujo",
     discount: "10% DESCUENTO",
-    exclusive: "Exclusivo PreviApp",
+    exclusive: "Oferta Especial",
     description:
-      "¿Cansado de las fiestas en tierra? Lleva tu celebración al siguiente nivel con nuestros barcos premium. Perfecto para usuarios de PreviApp que buscan experiencias únicas.",
+      "¿Cansado de las fiestas en tierra? Lleva tu celebración al siguiente nivel con nuestros barcos premium. Perfecto para grupos que buscan experiencias únicas.",
     features: {
       title: "¿Por qué elegir nuestras fiestas en barco?",
       items: [
@@ -27,7 +27,7 @@ const translations = {
       ],
     },
     packages: {
-      title: "Paquetes Especiales PreviApp",
+      title: "Paquetes Especiales",
       sunset: {
         name: "Sunset Party",
         description: "Fiesta al atardecer con vistas espectaculares",
@@ -48,15 +48,15 @@ const translations = {
       },
     },
     cta: "Reservar con Descuento",
-    app: "Descarga PreviApp",
+    contact: "Contactar",
   },
   en: {
     title: "VIP Parties at Sea",
-    subtitle: "Connect with PreviApp and organize the perfect party on our luxury boats",
+    subtitle: "Organize the perfect party on our luxury boats",
     discount: "10% DISCOUNT",
-    exclusive: "PreviApp Exclusive",
+    exclusive: "Special Offer",
     description:
-      "Tired of land parties? Take your celebration to the next level with our premium boats. Perfect for PreviApp users looking for unique experiences.",
+      "Tired of land parties? Take your celebration to the next level with our premium boats. Perfect for groups looking for unique experiences.",
     features: {
       title: "Why choose our boat parties?",
       items: [
@@ -69,7 +69,7 @@ const translations = {
       ],
     },
     packages: {
-      title: "Special PreviApp Packages",
+      title: "Special Packages",
       sunset: {
         name: "Sunset Party",
         description: "Sunset party with spectacular views",
@@ -85,12 +85,12 @@ const translations = {
       vip: {
         name: "VIP Experience",
         description: "The most exclusive experience available",
-        duration: "8 hours",
+        duration: "8 horas",
         includes: "All inclusive + VIP extras",
       },
     },
     cta: "Book with Discount",
-    app: "Download PreviApp",
+    contact: "Contact",
   },
 }
 
@@ -106,7 +106,6 @@ export function FiestasSection() {
       originalPrice: 2000,
       duration: t.packages.sunset.duration,
       includes: t.packages.sunset.includes,
-      gradient: "from-orange-500 to-pink-500",
     },
     {
       name: t.packages.night.name,
@@ -115,7 +114,6 @@ export function FiestasSection() {
       originalPrice: 3000,
       duration: t.packages.night.duration,
       includes: t.packages.night.includes,
-      gradient: "from-purple-500 to-blue-500",
     },
     {
       name: t.packages.vip.name,
@@ -124,43 +122,40 @@ export function FiestasSection() {
       originalPrice: 5000,
       duration: t.packages.vip.duration,
       includes: t.packages.vip.includes,
-      gradient: "from-gold to-yellow-500",
     },
   ]
 
   return (
-    <section className="py-24 bg-gradient-to-b from-black via-gray-900 to-black min-h-screen">
+    <section className="py-24 bg-white min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <Badge className="mb-6 bg-gradient-to-r from-gold to-yellow-500 text-black font-bold text-lg px-6 py-2">
+          <Badge className="mb-6 bg-gold text-black font-bold text-lg px-6 py-2">
             <PartyPopper className="h-5 w-5 mr-2" />
             {t.exclusive}
           </Badge>
 
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-playfair font-bold text-white mb-6">{t.title}</h1>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
 
-          <p className="text-xl md:text-2xl text-white/70 max-w-4xl mx-auto mb-8">{t.subtitle}</p>
+          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto mb-8">{t.subtitle}</p>
 
-          <Badge className="bg-red-600 text-white font-bold text-xl px-8 py-3 animate-pulse">{t.discount}</Badge>
+          <Badge className="bg-red-600 text-white font-bold text-xl px-8 py-3">{t.discount}</Badge>
         </div>
 
         {/* Description */}
         <div className="max-w-4xl mx-auto text-center mb-16">
-          <p className="text-lg text-white/80 leading-relaxed">{t.description}</p>
+          <p className="text-lg text-gray-600 leading-relaxed">{t.description}</p>
         </div>
 
         {/* Features */}
         <div className="mb-16">
-          <h2 className="text-3xl md:text-4xl font-playfair font-bold text-white text-center mb-12">
-            {t.features.title}
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-black text-center mb-12">{t.features.title}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {t.features.items.map((feature, index) => (
-              <div key={index} className="flex items-start space-x-3 p-4 bg-white/5 rounded-lg border border-gold/20">
-                <Sparkles className="h-6 w-6 text-gold mt-1 flex-shrink-0" />
-                <span className="text-white">{feature}</span>
+              <div key={index} className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="w-2 h-2 bg-gold rounded-full mt-2 flex-shrink-0" />
+                <span className="text-gray-700">{feature}</span>
               </div>
             ))}
           </div>
@@ -168,42 +163,36 @@ export function FiestasSection() {
 
         {/* Packages */}
         <div className="mb-16">
-          <h2 className="text-3xl md:text-4xl font-playfair font-bold text-white text-center mb-12">
-            {t.packages.title}
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-black text-center mb-12">{t.packages.title}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {packages.map((pkg, index) => (
               <Card
                 key={index}
-                className="bg-black/50 border-white/10 hover:border-gold/50 transition-all duration-500 transform hover:scale-105 relative overflow-hidden"
+                className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group"
               >
-                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${pkg.gradient}`}></div>
-
                 <CardHeader className="text-center">
                   <div className="flex justify-center mb-4">
-                    <div
-                      className={`w-16 h-16 rounded-full bg-gradient-to-r ${pkg.gradient} flex items-center justify-center`}
-                    >
-                      <Music className="h-8 w-8 text-white" />
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gold transition-colors duration-300">
+                      <Music className="h-8 w-8 text-black" />
                     </div>
                   </div>
 
-                  <CardTitle className="text-2xl font-playfair text-white">{pkg.name}</CardTitle>
-                  <CardDescription className="text-white/70">{pkg.description}</CardDescription>
+                  <CardTitle className="text-2xl font-bold text-black">{pkg.name}</CardTitle>
+                  <CardDescription className="text-gray-600">{pkg.description}</CardDescription>
                 </CardHeader>
 
                 <CardContent className="text-center">
                   <div className="mb-6">
                     <div className="flex items-center justify-center space-x-2 mb-2">
                       <span className="text-3xl font-bold text-gold">€{pkg.price}</span>
-                      <span className="text-lg text-white/50 line-through">€{pkg.originalPrice}</span>
+                      <span className="text-lg text-gray-400 line-through">€{pkg.originalPrice}</span>
                     </div>
-                    <p className="text-white/60 text-sm">{pkg.duration}</p>
+                    <p className="text-gray-500 text-sm">{pkg.duration}</p>
                   </div>
 
                   <div className="space-y-2 mb-6">
-                    <div className="flex items-center justify-center text-white/80">
+                    <div className="flex items-center justify-center text-gray-600">
                       <Users className="h-4 w-4 mr-2 text-gold" />
                       <span className="text-sm">{pkg.includes}</span>
                     </div>
@@ -211,7 +200,7 @@ export function FiestasSection() {
 
                   <Button
                     asChild
-                    className={`w-full bg-gradient-to-r ${pkg.gradient} text-white font-bold hover:scale-105 transition-all duration-300`}
+                    className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium"
                   >
                     <Link href={`/reservar/fiesta?package=${index}`}>
                       <Calendar className="h-4 w-4 mr-2" />
@@ -225,14 +214,14 @@ export function FiestasSection() {
         </div>
 
         {/* CTA Section */}
-        <div className="text-center bg-gradient-to-r from-gold/10 to-yellow-500/10 rounded-2xl p-12 border border-gold/30">
-          <h3 className="text-3xl font-playfair font-bold text-white mb-6">¿Listo para la fiesta perfecta?</h3>
+        <div className="text-center bg-gray-50 rounded-2xl p-12 border border-gray-200">
+          <h3 className="text-3xl font-bold text-black mb-6">¿Listo para la fiesta perfecta?</h3>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
               asChild
               size="lg"
-              className="bg-gradient-to-r from-gold to-yellow-500 text-black font-bold text-lg px-8 py-4 hover:from-yellow-500 hover:to-gold transition-all duration-500 transform hover:scale-105"
+              className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg px-8 py-4"
             >
               <Link href="/boats">
                 {t.cta}
@@ -244,11 +233,9 @@ export function FiestasSection() {
               asChild
               size="lg"
               variant="outline"
-              className="border-2 border-gold text-gold hover:bg-gold hover:text-black transition-all duration-500 transform hover:scale-105 font-semibold text-lg px-8 py-4"
+              className="border-2 border-black text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg px-8 py-4"
             >
-              <a href="#" target="_blank" rel="noreferrer">
-                {t.app}
-              </a>
+              <Link href="/contact">{t.contact}</Link>
             </Button>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { Footer } from "@/components/footer"
 
 export default function BoatsPage() {
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-white">
       <Navigation />
       <BoatsSection />
       <Footer />

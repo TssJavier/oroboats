@@ -4,7 +4,7 @@ import { Footer } from "@/components/footer"
 
 export default function FiestasPage() {
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-white">
       <Navigation />
       <FiestasSection />
       <Footer />
