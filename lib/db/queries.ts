@@ -130,7 +130,7 @@ export async function getSetting(key: string) {
   return result[0]
 }
 
-export async function updateSetting(key: string, value: any, description?: string) {
+export async function updateSetting(key: string, value: unknown, description?: string) {
   return await db
     .insert(settings)
     .values({ key, value, description })
@@ -179,10 +179,8 @@ export async function removeDuplicateVehicles() {
   try {
     console.log("🧹 DB: Removing duplicate vehicles...")
 
-    // Obtener todos los vehículos
     const allVehicles = await db.select().from(vehicles).orderBy(vehicles.id)
 
-    // Agrupar por nombre para encontrar duplicados
     const vehicleGroups = allVehicles.reduce(
       (groups, vehicle) => {
         const key = vehicle.name.toLowerCase().trim()
@@ -195,12 +193,10 @@ export async function removeDuplicateVehicles() {
       {} as Record<string, typeof allVehicles>,
     )
 
-    // Eliminar duplicados (mantener el primero)
     let deletedCount = 0
     for (const [name, vehiclesList] of Object.entries(vehicleGroups)) {
       if (vehiclesList.length > 1) {
         console.log(`🔍 Found ${vehiclesList.length} duplicates for "${name}"`)
-        // Mantener el primero, eliminar el resto
         for (let i = 1; i < vehiclesList.length; i++) {
           await db.delete(vehicles).where(eq(vehicles.id, vehiclesList[i].id))
           deletedCount++

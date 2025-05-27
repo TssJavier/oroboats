@@ -5,16 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Euro, Calendar, Clock, TrendingUp, Ship } from "lucide-react"
 
+interface Booking {
+  id: number
+  customerName: string
+  customerEmail: string
+  totalPrice: string
+  status: string
+  createdAt: string
+}
+
 interface AdminStatsData {
   totalBookings: number
   totalRevenue: number
   pendingBookings: number
   todayBookings: number
-  recentBookings: any[]
+  recentBookings: Booking[]
 }
 
 export function AdminStats() {
-  // Update the stats state initialization and add better error handling
   const [stats, setStats] = useState<AdminStatsData>({
     totalBookings: 0,
     totalRevenue: 0,
@@ -28,7 +36,6 @@ export function AdminStats() {
     fetchStats()
   }, [])
 
-  // Update the fetchStats function with better error handling
   const fetchStats = async () => {
     try {
       const response = await fetch("/api/admin/stats")
@@ -44,8 +51,8 @@ export function AdminStats() {
       } else {
         console.error("Failed to fetch stats:", response.statusText)
       }
-    } catch (error) {
-      console.error("Error fetching stats:", error)
+    } catch (err) {
+      console.error("Error fetching stats:", err)
     } finally {
       setLoading(false)
     }
@@ -91,7 +98,6 @@ export function AdminStats() {
             <Euro className="h-4 w-4 text-gold" />
           </CardHeader>
           <CardContent>
-            {/* Update the revenue display to safely handle the number */}
             <div className="text-2xl font-bold text-black">€{(stats.totalRevenue || 0).toFixed(2)}</div>
             <p className="text-xs text-gray-500">Pagos confirmados</p>
           </CardContent>
@@ -142,22 +148,22 @@ export function AdminStats() {
                       <Ship className="h-5 w-5 text-black" />
                     </div>
                     <div>
-                      <p className="font-semibold text-black">{booking.booking.customerName}</p>
-                      <p className="text-sm text-gray-600">{booking.booking.customerEmail}</p>
+                      <p className="font-semibold text-black">{booking.customerName}</p>
+                      <p className="text-sm text-gray-600">{booking.customerEmail}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gold">€{booking.booking.totalPrice}</p>
+                    <p className="font-bold text-gold">€{booking.totalPrice}</p>
                     <Badge
                       className={
-                        booking.booking.status === "confirmed"
+                        booking.status === "confirmed"
                           ? "bg-green-600 text-white"
-                          : booking.booking.status === "pending"
+                          : booking.status === "pending"
                             ? "bg-yellow-600 text-white"
                             : "bg-gray-600 text-white"
                       }
                     >
-                      {booking.booking.status}
+                      {booking.status}
                     </Badge>
                   </div>
                 </div>

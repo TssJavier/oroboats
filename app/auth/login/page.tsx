@@ -37,7 +37,8 @@ export default function LoginPage() {
       } else {
         setError(data.error || "Error al iniciar sesión")
       }
-    } catch (error) {
+    } catch (err) {
+      console.error("Login error:", err)
       setError("Error de conexión")
     } finally {
       setLoading(false)
@@ -84,7 +85,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder=""
+                  placeholder="Introduce tu email"
                   required
                   disabled={loading}
                   className="bg-gray-50 border-gray-200"
@@ -101,7 +102,7 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder=""
+                    placeholder="••••••••"
                     required
                     disabled={loading}
                     className="bg-gray-50 border-gray-200 pr-10"
@@ -138,10 +139,6 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
-
-        {/* Información de desarrollo */}
-        <div className="text-center text-xs text-gray-500">
-        </div>
       </div>
     </div>
   )

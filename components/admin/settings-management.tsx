@@ -10,8 +10,21 @@ import { Save, Phone, MapPin, Clock, Calendar } from "lucide-react"
 interface Setting {
   id: number
   key: string
-  value: any
+  value: Record<string, unknown> | string | number
   description: string
+}
+
+interface ContactInfo {
+  [key: string]: unknown
+  phone: string
+  email: string
+  address: string
+}
+
+interface BusinessHours {
+  [key: string]: unknown
+  start: string
+  end: string
 }
 
 export function SettingsManagement() {
@@ -19,13 +32,12 @@ export function SettingsManagement() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Estados para los formularios
-  const [contactInfo, setContactInfo] = useState({
+  const [contactInfo, setContactInfo] = useState<ContactInfo>({
     phone: "",
     email: "",
     address: "",
   })
-  const [businessHours, setBusinessHours] = useState({
+  const [businessHours, setBusinessHours] = useState<BusinessHours>({
     start: "",
     end: "",
   })
@@ -41,28 +53,27 @@ export function SettingsManagement() {
       const data = await response.json()
       setSettings(data)
 
-      // Procesar configuraciones
       data.forEach((setting: Setting) => {
         switch (setting.key) {
           case "contact_info":
-            setContactInfo(setting.value)
+            setContactInfo(setting.value as ContactInfo)
             break
           case "business_hours":
-            setBusinessHours(setting.value)
+            setBusinessHours(setting.value as BusinessHours)
             break
           case "booking_advance_days":
-            setBookingAdvanceDays(setting.value)
+            setBookingAdvanceDays(setting.value as number)
             break
         }
       })
-    } catch (error) {
-      console.error("Error fetching settings:", error)
+    } catch (err) {
+      console.error("Error fetching settings:", err)
     } finally {
       setLoading(false)
     }
   }
 
-  const saveSetting = async (key: string, value: any, description: string) => {
+  const saveSetting = async (key: string, value: Record<string, unknown> | string | number, description: string) => {
     setSaving(true)
     try {
       await fetch("/api/settings", {
@@ -70,8 +81,8 @@ export function SettingsManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value, description }),
       })
-    } catch (error) {
-      console.error("Error saving setting:", error)
+    } catch (err) {
+      console.error("Error saving setting:", err)
     } finally {
       setSaving(false)
     }
@@ -118,7 +129,6 @@ export function SettingsManagement() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Información de Contacto */}
         <Card className="bg-white border border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-black flex items-center">
@@ -171,7 +181,6 @@ export function SettingsManagement() {
           </CardContent>
         </Card>
 
-        {/* Horarios de Negocio */}
         <Card className="bg-white border border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-black flex items-center">
@@ -221,7 +230,6 @@ export function SettingsManagement() {
           </CardContent>
         </Card>
 
-        {/* Configuración de Reservas */}
         <Card className="bg-white border border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-black flex items-center">
@@ -259,7 +267,6 @@ export function SettingsManagement() {
           </CardContent>
         </Card>
 
-        {/* Información del Sistema */}
         <Card className="bg-white border border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-black flex items-center">

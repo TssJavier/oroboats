@@ -16,7 +16,6 @@ interface ImageUploadProps {
   className?: string
 }
 
-// Función para validar y normalizar URLs
 function normalizeImageUrl(url: string): { isValid: boolean; normalizedUrl: string; error?: string } {
   if (!url.trim()) {
     return { isValid: false, normalizedUrl: "", error: "URL vacía" }
@@ -24,7 +23,6 @@ function normalizeImageUrl(url: string): { isValid: boolean; normalizedUrl: stri
 
   const trimmedUrl = url.trim()
 
-  // Si es una URL completa (http/https), validarla
   if (trimmedUrl.startsWith("http")) {
     try {
       new URL(trimmedUrl)
@@ -34,17 +32,14 @@ function normalizeImageUrl(url: string): { isValid: boolean; normalizedUrl: stri
     }
   }
 
-  // Si no empieza con /assets/, añadirlo automáticamente
   let normalizedUrl = trimmedUrl
   if (!normalizedUrl.startsWith("/assets/")) {
-    // Remover / inicial si existe para evitar //assets/
     if (normalizedUrl.startsWith("/")) {
       normalizedUrl = normalizedUrl.substring(1)
     }
     normalizedUrl = `/assets/${normalizedUrl}`
   }
 
-  // Validar que tenga una extensión de imagen
   const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
   const hasValidExtension = imageExtensions.some((ext) => normalizedUrl.toLowerCase().endsWith(ext))
 
@@ -67,7 +62,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
   const [inputValue, setInputValue] = useState(value)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Verificar si una URL existe
   const checkUrl = async (url: string) => {
     const { isValid, normalizedUrl, error } = normalizeImageUrl(url)
 
@@ -81,7 +75,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
 
     try {
       if (normalizedUrl.startsWith("http")) {
-        // Para URLs externas, intentar cargar la imagen
         const img = new window.Image()
         img.onload = () => {
           setUrlError("")
@@ -94,7 +87,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
         }
         img.src = normalizedUrl
       } else {
-        // Para rutas locales, verificar en el servidor
         const response = await fetch("/api/upload/check", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -109,14 +101,14 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
           onChange(normalizedUrl)
         }
       }
-    } catch (error) {
+    } catch (err) {
+      console.error("Error checking URL:", err)
       setUrlError("Error al verificar la URL")
     } finally {
       setUrlChecking(false)
     }
   }
 
-  // Manejar subida de archivo
   const handleFileUpload = async (file: File) => {
     setUploading(true)
 
@@ -139,14 +131,14 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
       } else {
         setUrlError(result.error || "Error al subir archivo")
       }
-    } catch (error) {
+    } catch (err) {
+      console.error("Error uploading file:", err)
       setUrlError("Error al subir archivo")
     } finally {
       setUploading(false)
     }
   }
 
-  // Manejar selección de archivo
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -154,7 +146,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
     }
   }
 
-  // Manejar drag & drop
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
@@ -177,7 +168,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
     setDragOver(false)
   }
 
-  // Manejar cambio en el input
   const handleInputChange = (newValue: string) => {
     setInputValue(newValue)
     setUrlError("")
@@ -187,19 +177,16 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
       return
     }
 
-    // Validar en tiempo real
     const { isValid, normalizedUrl, error } = normalizeImageUrl(newValue)
     if (!isValid) {
       setUrlError(error || "URL inválida")
     } else {
-      // Si es válida, actualizar el valor normalizado
       if (normalizedUrl !== newValue) {
         setInputValue(normalizedUrl)
       }
     }
   }
 
-  // Obtener URL segura para mostrar
   const getSafeImageUrl = () => {
     if (!value) return "/placeholder.svg"
 
@@ -209,7 +196,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Vista previa de imagen actual */}
       {value && (
         <Card className="relative">
           <CardContent className="p-4">
@@ -238,7 +224,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
         </Card>
       )}
 
-      {/* Área de subida */}
       <Card
         className={`border-2 border-dashed transition-colors ${
           dragOver
@@ -280,7 +265,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
         </CardContent>
       </Card>
 
-      {/* Input de archivo oculto */}
       <input
         ref={fileInputRef}
         type="file"
@@ -290,7 +274,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
         disabled={uploading}
       />
 
-      {/* Input manual de URL */}
       <div className="space-y-2">
         <label className="block text-sm font-medium text-gray-700">O introduce la ruta de la imagen:</label>
         <div className="flex gap-2">
@@ -338,7 +321,6 @@ export function ImageUpload({ value, onChange, vehicleType, className }: ImageUp
         </div>
       </div>
 
-      {/* Información adicional */}
       <div className="text-xs text-gray-500 space-y-1">
         <p>
           <strong>Recomendado:</strong> Sube la imagen para mejor rendimiento

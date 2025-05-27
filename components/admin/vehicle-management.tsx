@@ -21,34 +21,28 @@ interface Vehicle {
   available: boolean
 }
 
-// Función para validar URLs
 function isValidUrl(string: string): boolean {
   try {
     new URL(string)
     return true
-  } catch (_) {
+  } catch {
     return false
   }
 }
 
-// Función para validar URLs de imagen
 function isValidImageUrl(url: string): boolean {
   if (!url) return false
 
-  // Verificar si es una URL válida
   if (!isValidUrl(url) && !url.startsWith("/")) {
     return false
   }
 
-  // Verificar extensiones de imagen comunes
   const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
   const hasValidExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
 
-  // Permitir rutas locales que empiecen con / o URLs válidas
   return url.startsWith("/") || hasValidExtension
 }
 
-// Componente para manejar imágenes con error
 function SafeImage({
   src,
   alt,
@@ -65,13 +59,11 @@ function SafeImage({
   const [imageError, setImageError] = useState(false)
   const [imageSrc, setImageSrc] = useState(src)
 
-  // Resetear error cuando cambia la src
   useEffect(() => {
     setImageError(false)
     setImageSrc(src)
   }, [src])
 
-  // Verificar si la URL es válida
   const isValid = isValidImageUrl(src)
 
   if (!isValid || imageError) {
@@ -128,8 +120,8 @@ export function VehicleManagement() {
         setVehicles([])
         setError("Error: Los datos recibidos no son válidos")
       }
-    } catch (error) {
-      console.error("Error fetching vehicles:", error)
+    } catch (err) {
+      console.error("Error fetching vehicles:", err)
       setVehicles([])
       setError("Error al cargar los vehículos. Verifica la conexión a la base de datos.")
     } finally {
@@ -147,8 +139,8 @@ export function VehicleManagement() {
       } else {
         setError("Error al eliminar el producto")
       }
-    } catch (error) {
-      console.error("Error deleting vehicle:", error)
+    } catch (err) {
+      console.error("Error deleting vehicle:", err)
       setError("Error al eliminar el producto")
     }
   }
@@ -165,8 +157,8 @@ export function VehicleManagement() {
       } else {
         setError("Error al actualizar la disponibilidad")
       }
-    } catch (error) {
-      console.error("Error toggling availability:", error)
+    } catch (err) {
+      console.error("Error toggling availability:", err)
       setError("Error al actualizar la disponibilidad")
     }
   }
@@ -177,7 +169,6 @@ export function VehicleManagement() {
     fetchVehicles()
   }
 
-  // Show error state
   if (error) {
     return (
       <div className="space-y-8">
@@ -229,7 +220,7 @@ export function VehicleManagement() {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(3)].map((_, i) => (
+          {[...Array(3)].map((__, i) => (
             <Card key={i} className="animate-pulse">
               <div className="h-48 bg-gray-200"></div>
               <CardHeader>
@@ -299,7 +290,6 @@ export function VehicleManagement() {
                     {vehicle.type === "jetski" ? <Zap className="h-3 w-3" /> : <Ship className="h-3 w-3" />}
                   </Badge>
                 </div>
-                {/* Indicador de imagen inválida */}
                 {!isValidImageUrl(vehicle.image) && (
                   <div className="absolute top-2 left-2">
                     <Badge className="bg-orange-500 text-white text-xs">

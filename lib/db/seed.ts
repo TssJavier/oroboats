@@ -5,7 +5,6 @@ import { vehicles, settings } from "./schema"
 import path from "path"
 import fs from "fs"
 
-// Verificar que el archivo .env.local existe
 const envPath = path.resolve(process.cwd(), ".env.local")
 console.log("🔍 Looking for .env.local at:", envPath)
 console.log("📁 File exists:", fs.existsSync(envPath))
@@ -16,21 +15,16 @@ if (fs.existsSync(envPath)) {
   console.log(content.split("\n").slice(0, 5).join("\n") + "...")
 }
 
-// Cargar variables de entorno
 config({ path: envPath })
-
-// También intentar cargar desde .env
 config({ path: path.resolve(process.cwd(), ".env") })
 
 async function seed() {
   console.log("🌱 Seeding database...")
 
-  // Debug: mostrar variables de entorno
   console.log("🔍 Checking environment variables...")
   console.log("NODE_ENV:", process.env.NODE_ENV)
   console.log("POSTGRES_URL_NON_POOLING exists:", !!process.env.POSTGRES_URL_NON_POOLING)
 
-  // Intentar diferentes nombres de variables
   const connectionString =
     process.env.POSTGRES_URL_NON_POOLING ||
     process.env.DATABASE_URL ||
@@ -51,7 +45,6 @@ async function seed() {
 
   console.log("🔗 Connecting to Supabase...")
 
-  // Crear cliente con configuración SSL para Supabase
   const client = postgres(connectionString, {
     prepare: false,
     ssl: "require",
@@ -67,7 +60,6 @@ async function seed() {
 
     console.log("📦 Inserting vehicles...")
 
-    // Insertar vehículos actuales
     const vehiclesData = [
       {
         name: "GTX 130",
@@ -113,23 +105,26 @@ async function seed() {
       },
     ]
 
-    // Insertar vehículos
     for (const vehicle of vehiclesData) {
       try {
         const result = await db.insert(vehicles).values(vehicle).returning()
         console.log(`✅ Inserted vehicle: ${vehicle.name} (ID: ${result[0].id})`)
-      } catch (error: any) {
-        if (error.message?.includes("duplicate") || error.code === "23505") {
-          console.log(`⚠️  Vehicle ${vehicle.name} already exists, skipping...`)
+      } catch (vehicleError: unknown) {
+        if (vehicleError && typeof vehicleError === "object" && "message" in vehicleError) {
+          const errorMessage = vehicleError.message as string
+          if (errorMessage?.includes("duplicate") || (vehicleError as { code?: string }).code === "23505") {
+            console.log(`⚠️  Vehicle ${vehicle.name} already exists, skipping...`)
+          } else {
+            console.error(`❌ Error inserting ${vehicle.name}:`, errorMessage)
+          }
         } else {
-          console.error(`❌ Error inserting ${vehicle.name}:`, error.message)
+          console.error(`❌ Error inserting ${vehicle.name}:`, vehicleError)
         }
       }
     }
 
     console.log("⚙️  Inserting settings...")
 
-    // Configuración inicial
     const settingsData = [
       {
         key: "business_hours",
@@ -152,7 +147,6 @@ async function seed() {
       },
     ]
 
-    // Insertar configuraciones
     for (const setting of settingsData) {
       try {
         await db
@@ -163,8 +157,12 @@ async function seed() {
             set: { value: setting.value, updatedAt: new Date() },
           })
         console.log(`✅ Upserted setting: ${setting.key}`)
-      } catch (error: any) {
-        console.error(`❌ Error inserting setting ${setting.key}:`, error.message)
+      } catch (settingError: unknown) {
+        if (settingError && typeof settingError === "object" && "message" in settingError) {
+          console.error(`❌ Error inserting setting ${setting.key}:`, settingError.message)
+        } else {
+          console.error(`❌ Error inserting setting ${setting.key}:`, settingError)
+        }
       }
     }
 
@@ -176,13 +174,11 @@ async function seed() {
     console.error("❌ Error seeding database:", error)
     process.exit(1)
   } finally {
-    // Cerrar conexión
     await client.end()
     console.log("🔌 Database connection closed")
   }
 }
 
-// Ejecutar seed
 seed().catch((error) => {
   console.error("❌ Seed script failed:", error)
   process.exit(1)
