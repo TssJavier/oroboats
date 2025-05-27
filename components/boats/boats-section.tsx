@@ -159,7 +159,7 @@ export function BoatsSection() {
           <TabsContent value="jetskis" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
               {jetskis.map((jetski) => (
-                <VehicleCard key={jetski.id} vehicle={jetski} type="jetski" t={t} />
+                <VehicleCard key={jetski.id} vehicle={jetski} t={t} />
               ))}
             </div>
           </TabsContent>
@@ -167,7 +167,7 @@ export function BoatsSection() {
           <TabsContent value="boats" className="mt-0">
             <div className="grid grid-cols-1 gap-8 max-w-3xl mx-auto">
               {boats.map((boat) => (
-                <VehicleCard key={boat.id} vehicle={boat} type="boat" t={t} />
+                <VehicleCard key={boat.id} vehicle={boat} t={t} />
               ))}
             </div>
           </TabsContent>
@@ -177,7 +177,7 @@ export function BoatsSection() {
   )
 }
 
-function VehicleCard({ vehicle, type, t }: { vehicle: Vehicle; type: string; t: Translations }) {
+function VehicleCard({ vehicle, t }: { vehicle: Vehicle; t: Translations }) {
   const getLowestPrice = () => {
     return Math.min(...vehicle.pricing.map((p) => p.price))
   }
