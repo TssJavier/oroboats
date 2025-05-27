@@ -6,6 +6,7 @@ import { VehicleManagement } from "./vehicle-management"
 import { BookingManagement } from "./booking-management"
 import { SettingsManagement } from "./settings-management"
 import { AdminStats } from "./admin-stats"
+import { AdminHeader } from "./admin-header"
 import { Ship, Calendar, Settings, BarChart3 } from "lucide-react"
 
 export function AdminDashboard() {
@@ -14,12 +15,7 @@ export function AdminDashboard() {
   return (
     <section className="py-24 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">Panel de Administración</h1>
-          <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">
-            Gestiona productos, reservas y configuración de OroBoats
-          </p>
-        </div>
+        <AdminHeader />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-4 mb-16 bg-white border border-gray-200 h-16 p-2">
