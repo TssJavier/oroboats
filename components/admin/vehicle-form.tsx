@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Plus, Trash2, Save, AlertTriangle, CheckCircle } from "lucide-react"
+import { ImageUpload } from "./image-upload"
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react"
 
 interface Vehicle {
   id?: number
@@ -28,33 +29,6 @@ interface VehicleFormProps {
   onCancel: () => void
 }
 
-// Función para validar URLs
-function isValidUrl(string: string): boolean {
-  try {
-    new URL(string)
-    return true
-  } catch (_) {
-    return false
-  }
-}
-
-// Función para validar URLs de imagen
-function isValidImageUrl(url: string): boolean {
-  if (!url) return false
-
-  // Verificar si es una URL válida o ruta local
-  if (!isValidUrl(url) && !url.startsWith("/")) {
-    return false
-  }
-
-  // Verificar extensiones de imagen comunes
-  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
-  const hasValidExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
-
-  // Permitir rutas locales que empiecen con / o URLs válidas con extensión de imagen
-  return url.startsWith("/") || hasValidExtension
-}
-
 export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) {
   const [formData, setFormData] = useState<Vehicle>({
     name: "",
@@ -69,7 +43,6 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
   })
   const [newInclude, setNewInclude] = useState("")
   const [loading, setLoading] = useState(false)
-  const [imageUrlError, setImageUrlError] = useState("")
 
   useEffect(() => {
     if (vehicle) {
@@ -77,28 +50,8 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     }
   }, [vehicle])
 
-  // Validar URL de imagen cuando cambie
-  useEffect(() => {
-    if (formData.image) {
-      if (isValidImageUrl(formData.image)) {
-        setImageUrlError("")
-      } else {
-        setImageUrlError("URL de imagen inválida. Debe ser una URL completa (https://...) o ruta local (/assets/...)")
-      }
-    } else {
-      setImageUrlError("")
-    }
-  }, [formData.image])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Validar URL de imagen antes de enviar
-    if (formData.image && !isValidImageUrl(formData.image)) {
-      setImageUrlError("Por favor, corrige la URL de la imagen antes de guardar")
-      return
-    }
-
     setLoading(true)
 
     try {
@@ -220,34 +173,6 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">URL de la imagen</label>
-                <Input
-                  value={formData.image}
-                  onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  placeholder="/assets/motos/moto1.png o https://ejemplo.com/imagen.jpg"
-                  required
-                  className={`bg-gray-50 ${imageUrlError ? "border-red-300" : "border-gray-200"}`}
-                />
-                {imageUrlError && (
-                  <div className="mt-2 flex items-center text-red-600 text-sm">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
-                    {imageUrlError}
-                  </div>
-                )}
-                {formData.image && !imageUrlError && (
-                  <div className="mt-2 flex items-center text-green-600 text-sm">
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    URL válida
-                  </div>
-                )}
-                <div className="mt-2 text-xs text-gray-500">
-                  <strong>Ejemplos válidos:</strong>
-                  <br />• Ruta local: /assets/motos/moto1.png
-                  <br />• URL completa: https://ejemplo.com/imagen.jpg
-                </div>
-              </div>
-
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
                 <Textarea
                   value={formData.description}
@@ -283,67 +208,82 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
             </CardContent>
           </Card>
 
-          {/* Precios */}
+          {/* Imagen */}
           <Card className="bg-white border border-gray-200">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-black">Precios</CardTitle>
-              <CardDescription>Configura los precios por duración</CardDescription>
+              <CardTitle className="text-xl font-bold text-black">Imagen del Producto</CardTitle>
+              <CardDescription>Sube o selecciona una imagen para el producto</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {formData.pricing.map((price, index) => (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Duración</label>
-                    <Input
-                      value={price.duration}
-                      onChange={(e) => updatePricing(index, "duration", e.target.value)}
-                      placeholder="30min, 1hour, halfday..."
-                      className="bg-gray-50 border-gray-200"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Precio (€)</label>
-                    <Input
-                      type="number"
-                      value={price.price}
-                      onChange={(e) => updatePricing(index, "price", Number.parseInt(e.target.value))}
-                      min="0"
-                      className="bg-gray-50 border-gray-200"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Etiqueta</label>
-                    <Input
-                      value={price.label}
-                      onChange={(e) => updatePricing(index, "label", e.target.value)}
-                      placeholder="30 min, 1 hora..."
-                      className="bg-gray-50 border-gray-200"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removePricing(index)}
-                    className="border-red-300 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={addPricing}
-                className="w-full border-gray-300 hover:border-gold hover:text-gold"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir precio
-              </Button>
+            <CardContent>
+              <ImageUpload
+                value={formData.image}
+                onChange={(url) => setFormData({ ...formData, image: url })}
+                vehicleType={formData.type as "boat" | "jetski"}
+              />
             </CardContent>
           </Card>
         </div>
+
+        {/* Precios */}
+        <Card className="bg-white border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-black">Precios</CardTitle>
+            <CardDescription>Configura los precios por duración</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {formData.pricing.map((price, index) => (
+              <div key={index} className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Duración</label>
+                  <Input
+                    value={price.duration}
+                    onChange={(e) => updatePricing(index, "duration", e.target.value)}
+                    placeholder="30min, 1hour, halfday..."
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio (€)</label>
+                  <Input
+                    type="number"
+                    value={price.price}
+                    onChange={(e) => updatePricing(index, "price", Number.parseInt(e.target.value))}
+                    min="0"
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Etiqueta</label>
+                  <Input
+                    value={price.label}
+                    onChange={(e) => updatePricing(index, "label", e.target.value)}
+                    placeholder="30 min, 1 hora..."
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removePricing(index)}
+                  className="border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addPricing}
+              className="w-full border-gray-300 hover:border-gold hover:text-gold"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Añadir precio
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Incluye */}
         <Card className="bg-white border border-gray-200">
@@ -387,7 +327,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
           </Button>
           <Button
             type="submit"
-            disabled={loading || !!imageUrlError}
+            disabled={loading}
             className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 disabled:opacity-50"
           >
             <Save className="h-4 w-4 mr-2" />
