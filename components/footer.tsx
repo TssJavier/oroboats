@@ -56,11 +56,11 @@ export function Footer() {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-gold" />
-                <span className="text-white/80">vip@oroboats.com</span>
+                <span className="text-white/80">info@oroboats.com</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="h-5 w-5 text-gold" />
-                <span className="text-white/80">+34 123 456 789</span>
+                <span className="text-white/80">+34 655 52 79 88</span>
               </div>
             </div>
           </div>

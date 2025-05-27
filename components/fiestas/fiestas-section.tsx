@@ -19,7 +19,7 @@ const translations = {
       title: "¿Por qué elegir nuestras fiestas en barco?",
       items: [
         "Barcos de lujo con sistema de sonido premium",
-        "Capacidad para grupos grandes (hasta 20 personas)",
+        "Capacidad para grupos grandes (hasta 8 personas)",
         "Servicio de catering y bebidas incluido",
         "Ubicaciones exclusivas en alta mar",
         "Fotografía profesional incluida",
