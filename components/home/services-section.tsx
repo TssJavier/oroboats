@@ -125,7 +125,7 @@ export function ServicesSection() {
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full border-gold/50 text-gold hover:bg-gold hover:text-black transition-all duration-300 font-semibold"
+                  className="w-full border-gold/50 text-white bg-black/20 hover:bg-gold hover:text-black transition-all duration-300 font-semibold"
                 >
                   <Link href={service.href}>{service.action}</Link>
                 </Button>

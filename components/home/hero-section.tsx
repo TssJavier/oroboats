@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Waves, Sparkles } from "lucide-react"
+import { ArrowRight, ChevronDown } from "lucide-react"
 import Link from "next/link"
 import { useApp } from "@/components/providers"
 
@@ -46,7 +46,11 @@ export function HeroSection() {
       {/* Main content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="mb-8 animate-fade-in">
-          <Sparkles className="h-16 w-16 text-gold mx-auto mb-6 animate-pulse" />
+          <div className="h-16 w-16 text-gold mx-auto mb-6 animate-pulse">
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+          </div>
         </div>
 
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-playfair font-bold text-white mb-4 animate-slide-up">
@@ -61,7 +65,7 @@ export function HeroSection() {
           {t.description}
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center animate-slide-up delay-600">
+        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center animate-slide-up delay-600 mb-25">
           <Button
             asChild
             size="lg"
@@ -76,8 +80,7 @@ export function HeroSection() {
           <Button
             asChild
             size="lg"
-            variant="outline"
-            className="border-2 border-gold text-gold hover:bg-gold hover:text-black transition-all duration-500 transform hover:scale-105 font-semibold text-lg px-8 py-4"
+            className="bg-white text-black font-bold text-lg px-8 py-4 hover:bg-gray-100 transition-all duration-500 transform hover:scale-105 border-2 border-white hover:border-gold"
           >
             <Link href="/boats?type=sale">{t.buyNow}</Link>
           </Button>
@@ -85,27 +88,22 @@ export function HeroSection() {
           <Button
             asChild
             size="lg"
-            variant="outline"
-            className="border-2 border-white/30 text-white hover:bg-white hover:text-black transition-all duration-500 transform hover:scale-105 font-semibold text-lg px-8 py-4"
+            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-lg px-8 py-4 hover:from-purple-700 hover:to-pink-700 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/25"
           >
             <Link href="/fiestas">{t.parties}</Link>
           </Button>
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <div className="flex flex-col items-center text-white/60">
-            <span className="text-sm mb-2">{t.scroll}</span>
-            <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-              <div className="w-1 h-3 bg-gold rounded-full mt-2 animate-pulse"></div>
+        {/* Scroll indicator - mejorado */}
+        <div className="absolute bottom-18 left-1/2 transform -translate-x-1/2 mt-10">
+          <div className="flex flex-col items-center text-white/60 cursor-pointer group">
+            <span className="text-sm mb-3 group-hover:text-gold transition-colors duration-300">{t.scroll}</span>
+            <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center group-hover:border-gold/50 transition-colors duration-300">
+              <div className="w-1 h-3 bg-gold rounded-full mt-2 animate-bounce"></div>
             </div>
+            <ChevronDown className="h-5 w-5 mt-2 animate-bounce text-gold/70" />
           </div>
         </div>
-      </div>
-
-      {/* Floating waves decoration */}
-      <div className="absolute bottom-0 left-0 right-0 opacity-10">
-        <Waves className="w-full h-32 text-gold" />
       </div>
     </section>
   )

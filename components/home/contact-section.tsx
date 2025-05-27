@@ -63,7 +63,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <p className="text-white/60 text-sm">{t.phone}</p>
-                  <p className="text-white text-lg font-semibold">+34 123 456 789</p>
+                  <p className="text-white text-lg font-semibold">+34 655 52 79 88</p>
                 </div>
               </div>
 
@@ -73,7 +73,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <p className="text-white/60 text-sm">{t.emailLabel}</p>
-                  <p className="text-white text-lg font-semibold">vip@oroboats.com</p>
+                  <p className="text-white text-lg font-semibold">info@oroboats.com</p>
                 </div>
               </div>
 
@@ -83,7 +83,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <p className="text-white/60 text-sm">{t.whatsapp}</p>
-                  <p className="text-white text-lg font-semibold">+34 123 456 789</p>
+                  <p className="text-white text-lg font-semibold">+34 655 52 79 88</p>
                 </div>
               </div>
             </CardContent>
