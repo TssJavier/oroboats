@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, User, Globe, Crown } from "lucide-react"
+import { Menu, X, User, Globe, Crown, Ship } from "lucide-react"
 import { useApp } from "@/components/providers"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -42,14 +42,13 @@ export function Navigation() {
 
   return (
     <nav
-      className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        scrolled ? "bg-black/95 backdrop-blur-md border-b border-gold/20" : "bg-transparent"
-      }`}
+      className={`fixed top-0 w-full z-50 transition-all duration-500 ${scrolled ? "bg-black/95 backdrop-blur-md border-b border-gold/20" : "bg-transparent"
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <Link href="/" className="flex items-center space-x-2 group">
-            <Crown className="h-8 w-8 text-gold transition-transform group-hover:scale-110" />
+            <Ship className="h-8 w-8 text-gold transition-transform group-hover:scale-110" />
             <span className="text-2xl font-playfair font-bold text-white">
               Oro<span className="text-gold">Boats</span>
             </span>

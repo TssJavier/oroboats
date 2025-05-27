@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Zap, Shield, Crown, Star } from "lucide-react"
+import { Zap, Crown, Star } from 'lucide-react'
 import Link from "next/link"
 import { useApp } from "@/components/providers"
 
@@ -12,7 +12,7 @@ const translations = {
     subtitle: "Excelencia en cada detalle para una experiencia inolvidable",
     boats: {
       title: "Flota de Lujo",
-      description: "Barcos premium con acabados de primera clase y tecnología de vanguardia",
+      description: "Barcos premium con acabados de primera clase",
       action: "Ver Flota",
     },
     jetskis: {
@@ -24,11 +24,6 @@ const translations = {
       title: "Reserva VIP",
       description: "Sistema de reservas premium con atención personalizada 24/7",
       action: "Reservar",
-    },
-    safety: {
-      title: "Seguridad Total",
-      description: "Equipos certificados y seguros premium incluidos en todos los servicios",
-      action: "Más Info",
     },
   },
   en: {
@@ -48,11 +43,6 @@ const translations = {
       title: "VIP Booking",
       description: "Premium booking system with personalized 24/7 attention",
       action: "Book Now",
-    },
-    safety: {
-      title: "Total Safety",
-      description: "Certified equipment and premium insurance included in all services",
-      action: "More Info",
     },
   },
 }
@@ -86,14 +76,6 @@ export function ServicesSection() {
       href: "/boats",
       gradient: "from-purple-500 to-pink-500",
     },
-    {
-      icon: Shield,
-      title: t.safety.title,
-      description: t.safety.description,
-      action: t.safety.action,
-      href: "/safety",
-      gradient: "from-green-500 to-emerald-500",
-    },
   ]
 
   return (
@@ -104,7 +86,7 @@ export function ServicesSection() {
           <p className="text-xl md:text-2xl text-white/70 max-w-4xl mx-auto leading-relaxed">{t.subtitle}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {services.map((service, index) => (
             <Card
               key={index}

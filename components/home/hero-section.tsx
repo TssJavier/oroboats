@@ -1,9 +1,9 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight, ChevronDown } from "lucide-react"
 import Link from "next/link"
 import { useApp } from "@/components/providers"
+import { ArrowRight, ChevronDown, Anchor } from 'lucide-react'
 
 const translations = {
   es: {
@@ -46,11 +46,7 @@ export function HeroSection() {
       {/* Main content */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <div className="mb-8 animate-fade-in">
-          <div className="h-16 w-16 text-gold mx-auto mb-6 animate-pulse">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-          </div>
+        <Anchor className="h-16 w-16 text-gold mx-auto mb-6 animate-pulse" />
         </div>
 
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-playfair font-bold text-white mb-4 animate-slide-up">

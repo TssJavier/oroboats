@@ -7,18 +7,18 @@ const translations = {
   es: {
     title: "Ubicación Exclusiva",
     subtitle: "Encuéntranos en el puerto más prestigioso de la costa",
-    address: "Puerto Deportivo Marina Premium",
-    location: "Muelle VIP 15, Valencia",
+    address: "Puerto de Carboneras, Almería",
+    location: "Carboneras, Almería",
     hours: "Abierto todos los días: 9:00 - 21:00",
-    phone: "+34 123 456 789",
+    phone: "+34 655 52 79 88",
   },
   en: {
     title: "Exclusive Location",
     subtitle: "Find us at the most prestigious marina on the coast",
-    address: "Marina Premium Sports Port",
-    location: "VIP Dock 15, Valencia",
+    address: "Puerto de Carboneras, Almería",
+    location: "Carboneras, Almería",
     hours: "Open every day: 9:00 AM - 9:00 PM",
-    phone: "+34 123 456 789",
+    phone: "+34 655 52 79 88",
   },
 }
 
