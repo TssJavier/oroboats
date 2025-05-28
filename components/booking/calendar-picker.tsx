@@ -120,8 +120,13 @@ export function CalendarPicker({ vehicleId, selectedDate, onDateSelect }: Calend
 
     // Generar 42 días (6 semanas)
     for (let i = 0; i < 42; i++) {
-      const dateString = current.toISOString().split("T")[0]
-      const isCurrentMonth = current.getMonth() === month
+      // Crear la fecha en zona horaria local para evitar problemas de UTC
+      const year = current.getFullYear()
+      const monthNum = current.getMonth() + 1
+      const month = monthNum.toString().padStart(2, "0")
+      const day = current.getDate().toString().padStart(2, "0")
+      const dateString = `${year}-${month}-${day}`
+      const isCurrentMonth = current.getMonth() === currentDate.getMonth()
       const isPast = current < today
       const isToday = current.getTime() === today.getTime()
       const isSelected = dateString === selectedDate
@@ -158,6 +163,7 @@ export function CalendarPicker({ vehicleId, selectedDate, onDateSelect }: Calend
 
   const handleDateClick = (day: DayInfo) => {
     if (day.isAvailable) {
+      console.log("📅 Calendario: Seleccionando fecha:", day.date)
       onDateSelect(day.date)
     }
   }

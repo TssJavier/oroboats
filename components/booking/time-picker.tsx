@@ -55,6 +55,7 @@ const translations = {
     minutes: "Minutos",
     estimatedPrice: "Precio estimado",
     apply: "Aplicar",
+    todayInfo: "Hoy - Solo desde 30min después de la hora actual",
   },
   en: {
     selectDuration: "Select duration",
@@ -62,8 +63,7 @@ const translations = {
     noSlots: "No time slots available for this date",
     loading: "Loading time slots...",
     from: "From",
-    to: "To",
-    price: "Price",
+    to: "Price",
     selected: "Selected",
     customDuration: "Custom duration",
     selectCustomTime: "Select hours and minutes",
@@ -72,6 +72,7 @@ const translations = {
     minutes: "Minutes",
     estimatedPrice: "Estimated price",
     apply: "Apply",
+    todayInfo: "Today - Only from 30min after current time",
   },
 }
 
@@ -87,6 +88,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   const [customRatePerMinute, setCustomRatePerMinute] = useState<number>(0)
 
   useEffect(() => {
+    console.log("🎯 TimePicker: Fecha recibida:", selectedDate)
     if (selectedDate) {
       fetchAvailableSlots()
       fetchCustomRate()
@@ -122,32 +124,25 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   }
 
   const calculateCustomPrice = (hours: number, minutes: number): number => {
-    // Convertir a minutos totales
     const totalMinutes = hours * 60 + minutes
 
-    // Usar la tarifa personalizada configurada
     if (customRatePerMinute > 0) {
       return Math.round(customRatePerMinute * totalMinutes)
     } else {
-      // Si no hay tarifa personalizada, calcular basado en las opciones existentes
       const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
-
-      // Intentar encontrar una tarifa por hora
       const hourlyOption = pricingOptions.find((option) => option.duration === "1hour")
 
-      // Si no hay tarifa por hora, usar halfday dividido por 6
       if (!hourlyOption) {
         const halfdayOption = pricingOptions.find((option) => option.duration === "halfday")
         if (halfdayOption) {
-          const hourlyRate = halfdayOption.price / 6 // 6 horas = halfday
+          const hourlyRate = halfdayOption.price / 6
           return Math.round((hourlyRate / 60) * totalMinutes)
         }
       } else {
-        const hourlyRate = hourlyOption.price / 60 // precio por minuto
+        const hourlyRate = hourlyOption.price / 60
         return Math.round(hourlyRate * totalMinutes)
       }
 
-      // Fallback: usar un precio base de 2€ por minuto
       return Math.round(2 * totalMinutes)
     }
   }
@@ -157,8 +152,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     let totalMinutes = hours * 60 + minutes
 
     if (duration.startsWith("custom_")) {
-      // Formato: custom_2h30
-      const durationPart = duration.substring(7) // Quitar "custom_"
+      const durationPart = duration.substring(7)
       const hoursMatch = durationPart.match(/(\d+)h/)
       const minutesMatch = durationPart.match(/h(\d+)/)
 
@@ -178,10 +172,10 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
           totalMinutes += 120
           break
         case "halfday":
-          totalMinutes += 360 // 6 horas
+          totalMinutes += 360
           break
         case "fullday":
-          totalMinutes += 720 // 12 horas
+          totalMinutes += 720
           break
         default:
           totalMinutes += 60
@@ -202,7 +196,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     const [endHours, endMinutes] = endTime.split(":").map(Number)
     const endTimeMinutes = endHours * 60 + endMinutes
 
-    // Verificar que todos los slots hasta la hora de fin estén disponibles
     for (let i = startIndex; i < availableSlots.length; i++) {
       const slot = availableSlots[i]
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
@@ -228,10 +221,83 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     })
   }
 
+  // Función para obtener la hora actual en España
+  const getSpainTime = (): Date => {
+    return new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Madrid" }))
+  }
+
+  // Función para verificar si la fecha seleccionada es hoy en España
+  const isToday = (dateString: string): boolean => {
+    console.log("🔍 Verificando si es hoy - Fecha recibida:", dateString)
+
+    const spainTime = getSpainTime()
+    const selectedDate = new Date(dateString + "T00:00:00")
+
+    const todayInSpain = new Date(spainTime.getFullYear(), spainTime.getMonth(), spainTime.getDate())
+    const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
+
+    console.log("🗓️ Comparando fechas:")
+    console.log("Hoy en España:", todayInSpain.toDateString(), "Día:", todayInSpain.getDate())
+    console.log("Fecha seleccionada:", selectedDateOnly.toDateString(), "Día:", selectedDateOnly.getDate())
+    console.log("¿Es hoy?:", todayInSpain.getTime() === selectedDateOnly.getTime())
+
+    return todayInSpain.getTime() === selectedDateOnly.getTime()
+  }
+
   const getAvailableSlotsForDuration = () => {
     if (!selectedDuration) return []
 
-    return availableSlots.filter((slot) => slot.available && isSlotAvailable(slot.time, selectedDuration.duration))
+    const spainTime = getSpainTime()
+    const isSelectedDateToday = isToday(selectedDate)
+
+    console.log("=== FILTRADO DE SLOTS (ZONA HORARIA ESPAÑA) ===")
+    console.log("Fecha seleccionada:", selectedDate)
+    console.log("Es hoy:", isSelectedDateToday)
+    console.log("Hora actual España:", spainTime.toLocaleTimeString())
+    console.log("Día actual:", spainTime.getDate())
+    console.log("Día seleccionado:", new Date(selectedDate).getDate())
+
+    const filteredSlots = availableSlots.filter((slot) => {
+      // 1. Verificar disponibilidad básica
+      if (!slot.available) {
+        return false
+      }
+
+      // 2. Verificar duración disponible
+      if (!isSlotAvailable(slot.time, selectedDuration.duration)) {
+        return false
+      }
+
+      // 3. Si no es hoy, mostrar todos los slots disponibles
+      if (!isSelectedDateToday) {
+        console.log(`✅ Fecha futura - mostrando slot ${slot.time}`)
+        return true
+      }
+
+      // 4. Si es hoy, filtrar por tiempo (zona horaria España)
+      const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
+      const slotTimeInMinutes = slotHours * 60 + slotMinutes
+
+      // Calcular tiempo mínimo (hora actual España + 30 minutos)
+      const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
+      const minimumTimeInMinutes = currentTimeInMinutes + 30
+
+      const isInFuture = slotTimeInMinutes >= minimumTimeInMinutes
+
+      console.log(
+        `Slot ${slot.time} (${slotTimeInMinutes}min) vs Mínimo ${Math.floor(minimumTimeInMinutes / 60)}:${(minimumTimeInMinutes % 60).toString().padStart(2, "0")} (${minimumTimeInMinutes}min) = ${isInFuture ? "✅" : "❌"}`,
+      )
+
+      return isInFuture
+    })
+
+    console.log(
+      "Slots finales disponibles:",
+      filteredSlots.map((s) => s.time),
+    )
+    console.log("=========================")
+
+    return filteredSlots
   }
 
   const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
@@ -268,6 +334,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 </div>
               </button>
             ))}
+
             {/* Opción de duración personalizada */}
             <button
               onClick={() => setShowCustomDuration(!showCustomDuration)}
@@ -333,7 +400,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                     </div>
                     <Button
                       onClick={() => {
-                        const totalMinutes = customDuration.hours * 60 + customDuration.minutes
                         const durationStr = `${customDuration.hours}h${customDuration.minutes > 0 ? customDuration.minutes : ""}`
                         const customOption = {
                           duration: `custom_${durationStr}`,
@@ -361,10 +427,17 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
       {selectedDuration && (
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-6">
-            <h4 className="text-lg font-semibold text-black mb-4 flex items-center">
-              <Clock className="h-5 w-5 text-gold mr-2" />
-              {t.availableSlots}
-            </h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-black flex items-center">
+                <Clock className="h-5 w-5 text-gold mr-2" />
+                {t.availableSlots}
+              </h4>
+              {isToday(selectedDate) && (
+                <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  {t.todayInfo} ({getSpainTime().toLocaleTimeString()})
+                </div>
+              )}
+            </div>
 
             {loading ? (
               <div className="text-center py-8">
