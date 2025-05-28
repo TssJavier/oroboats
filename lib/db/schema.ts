@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, decimal, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, serial, text, integer, boolean, timestamp, decimal, jsonb, date, time } from "drizzle-orm/pg-core"
 
 // Tabla de vehículos (completamente gestionable por admin)
 export const vehicles = pgTable("vehicles", {
@@ -23,8 +23,9 @@ export const bookings = pgTable("bookings", {
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone").notNull(),
-  bookingDate: timestamp("booking_date").notNull(),
-  timeSlot: text("time_slot").notNull(), // "09:00-10:00"
+  bookingDate: date("booking_date").notNull(), // Solo fecha
+  startTime: time("start_time").notNull(), // Hora inicio
+  endTime: time("end_time").notNull(), // Hora fin
   duration: text("duration").notNull(), // '30min', '1hour', 'halfday', 'fullday'
   totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
   status: text("status").default("pending"), // 'pending', 'confirmed', 'cancelled', 'completed'
@@ -33,6 +34,28 @@ export const bookings = pgTable("bookings", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+// Configuración de horarios por vehículo
+export const vehicleAvailability = pgTable("vehicle_availability", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Domingo, 1=Lunes, etc.
+  startTime: time("start_time").notNull(),
+  endTime: time("end_time").notNull(),
+  isAvailable: boolean("is_available").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+// Días bloqueados globalmente (vacaciones, mantenimiento, etc.)
+export const blockedDates = pgTable("blocked_dates", {
+  id: serial("id").primaryKey(),
+  date: date("date").notNull(),
+  reason: text("reason").notNull(), // 'vacation', 'maintenance', 'weather', 'custom'
+  description: text("description"),
+  vehicleId: integer("vehicle_id").references(() => vehicles.id), // null = todos los vehículos
+  createdAt: timestamp("created_at").defaultNow(),
 })
 
 // Tabla de usuarios opcionales (para clientes frecuentes)
@@ -64,8 +87,21 @@ export const payments = pgTable("payments", {
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
   key: text("key").unique().notNull(),
-  value: jsonb("value").notNull(),
+  value: text("value").notNull(),
   description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+// Tabla de reglas de precios por vehículo
+export const pricingRules = pgTable("pricing_rules", {
+  id: serial("id").primaryKey(),
+  vehicleId: integer("vehicle_id")
+    .references(() => vehicles.id)
+    .notNull(),
+  duration: text("duration").notNull(), // '30min', '1hour', '2hour', 'halfday', 'fullday'
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  label: text("label").notNull(), // Texto visible para el cliente
+  createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })
 
@@ -74,6 +110,12 @@ export type Vehicle = typeof vehicles.$inferSelect
 export type NewVehicle = typeof vehicles.$inferInsert
 export type Booking = typeof bookings.$inferSelect
 export type NewBooking = typeof bookings.$inferInsert
+export type VehicleAvailability = typeof vehicleAvailability.$inferSelect
+export type NewVehicleAvailability = typeof vehicleAvailability.$inferInsert
+export type BlockedDate = typeof blockedDates.$inferSelect
+export type NewBlockedDate = typeof blockedDates.$inferInsert
 export type User = typeof users.$inferSelect
 export type Payment = typeof payments.$inferSelect
 export type Setting = typeof settings.$inferSelect
+export type PricingRule = typeof pricingRules.$inferSelect
+export type NewPricingRule = typeof pricingRules.$inferInsert

@@ -7,7 +7,8 @@ import { BookingManagement } from "./booking-management"
 import { SettingsManagement } from "./settings-management"
 import { AdminStats } from "./admin-stats"
 import { AdminHeader } from "./admin-header"
-import { Ship, Calendar, Settings, BarChart3 } from "lucide-react"
+import { PricingSettings } from "./pricing-settings"
+import { Ship, Calendar, Settings, BarChart3, DollarSign } from "lucide-react"
 
 export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("stats")
@@ -18,7 +19,7 @@ export function AdminDashboard() {
         <AdminHeader />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-4 mb-16 bg-white border border-gray-200 h-16 p-2">
+          <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-5 mb-16 bg-white border border-gray-200 h-16 p-2">
             <TabsTrigger
               value="stats"
               className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
@@ -32,6 +33,13 @@ export function AdminDashboard() {
             >
               <Ship className="h-5 w-5 mr-3" />
               Productos
+            </TabsTrigger>
+            <TabsTrigger
+              value="pricing"
+              className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
+            >
+              <DollarSign className="h-5 w-5 mr-3" />
+              Precios
             </TabsTrigger>
             <TabsTrigger
               value="bookings"
@@ -55,6 +63,10 @@ export function AdminDashboard() {
 
           <TabsContent value="vehicles" className="mt-0">
             <VehicleManagement />
+          </TabsContent>
+
+          <TabsContent value="pricing" className="mt-0">
+            <PricingSettings />
           </TabsContent>
 
           <TabsContent value="bookings" className="mt-0">

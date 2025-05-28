@@ -16,7 +16,6 @@ export default {
   driver: "pg",
   dbCredentials: {
     connectionString,
-    ssl: true, // Requerido para Supabase
   },
   verbose: true,
   strict: true,

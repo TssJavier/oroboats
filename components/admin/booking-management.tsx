@@ -66,18 +66,34 @@ export function BookingManagement() {
 
   const updateBookingStatus = async (id: number, status: string) => {
     try {
-      const response = await fetch(`/api/bookings/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      })
-      if (response.ok) {
-        fetchBookings()
+      // Si el estado es "cancelled", usar el endpoint específico de cancelación
+      if (status === "cancelled") {
+        const response = await fetch(`/api/bookings/${id}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        if (response.ok) {
+          fetchBookings()
+        } else {
+          setError("Error al cancelar la reserva")
+        }
       } else {
-        setError("Error al actualizar la reserva")
+        // Para otros estados, usar el endpoint normal
+        const response = await fetch(`/api/bookings/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        })
+
+        if (response.ok) {
+          fetchBookings()
+        } else {
+          setError("Error al actualizar la reserva")
+        }
       }
-    } catch (error) {
-      console.error("Error updating booking:", error)
+    } catch (err) {
+      console.error("Error updating booking:", err)
       setError("Error al actualizar la reserva")
     }
   }

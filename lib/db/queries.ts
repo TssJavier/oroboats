@@ -113,7 +113,12 @@ export async function getBookingsByDate(date: Date) {
   return await db
     .select()
     .from(bookings)
-    .where(and(gte(bookings.bookingDate, startOfDay), lte(bookings.bookingDate, endOfDay)))
+    .where(
+      and(
+        gte(bookings.bookingDate, startOfDay.toISOString()),
+        lte(bookings.bookingDate, endOfDay.toISOString())
+      )
+    )
 }
 
 export async function createBooking(booking: NewBooking) {
@@ -133,10 +138,10 @@ export async function getSetting(key: string) {
 export async function updateSetting(key: string, value: unknown, description?: string) {
   return await db
     .insert(settings)
-    .values({ key, value, description })
+    .values({ key, value: value === undefined ? "" : String(value), description })
     .onConflictDoUpdate({
       target: settings.key,
-      set: { value, updatedAt: new Date() },
+      set: { value: value === undefined ? "" : String(value), updatedAt: new Date() },
     })
 }
 
