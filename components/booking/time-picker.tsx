@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Euro, Loader2, Check } from "lucide-react"
+import { Clock, Euro, Loader2 } from "lucide-react"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
 
@@ -55,9 +55,6 @@ const translations = {
     minutes: "Minutos",
     estimatedPrice: "Precio estimado",
     apply: "Aplicar",
-    customSelected: "Personalizada:",
-    clickTimeSlot: "Haz clic en una hora de inicio",
-    selectedRange: "Rango seleccionado",
   },
   en: {
     selectDuration: "Select duration",
@@ -75,9 +72,6 @@ const translations = {
     minutes: "Minutes",
     estimatedPrice: "Estimated price",
     apply: "Apply",
-    customSelected: "Custom:",
-    clickTimeSlot: "Click on a start time",
-    selectedRange: "Selected range",
   },
 }
 
@@ -128,25 +122,32 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   }
 
   const calculateCustomPrice = (hours: number, minutes: number): number => {
+    // Convertir a minutos totales
     const totalMinutes = hours * 60 + minutes
 
+    // Usar la tarifa personalizada configurada
     if (customRatePerMinute > 0) {
       return Math.round(customRatePerMinute * totalMinutes)
     } else {
+      // Si no hay tarifa personalizada, calcular basado en las opciones existentes
       const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
+
+      // Intentar encontrar una tarifa por hora
       const hourlyOption = pricingOptions.find((option) => option.duration === "1hour")
 
+      // Si no hay tarifa por hora, usar halfday dividido por 6
       if (!hourlyOption) {
         const halfdayOption = pricingOptions.find((option) => option.duration === "halfday")
         if (halfdayOption) {
-          const hourlyRate = halfdayOption.price / 6
+          const hourlyRate = halfdayOption.price / 6 // 6 horas = halfday
           return Math.round((hourlyRate / 60) * totalMinutes)
         }
       } else {
-        const hourlyRate = hourlyOption.price / 60
+        const hourlyRate = hourlyOption.price / 60 // precio por minuto
         return Math.round(hourlyRate * totalMinutes)
       }
 
+      // Fallback: usar un precio base de 2€ por minuto
       return Math.round(2 * totalMinutes)
     }
   }
@@ -156,7 +157,8 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     let totalMinutes = hours * 60 + minutes
 
     if (duration.startsWith("custom_")) {
-      const durationPart = duration.substring(7)
+      // Formato: custom_2h30
+      const durationPart = duration.substring(7) // Quitar "custom_"
       const hoursMatch = durationPart.match(/(\d+)h/)
       const minutesMatch = durationPart.match(/h(\d+)/)
 
@@ -176,10 +178,10 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
           totalMinutes += 120
           break
         case "halfday":
-          totalMinutes += 360
+          totalMinutes += 360 // 6 horas
           break
         case "fullday":
-          totalMinutes += 720
+          totalMinutes += 720 // 12 horas
           break
         default:
           totalMinutes += 60
@@ -200,6 +202,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     const [endHours, endMinutes] = endTime.split(":").map(Number)
     const endTimeMinutes = endHours * 60 + endMinutes
 
+    // Verificar que todos los slots hasta la hora de fin estén disponibles
     for (let i = startIndex; i < availableSlots.length; i++) {
       const slot = availableSlots[i]
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
@@ -227,23 +230,8 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   const getAvailableSlotsForDuration = () => {
     if (!selectedDuration) return []
+
     return availableSlots.filter((slot) => slot.available && isSlotAvailable(slot.time, selectedDuration.duration))
-  }
-
-  // Función para verificar si un slot está dentro del rango seleccionado
-  const isSlotInSelectedRange = (slotTime: string): boolean => {
-    if (!selectedTime || !selectedDuration) return false
-
-    const [slotHours, slotMinutes] = slotTime.split(":").map(Number)
-    const slotTimeMinutes = slotHours * 60 + slotMinutes
-
-    const [startHours, startMinutes] = selectedTime.start.split(":").map(Number)
-    const startTimeMinutes = startHours * 60 + startMinutes
-
-    const [endHours, endMinutes] = selectedTime.end.split(":").map(Number)
-    const endTimeMinutes = endHours * 60 + endMinutes
-
-    return slotTimeMinutes >= startTimeMinutes && slotTimeMinutes < endTimeMinutes
   }
 
   const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
@@ -280,38 +268,27 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 </div>
               </button>
             ))}
-
             {/* Opción de duración personalizada */}
             <button
               onClick={() => setShowCustomDuration(!showCustomDuration)}
               className={`
                 p-4 rounded-lg border-2 transition-all duration-200 text-left
-                ${showCustomDuration || (selectedDuration?.isCustom) ? "border-gold bg-gold/10" : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"}
+                ${showCustomDuration ? "border-gold bg-gold/10" : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"}
               `}
             >
               <div className="flex justify-between items-start">
                 <div>
                   <div className="font-semibold text-black">{t.customDuration}</div>
-                  {selectedDuration?.isCustom ? (
-                    <div className="text-sm text-gold font-medium">
-                      {t.customSelected} {selectedDuration.label}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-600">{t.selectCustomTime}</div>
-                  )}
+                  <div className="text-sm text-gray-600">{t.selectCustomTime}</div>
                 </div>
                 <div className="text-right">
-                  {selectedDuration?.isCustom ? (
-                    <div className="text-xl font-bold text-gold">€{selectedDuration.price}</div>
-                  ) : (
-                    <div className="text-xl font-bold text-gold">+</div>
-                  )}
+                  <div className="text-xl font-bold text-gold">+</div>
                 </div>
               </div>
             </button>
 
             {showCustomDuration && (
-              <div className="md:col-span-2 p-4 rounded-lg border-2 border-gold bg-gold/5">
+              <div className="p-4 rounded-lg border-2 border-gold bg-gold/5">
                 <div className="mb-3 font-medium text-black">{t.customDurationTitle}</div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -356,6 +333,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                     </div>
                     <Button
                       onClick={() => {
+                        const totalMinutes = customDuration.hours * 60 + customDuration.minutes
                         const durationStr = `${customDuration.hours}h${customDuration.minutes > 0 ? customDuration.minutes : ""}`
                         const customOption = {
                           duration: `custom_${durationStr}`,
@@ -369,7 +347,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                       disabled={customDuration.hours === 0 && customDuration.minutes === 0}
                       className="bg-gold text-black hover:bg-black hover:text-white"
                     >
-                      <Check className="h-4 w-4 mr-2" />
                       {t.apply}
                     </Button>
                   </div>
@@ -384,18 +361,10 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
       {selectedDuration && (
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-lg font-semibold text-black flex items-center">
-                <Clock className="h-5 w-5 text-gold mr-2" />
-                {t.availableSlots}
-              </h4>
-              {selectedDuration && (
-                <div className="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
-                  {selectedDuration.isCustom ? `${t.customSelected} ${selectedDuration.label}` : selectedDuration.label}{" "}
-                  - {t.clickTimeSlot}
-                </div>
-              )}
-            </div>
+            <h4 className="text-lg font-semibold text-black mb-4 flex items-center">
+              <Clock className="h-5 w-5 text-gold mr-2" />
+              {t.availableSlots}
+            </h4>
 
             {loading ? (
               <div className="text-center py-8">
@@ -410,7 +379,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                       const endTime = calculateEndTime(slot.time, selectedDuration.duration)
                       const isSelected =
                         selectedTime?.start === slot.time && selectedTime?.duration === selectedDuration.duration
-                      const isInRange = isSlotInSelectedRange(slot.time)
 
                       return (
                         <Button
@@ -418,13 +386,11 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                           variant={isSelected ? "default" : "outline"}
                           onClick={() => handleTimeSlotClick(slot.time)}
                           className={`
-                            h-auto p-3 flex flex-col items-center transition-all duration-200
+                            h-auto p-3 flex flex-col items-center
                             ${
                               isSelected
-                                ? "bg-gold text-black hover:bg-gold/90 border-gold shadow-lg scale-105"
-                                : isInRange
-                                  ? "bg-gold/20 border-gold/50 text-black"
-                                  : "border-gray-300 hover:border-gold hover:bg-gold/10"
+                                ? "bg-gold text-black hover:bg-gold/90"
+                                : "border-gray-300 hover:border-gold hover:bg-gold/10"
                             }
                           `}
                         >
@@ -457,12 +423,12 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
               <div className="flex items-center">
                 <Clock className="h-5 w-5 text-gold mr-2" />
                 <div>
-                  <div className="font-semibold text-black text-lg">
+                  <div className="font-semibold text-black">
                     {selectedTime.start} - {selectedTime.end}
                   </div>
                   <div className="text-sm text-gray-600">
                     {selectedTime.duration.startsWith("custom_")
-                      ? `${t.customSelected} ${selectedTime.duration.replace("custom_", "").replace("h", "h ")}`
+                      ? selectedTime.duration.replace("custom_", "").replace("h", "h ")
                       : pricingOptions.find((p) => p.duration === selectedTime.duration)?.label}
                   </div>
                 </div>
@@ -472,7 +438,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                   <Euro className="h-5 w-5 mr-1" />
                   {selectedTime.price}
                 </div>
-                <div className="text-xs text-gray-500">{t.selectedRange}</div>
               </div>
             </div>
           </CardContent>

@@ -14,6 +14,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
+import { useRouter } from "next/navigation"
 
 interface BookingFormProps {
   vehicle: Vehicle
@@ -38,7 +39,7 @@ const translations = {
     subtitle: "Completa tu reserva",
     step1: "Selecciona fecha y hora",
     step2: "Datos del cliente",
-    step3: "Confirmar y pagar",
+    step3: "Confirmar",
     selectDate: "Selecciona una fecha",
     selectTime: "Selecciona horario",
     customerInfo: "Información del cliente",
@@ -49,7 +50,7 @@ const translations = {
     notesPlaceholder: "Alguna petición especial...",
     summary: "Resumen de la reserva",
     total: "Total",
-    payNow: "Pagar Ahora",
+    payNow: "Confirmar Reserva",
     back: "Volver",
     capacity: "Capacidad",
     includes: "Incluye",
@@ -57,13 +58,15 @@ const translations = {
     selectDateFirst: "Selecciona una fecha primero",
     selectTimeFirst: "Selecciona un horario",
     fillAllFields: "Completa todos los campos obligatorios",
+    bookingSuccess: "¡Reserva creada exitosamente!",
+    pastBookingError: "No puedes reservar en el pasado",
   },
   en: {
     title: "Book",
     subtitle: "Complete your booking",
     step1: "Select date and time",
     step2: "Customer details",
-    step3: "Confirm and pay",
+    step3: "Confirm",
     selectDate: "Select a date",
     selectTime: "Select time",
     customerInfo: "Customer information",
@@ -74,7 +77,7 @@ const translations = {
     notesPlaceholder: "Any special requests...",
     summary: "Booking summary",
     total: "Total",
-    payNow: "Pay Now",
+    payNow: "Confirm Booking",
     back: "Back",
     capacity: "Capacity",
     includes: "Includes",
@@ -82,12 +85,15 @@ const translations = {
     selectDateFirst: "Select a date first",
     selectTimeFirst: "Select a time slot",
     fillAllFields: "Fill all required fields",
+    bookingSuccess: "Booking created successfully!",
+    pastBookingError: "You cannot book in the past",
   },
 }
 
 export function BookingForm({ vehicle }: BookingFormProps) {
   const { language } = useApp()
   const t = translations[language]
+  const router = useRouter()
 
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedDate, setSelectedDate] = useState<string>("")
@@ -158,9 +164,17 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     setLoading(true)
     setError("")
 
+    // Verificar si la fecha y hora son válidas
+    const now = new Date()
+    const bookingDateTime = new Date(`${bookingData.bookingDate}T${bookingData.startTime}`)
+
+    if (bookingDateTime < now) {
+      setError(t.pastBookingError)
+      setLoading(false)
+      return
+    }
+
     try {
-      // Aquí iría la lógica de pago
-      // Por ahora solo creamos la reserva
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -169,7 +183,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
 
       if (response.ok) {
         // Redirigir a página de éxito o mostrar modal
-        alert("¡Reserva creada exitosamente! Pronto implementaremos el pago.")
+        alert(t.bookingSuccess)
+        router.push("/") // Redirigir a la página principal
       } else {
         const data = await response.json()
         setError(data.error || "Error al crear la reserva")
@@ -228,7 +243,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                   <Image
                     src={vehicle.image || "/placeholder.svg"}
                     alt={vehicle.name}
-                    fill
+                    width={500}
+                    height={300}
                     className="object-contain p-4"
                   />
                 </div>
@@ -402,7 +418,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                       <Button
                         onClick={handleBooking}
                         disabled={loading}
-                        className="bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-semibold text-lg px-8 py-3"
+                        className="bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg px-8 py-3"
                       >
                         <CreditCard className="h-5 w-5 mr-2" />
                         {loading ? t.loading : t.payNow}
