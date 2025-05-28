@@ -62,9 +62,18 @@ export async function GET(request: NextRequest, context: RouteParams) {
       })
     }
 
-    console.log(`✅ Horario encontrado: ${schedule.startTime} - ${schedule.endTime}`)
+    // 4. Extender horario hasta las 21:00 si es necesario
+    let endTime = schedule.endTime
+    const endHour = Number.parseInt(endTime.split(":")[0])
 
-    // 4. Obtener reservas existentes para esta fecha
+    if (endHour < 21) {
+      endTime = "21:00"
+      console.log(`⏰ Extendiendo horario hasta las 21:00 (era ${schedule.endTime})`)
+    }
+
+    console.log(`✅ Horario: ${schedule.startTime} - ${endTime}`)
+
+    // 5. Obtener reservas existentes para esta fecha
     const existingBookings = await db
       .select()
       .from(bookings)
@@ -78,15 +87,19 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
     console.log(`📋 Reservas existentes: ${existingBookings.length}`)
 
-    // 5. Generar slots de 30 minutos
+    // 6. Generar slots de 30 minutos
     const slots = []
     const startHour = Number.parseInt(schedule.startTime.split(":")[0])
     const startMinute = Number.parseInt(schedule.startTime.split(":")[1])
-    const endHour = Number.parseInt(schedule.endTime.split(":")[0])
-    const endMinute = Number.parseInt(schedule.endTime.split(":")[1])
+    const finalEndHour = Number.parseInt(endTime.split(":")[0])
+    const finalEndMinute = Number.parseInt(endTime.split(":")[1])
 
     let currentTime = startHour * 60 + startMinute // minutos desde medianoche
-    const endTimeMinutes = endHour * 60 + endMinute
+    const endTimeMinutes = finalEndHour * 60 + finalEndMinute
+
+    console.log(
+      `⏰ Generando slots desde ${Math.floor(currentTime / 60)}:${(currentTime % 60).toString().padStart(2, "0")} hasta ${Math.floor(endTimeMinutes / 60)}:${(endTimeMinutes % 60).toString().padStart(2, "0")}`,
+    )
 
     while (currentTime < endTimeMinutes) {
       const hours = Math.floor(currentTime / 60)
@@ -109,12 +122,13 @@ export async function GET(request: NextRequest, context: RouteParams) {
     }
 
     console.log(`⏰ Generados ${slots.length} slots, ${slots.filter((s) => s.available).length} disponibles`)
+    console.log(`🕐 Último slot: ${slots[slots.length - 1]?.time} (debería ser 20:30 para sesión 20:00-21:00)`)
 
     return NextResponse.json({
       slots,
       schedule: {
         startTime: schedule.startTime,
-        endTime: schedule.endTime,
+        endTime: endTime,
         dayOfWeek,
       },
       existingBookings: existingBookings.length,
