@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { db } from "@/lib/db"
+import { vehicleAvailability, vehicles } from "@/lib/db/schema"
+import { eq } from "drizzle-orm"
 import { sql } from "drizzle-orm"
 
 export async function GET() {
@@ -49,39 +51,64 @@ export async function GET() {
 
     console.log("✅ Availability table created:", createAvailabilityResult)
 
-    // Insertar datos de disponibilidad por defecto
-    const insertAvailabilityResult = await db.execute(sql`
-      -- Insertar disponibilidad por defecto para todos los vehículos
-      INSERT INTO vehicle_availability (vehicle_id, day_of_week, start_time, end_time, is_available)
-      SELECT 
-        v.id,
-        d.day,
-        '09:00:00'::TIME,
-        '19:00:00'::TIME,
-        true
-      FROM vehicles v
-      CROSS JOIN (
-        SELECT generate_series(0, 6) AS day
-      ) d
-      WHERE NOT EXISTS (
-        SELECT 1 FROM vehicle_availability va 
-        WHERE va.vehicle_id = v.id AND va.day_of_week = d.day
-      );
-    `)
+    // 1. Obtener todos los vehículos
+    const allVehicles = await db.select().from(vehicles)
+    console.log(`📋 Encontrados ${allVehicles.length} vehículos`)
 
-    console.log("✅ Default availability inserted:", insertAvailabilityResult)
+    // 2. Para cada vehículo, verificar si tiene disponibilidad
+    for (const vehicle of allVehicles) {
+      console.log(`🚗 Procesando vehículo: ${vehicle.name} (ID: ${vehicle.id})`)
+
+      // Verificar si ya tiene disponibilidad
+      const existingAvailability = await db
+        .select()
+        .from(vehicleAvailability)
+        .where(eq(vehicleAvailability.vehicleId, vehicle.id))
+
+      if (existingAvailability.length === 0) {
+        console.log(`⚠️ Sin disponibilidad para ${vehicle.name} - Creando horarios por defecto`)
+
+        // Crear disponibilidad para todos los días de la semana (0=Domingo, 6=Sábado)
+        const defaultSchedule = []
+        for (let dayOfWeek = 0; dayOfWeek <= 6; dayOfWeek++) {
+          defaultSchedule.push({
+            vehicleId: vehicle.id,
+            dayOfWeek,
+            startTime: "09:00:00",
+            endTime: "19:00:00",
+            isAvailable: true,
+          })
+        }
+
+        // Insertar la disponibilidad
+        await db.insert(vehicleAvailability).values(defaultSchedule)
+        console.log(`✅ Creados horarios 9:00-19:00 para ${vehicle.name}`)
+      } else {
+        console.log(`✅ ${vehicle.name} ya tiene ${existingAvailability.length} horarios configurados`)
+      }
+    }
+
+    // 3. Verificar el resultado final
+    const totalAvailability = await db.select().from(vehicleAvailability)
+    console.log(`📊 Total de horarios en la base de datos: ${totalAvailability.length}`)
 
     return NextResponse.json({
       success: true,
       message: "Database schema fixed successfully",
+      vehicles: allVehicles.length,
+      totalSchedules: totalAvailability.length,
+      details: allVehicles.map((v) => ({
+        id: v.id,
+        name: v.name,
+        available: v.available,
+      })),
     })
   } catch (error) {
     console.error("❌ Error fixing database schema:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fix database schema",
-        details: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )

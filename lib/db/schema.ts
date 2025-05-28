@@ -98,7 +98,7 @@ export const pricingRules = pgTable("pricing_rules", {
   vehicleId: integer("vehicle_id")
     .references(() => vehicles.id)
     .notNull(),
-  duration: text("duration").notNull(), // '30min', '1hour', '2hour', 'halfday', 'fullday'
+  duration: text("duration").notNull(), // '30min', '1hour', 'halfday', 'fullday'
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   label: text("label").notNull(), // Texto visible para el cliente
   createdAt: timestamp("created_at").defaultNow(),
