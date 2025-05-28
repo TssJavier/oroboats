@@ -38,6 +38,12 @@ interface PricingOption {
   isCustom?: boolean
 }
 
+interface Schedule {
+  startTime: string
+  endTime: string
+  dayOfWeek: number
+}
+
 const translations = {
   es: {
     selectDuration: "Selecciona duración",
@@ -56,6 +62,8 @@ const translations = {
     estimatedPrice: "Precio estimado",
     apply: "Aplicar",
     todayInfo: "Hoy - Solo desde 30min después de la hora actual",
+    exceedsClosing: "Excede horario de cierre",
+    conflictWithBooking: "Conflicto con otra reserva",
   },
   en: {
     selectDuration: "Select duration",
@@ -63,7 +71,8 @@ const translations = {
     noSlots: "No time slots available for this date",
     loading: "Loading time slots...",
     from: "From",
-    to: "Price",
+    to: "To",
+    price: "Price",
     selected: "Selected",
     customDuration: "Custom duration",
     selectCustomTime: "Select hours and minutes",
@@ -73,6 +82,8 @@ const translations = {
     estimatedPrice: "Estimated price",
     apply: "Apply",
     todayInfo: "Today - Only from 30min after current time",
+    exceedsClosing: "Exceeds closing time",
+    conflictWithBooking: "Conflicts with another booking",
   },
 }
 
@@ -82,13 +93,13 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   const [selectedDuration, setSelectedDuration] = useState<PricingOption | null>(null)
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
+  const [schedule, setSchedule] = useState<Schedule | null>(null)
   const [loading, setLoading] = useState(false)
   const [customDuration, setCustomDuration] = useState<{ hours: number; minutes: number }>({ hours: 1, minutes: 0 })
   const [showCustomDuration, setShowCustomDuration] = useState(false)
   const [customRatePerMinute, setCustomRatePerMinute] = useState<number>(0)
 
   useEffect(() => {
-    console.log("🎯 TimePicker: Fecha recibida:", selectedDate)
     if (selectedDate) {
       fetchAvailableSlots()
       fetchCustomRate()
@@ -102,10 +113,12 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
       if (response.ok) {
         const data = await response.json()
         setAvailableSlots(data.slots || [])
+        setSchedule(data.schedule || null)
       }
     } catch (error) {
       console.error("Error fetching time slots:", error)
       setAvailableSlots([])
+      setSchedule(null)
     } finally {
       setLoading(false)
     }
@@ -187,22 +200,47 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`
   }
 
+  // Función para verificar si la reserva excede el horario de cierre
+  const exceedsClosingTime = (startTime: string, duration: string): boolean => {
+    if (!schedule) return false
+
+    const endTime = calculateEndTime(startTime, duration)
+    const [endHours, endMinutes] = endTime.split(":").map(Number)
+    const [closeHours, closeMinutes] = schedule.endTime.split(":").map(Number)
+
+    const endTimeMinutes = endHours * 60 + endMinutes
+    const closeTimeMinutes = closeHours * 60 + closeMinutes
+
+    return endTimeMinutes > closeTimeMinutes
+  }
+
+  // Función para verificar disponibilidad continua (sin reservas en el medio)
   const isSlotAvailable = (startTime: string, duration: string): boolean => {
     const endTime = calculateEndTime(startTime, duration)
     const startIndex = availableSlots.findIndex((slot) => slot.time === startTime)
 
     if (startIndex === -1) return false
 
+    // Verificar que no exceda el horario de cierre
+    if (exceedsClosingTime(startTime, duration)) {
+      console.log(`❌ Slot ${startTime} excede horario de cierre (termina a ${endTime})`)
+      return false
+    }
+
     const [endHours, endMinutes] = endTime.split(":").map(Number)
     const endTimeMinutes = endHours * 60 + endMinutes
 
+    // Verificar que todos los slots hasta la hora de fin estén disponibles (sin interrupciones)
     for (let i = startIndex; i < availableSlots.length; i++) {
       const slot = availableSlots[i]
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
       const slotTimeMinutes = slotHours * 60 + slotMinutes
 
       if (slotTimeMinutes >= endTimeMinutes) break
-      if (!slot.available) return false
+      if (!slot.available) {
+        console.log(`❌ Slot ${startTime} tiene conflicto en ${slot.time}`)
+        return false
+      }
     }
 
     return true
@@ -228,18 +266,11 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   // Función para verificar si la fecha seleccionada es hoy en España
   const isToday = (dateString: string): boolean => {
-    console.log("🔍 Verificando si es hoy - Fecha recibida:", dateString)
-
     const spainTime = getSpainTime()
     const selectedDate = new Date(dateString + "T00:00:00")
 
     const todayInSpain = new Date(spainTime.getFullYear(), spainTime.getMonth(), spainTime.getDate())
     const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
-
-    console.log("🗓️ Comparando fechas:")
-    console.log("Hoy en España:", todayInSpain.toDateString(), "Día:", todayInSpain.getDate())
-    console.log("Fecha seleccionada:", selectedDateOnly.toDateString(), "Día:", selectedDateOnly.getDate())
-    console.log("¿Es hoy?:", todayInSpain.getTime() === selectedDateOnly.getTime())
 
     return todayInSpain.getTime() === selectedDateOnly.getTime()
   }
@@ -250,12 +281,10 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     const spainTime = getSpainTime()
     const isSelectedDateToday = isToday(selectedDate)
 
-    console.log("=== FILTRADO DE SLOTS (ZONA HORARIA ESPAÑA) ===")
+    console.log("=== FILTRADO DE SLOTS ===")
     console.log("Fecha seleccionada:", selectedDate)
     console.log("Es hoy:", isSelectedDateToday)
-    console.log("Hora actual España:", spainTime.toLocaleTimeString())
-    console.log("Día actual:", spainTime.getDate())
-    console.log("Día seleccionado:", new Date(selectedDate).getDate())
+    console.log("Horario de cierre:", schedule?.endTime)
 
     const filteredSlots = availableSlots.filter((slot) => {
       // 1. Verificar disponibilidad básica
@@ -263,14 +292,13 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
         return false
       }
 
-      // 2. Verificar duración disponible
+      // 2. Verificar duración disponible (incluyendo horario de cierre y conflictos)
       if (!isSlotAvailable(slot.time, selectedDuration.duration)) {
         return false
       }
 
-      // 3. Si no es hoy, mostrar todos los slots disponibles
+      // 3. Si no es hoy, mostrar todos los slots válidos
       if (!isSelectedDateToday) {
-        console.log(`✅ Fecha futura - mostrando slot ${slot.time}`)
         return true
       }
 
@@ -278,17 +306,10 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
       const slotTimeInMinutes = slotHours * 60 + slotMinutes
 
-      // Calcular tiempo mínimo (hora actual España + 30 minutos)
       const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
       const minimumTimeInMinutes = currentTimeInMinutes + 30
 
-      const isInFuture = slotTimeInMinutes >= minimumTimeInMinutes
-
-      console.log(
-        `Slot ${slot.time} (${slotTimeInMinutes}min) vs Mínimo ${Math.floor(minimumTimeInMinutes / 60)}:${(minimumTimeInMinutes % 60).toString().padStart(2, "0")} (${minimumTimeInMinutes}min) = ${isInFuture ? "✅" : "❌"}`,
-      )
-
-      return isInFuture
+      return slotTimeInMinutes >= minimumTimeInMinutes
     })
 
     console.log(
@@ -432,10 +453,8 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 <Clock className="h-5 w-5 text-gold mr-2" />
                 {t.availableSlots}
               </h4>
-              {isToday(selectedDate) && (
-                <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                  {t.todayInfo} ({getSpainTime().toLocaleTimeString()})
-                </div>
+              {schedule && (
+                <div className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">Cierre: {schedule.endTime}</div>
               )}
             </div>
 

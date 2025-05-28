@@ -62,13 +62,16 @@ export async function GET(request: NextRequest, context: RouteParams) {
       })
     }
 
-    // 4. Extender horario hasta las 21:00 si es necesario
+    // 4. Definir horario máximo (21:00)
+    const maxEndTime = "21:00"
     let endTime = schedule.endTime
-    const endHour = Number.parseInt(endTime.split(":")[0])
+    const scheduleEndHour = Number.parseInt(endTime.split(":")[0])
+    const maxEndHour = Number.parseInt(maxEndTime.split(":")[0])
 
-    if (endHour < 21) {
-      endTime = "21:00"
-      console.log(`⏰ Extendiendo horario hasta las 21:00 (era ${schedule.endTime})`)
+    // Usar el menor entre el horario configurado y las 21:00
+    if (scheduleEndHour > maxEndHour) {
+      endTime = maxEndTime
+      console.log(`⏰ Limitando horario a ${maxEndTime} (era ${schedule.endTime})`)
     }
 
     console.log(`✅ Horario: ${schedule.startTime} - ${endTime}`)
@@ -122,13 +125,13 @@ export async function GET(request: NextRequest, context: RouteParams) {
     }
 
     console.log(`⏰ Generados ${slots.length} slots, ${slots.filter((s) => s.available).length} disponibles`)
-    console.log(`🕐 Último slot: ${slots[slots.length - 1]?.time} (debería ser 20:30 para sesión 20:00-21:00)`)
+    console.log(`🕐 Último slot: ${slots[slots.length - 1]?.time} (máximo permitido: ${endTime})`)
 
     return NextResponse.json({
       slots,
       schedule: {
         startTime: schedule.startTime,
-        endTime: endTime,
+        endTime: endTime, // Devolver el horario limitado
         dayOfWeek,
       },
       existingBookings: existingBookings.length,
