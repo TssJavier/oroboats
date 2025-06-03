@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Ship, Zap, Users, Clock, Calendar, Fuel } from "lucide-react"
+import { Ship, Zap, Users, Clock, Calendar, Fuel } from 'lucide-react'
 import Link from "next/link"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -42,6 +42,7 @@ interface Translations {
   fuelSeparate: string
   noVehicles: string
   loading: string
+  error: string
 }
 
 const translations = {
@@ -58,6 +59,7 @@ const translations = {
     fuelSeparate: "Gasolina aparte",
     noVehicles: "No hay vehículos disponibles",
     loading: "Cargando...",
+    error: "Error al cargar los vehículos. Inténtalo de nuevo más tarde."
   },
   en: {
     title: "Our Fleet",
@@ -72,6 +74,7 @@ const translations = {
     fuelSeparate: "Fuel separate",
     noVehicles: "No vehicles available",
     loading: "Loading...",
+    error: "Error loading vehicles. Please try again later."
   },
 }
 
@@ -81,6 +84,7 @@ export function BoatsSection() {
   const [activeTab, setActiveTab] = useState("jetskis")
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchVehicles()
@@ -88,16 +92,33 @@ export function BoatsSection() {
 
   const fetchVehicles = async () => {
     try {
+      setError(null)
       const response = await fetch("/api/vehicles")
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
       const data = await response.json()
-      setVehicles(data)
+      
+      // Verificar que la respuesta sea un array
+      if (Array.isArray(data)) {
+        setVehicles(data)
+      } else {
+        console.error("API returned non-array data:", data)
+        setError("API returned invalid data format")
+        setVehicles([]) // Mantener array vacío si hay error
+      }
     } catch (error) {
       console.error("Error fetching vehicles:", error)
+      setError(error instanceof Error ? error.message : "Unknown error")
+      setVehicles([]) // Asegurar que vehicles siempre sea un array
     } finally {
       setLoading(false)
     }
   }
 
+  // Ahora vehicles siempre será un array, así que filter funcionará
   const jetskis = vehicles.filter((v) => v.type === "jetski")
   const boats = vehicles.filter((v) => v.type === "boat")
 
@@ -119,6 +140,28 @@ export function BoatsSection() {
                 </CardHeader>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="py-24 bg-white min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
+            <p className="text-xl md:text-2xl text-red-600 max-w-4xl mx-auto">{t.error}</p>
+            <Button 
+              onClick={() => {
+                setLoading(true);
+                fetchVehicles();
+              }}
+              className="mt-8 bg-black text-white hover:bg-gold hover:text-black"
+            >
+              Intentar de nuevo
+            </Button>
           </div>
         </div>
       </section>

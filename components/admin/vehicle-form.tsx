@@ -21,6 +21,7 @@ interface Vehicle {
   description: string
   image: string
   available: boolean
+  customDurationEnabled: boolean // NUEVO CAMPO
 }
 
 interface VehicleFormProps {
@@ -40,13 +41,17 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     description: "",
     image: "",
     available: true,
+    customDurationEnabled: true, // NUEVO CAMPO
   })
   const [newInclude, setNewInclude] = useState("")
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (vehicle) {
-      setFormData(vehicle)
+      setFormData({
+        ...vehicle,
+        customDurationEnabled: vehicle.customDurationEnabled ?? true, // Valor por defecto
+      })
     }
   }, [vehicle])
 
@@ -184,26 +189,44 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 />
               </div>
 
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.fuelIncluded}
-                    onChange={(e) => setFormData({ ...formData, fuelIncluded: e.target.checked })}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-sm text-gray-700">Gasolina incluida</span>
-                </label>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.fuelIncluded}
+                      onChange={(e) => setFormData({ ...formData, fuelIncluded: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Gasolina incluida</span>
+                  </label>
 
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.available}
-                    onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-sm text-gray-700">Disponible</span>
-                </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.available}
+                      onChange={(e) => setFormData({ ...formData, available: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Disponible</span>
+                  </label>
+                </div>
+
+                {/* NUEVO CAMPO: Duración personalizada */}
+                <div className="border-t pt-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.customDurationEnabled}
+                      onChange={(e) => setFormData({ ...formData, customDurationEnabled: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">Permitir duración personalizada</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si está desactivado, los clientes solo podrán elegir las duraciones predefinidas
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -228,7 +251,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         <Card className="bg-white border border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-black">Precios</CardTitle>
-            <CardDescription>Configura los precios por duración</CardDescription>
+            <CardDescription>Configura los precios por duración (Horario: 09:00 - 21:00)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {formData.pricing.map((price, index) => (

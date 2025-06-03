@@ -29,6 +29,7 @@ interface TimePickerProps {
 interface TimeSlot {
   time: string
   available: boolean
+  type?: string
 }
 
 interface PricingOption {
@@ -62,8 +63,7 @@ const translations = {
     estimatedPrice: "Precio estimado",
     apply: "Aplicar",
     todayInfo: "Hoy - Solo desde 30min después de la hora actual",
-    exceedsClosing: "Excede horario de cierre",
-    conflictWithBooking: "Conflicto con otra reserva",
+    businessHours: "Horario: 09:00 - 21:00",
   },
   en: {
     selectDuration: "Select duration",
@@ -82,8 +82,7 @@ const translations = {
     estimatedPrice: "Estimated price",
     apply: "Apply",
     todayInfo: "Today - Only from 30min after current time",
-    exceedsClosing: "Exceeds closing time",
-    conflictWithBooking: "Conflicts with another booking",
+    businessHours: "Hours: 09:00 - 21:00",
   },
 }
 
@@ -98,22 +97,27 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   const [customDuration, setCustomDuration] = useState<{ hours: number; minutes: number }>({ hours: 1, minutes: 0 })
   const [showCustomDuration, setShowCustomDuration] = useState(false)
   const [customRatePerMinute, setCustomRatePerMinute] = useState<number>(0)
+  const [vehicleType, setVehicleType] = useState<string>("other")
+  const [customDurationEnabled, setCustomDurationEnabled] = useState<boolean>(true) // NUEVO ESTADO
 
   useEffect(() => {
     if (selectedDate) {
       fetchAvailableSlots()
       fetchCustomRate()
     }
-  }, [selectedDate, vehicleId])
+  }, [selectedDate, vehicleId, selectedDuration])
 
   const fetchAvailableSlots = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/availability/${vehicleId}/slots?date=${selectedDate}`)
+      const durationParam = selectedDuration ? `&duration=${selectedDuration.duration}` : ""
+      const response = await fetch(`/api/availability/${vehicleId}/slots?date=${selectedDate}${durationParam}`)
       if (response.ok) {
         const data = await response.json()
         setAvailableSlots(data.slots || [])
         setSchedule(data.schedule || null)
+        setVehicleType(data.vehicleType || "other")
+        setCustomDurationEnabled(data.customDurationEnabled ?? true) // NUEVO CAMPO
       }
     } catch (error) {
       console.error("Error fetching time slots:", error)
@@ -200,52 +204,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`
   }
 
-  // Función para verificar si la reserva excede el horario de cierre
-  const exceedsClosingTime = (startTime: string, duration: string): boolean => {
-    if (!schedule) return false
-
-    const endTime = calculateEndTime(startTime, duration)
-    const [endHours, endMinutes] = endTime.split(":").map(Number)
-    const [closeHours, closeMinutes] = schedule.endTime.split(":").map(Number)
-
-    const endTimeMinutes = endHours * 60 + endMinutes
-    const closeTimeMinutes = closeHours * 60 + closeMinutes
-
-    return endTimeMinutes > closeTimeMinutes
-  }
-
-  // Función para verificar disponibilidad continua (sin reservas en el medio)
-  const isSlotAvailable = (startTime: string, duration: string): boolean => {
-    const endTime = calculateEndTime(startTime, duration)
-    const startIndex = availableSlots.findIndex((slot) => slot.time === startTime)
-
-    if (startIndex === -1) return false
-
-    // Verificar que no exceda el horario de cierre
-    if (exceedsClosingTime(startTime, duration)) {
-      console.log(`❌ Slot ${startTime} excede horario de cierre (termina a ${endTime})`)
-      return false
-    }
-
-    const [endHours, endMinutes] = endTime.split(":").map(Number)
-    const endTimeMinutes = endHours * 60 + endMinutes
-
-    // Verificar que todos los slots hasta la hora de fin estén disponibles (sin interrupciones)
-    for (let i = startIndex; i < availableSlots.length; i++) {
-      const slot = availableSlots[i]
-      const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
-      const slotTimeMinutes = slotHours * 60 + slotMinutes
-
-      if (slotTimeMinutes >= endTimeMinutes) break
-      if (!slot.available) {
-        console.log(`❌ Slot ${startTime} tiene conflicto en ${slot.time}`)
-        return false
-      }
-    }
-
-    return true
-  }
-
   const handleTimeSlotClick = (startTime: string) => {
     if (!selectedDuration) return
 
@@ -259,12 +217,10 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     })
   }
 
-  // Función para obtener la hora actual en España
   const getSpainTime = (): Date => {
     return new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Madrid" }))
   }
 
-  // Función para verificar si la fecha seleccionada es hoy en España
   const isToday = (dateString: string): boolean => {
     const spainTime = getSpainTime()
     const selectedDate = new Date(dateString + "T00:00:00")
@@ -281,42 +237,18 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
     const spainTime = getSpainTime()
     const isSelectedDateToday = isToday(selectedDate)
 
-    console.log("=== FILTRADO DE SLOTS ===")
-    console.log("Fecha seleccionada:", selectedDate)
-    console.log("Es hoy:", isSelectedDateToday)
-    console.log("Horario de cierre:", schedule?.endTime)
-
     const filteredSlots = availableSlots.filter((slot) => {
-      // 1. Verificar disponibilidad básica
-      if (!slot.available) {
-        return false
-      }
+      if (!slot.available) return false
 
-      // 2. Verificar duración disponible (incluyendo horario de cierre y conflictos)
-      if (!isSlotAvailable(slot.time, selectedDuration.duration)) {
-        return false
-      }
+      if (!isSelectedDateToday) return true
 
-      // 3. Si no es hoy, mostrar todos los slots válidos
-      if (!isSelectedDateToday) {
-        return true
-      }
-
-      // 4. Si es hoy, filtrar por tiempo (zona horaria España)
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
       const slotTimeInMinutes = slotHours * 60 + slotMinutes
-
       const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
       const minimumTimeInMinutes = currentTimeInMinutes + 30
 
       return slotTimeInMinutes >= minimumTimeInMinutes
     })
-
-    console.log(
-      "Slots finales disponibles:",
-      filteredSlots.map((s) => s.time),
-    )
-    console.log("=========================")
 
     return filteredSlots
   }
@@ -356,26 +288,28 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
               </button>
             ))}
 
-            {/* Opción de duración personalizada */}
-            <button
-              onClick={() => setShowCustomDuration(!showCustomDuration)}
-              className={`
-                p-4 rounded-lg border-2 transition-all duration-200 text-left
-                ${showCustomDuration ? "border-gold bg-gold/10" : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"}
-              `}
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="font-semibold text-black">{t.customDuration}</div>
-                  <div className="text-sm text-gray-600">{t.selectCustomTime}</div>
+            {/* Opción de duración personalizada - SOLO SI ESTÁ HABILITADA */}
+            {customDurationEnabled && (
+              <button
+                onClick={() => setShowCustomDuration(!showCustomDuration)}
+                className={`
+                  p-4 rounded-lg border-2 transition-all duration-200 text-left
+                  ${showCustomDuration ? "border-gold bg-gold/10" : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"}
+                `}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-semibold text-black">{t.customDuration}</div>
+                    <div className="text-sm text-gray-600">{t.selectCustomTime}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-gold">+</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-gold">+</div>
-                </div>
-              </div>
-            </button>
+              </button>
+            )}
 
-            {showCustomDuration && (
+            {showCustomDuration && customDurationEnabled && (
               <div className="p-4 rounded-lg border-2 border-gold bg-gold/5">
                 <div className="mb-3 font-medium text-black">{t.customDurationTitle}</div>
                 <div className="grid grid-cols-2 gap-4">
@@ -386,7 +320,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                       onChange={(e) => setCustomDuration({ ...customDuration, hours: Number.parseInt(e.target.value) })}
                       className="w-full p-2 border border-gray-200 rounded-md"
                     >
-                      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((hour) => (
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((hour) => (
                         <option key={hour} value={hour}>
                           {hour}
                         </option>
@@ -453,9 +387,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 <Clock className="h-5 w-5 text-gold mr-2" />
                 {t.availableSlots}
               </h4>
-              {schedule && (
-                <div className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">Cierre: {schedule.endTime}</div>
-              )}
+              <div className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">{t.businessHours}</div>
             </div>
 
             {loading ? (
@@ -472,6 +404,12 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                       const isSelected =
                         selectedTime?.start === slot.time && selectedTime?.duration === selectedDuration.duration
 
+                      // Etiquetas especiales para slots fijos de barcos
+                      let slotLabel = slot.time
+                      if (slot.type === "morning-half") slotLabel = "Mañana (09:00)"
+                      if (slot.type === "afternoon-half") slotLabel = "Tarde (15:00)"
+                      if (slot.type === "fullday") slotLabel = "Todo el día (09:00)"
+
                       return (
                         <Button
                           key={slot.time}
@@ -486,7 +424,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                             }
                           `}
                         >
-                          <div className="font-semibold">{slot.time}</div>
+                          <div className="font-semibold">{slotLabel}</div>
                           <div className="text-xs opacity-75">
                             {t.to} {endTime}
                           </div>

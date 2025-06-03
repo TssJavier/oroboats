@@ -12,6 +12,7 @@ export const vehicles = pgTable("vehicles", {
   description: text("description").notNull(),
   image: text("image").notNull(),
   available: boolean("available").default(true),
+  customDurationEnabled: boolean("custom_duration_enabled").default(true), // NUEVO CAMPO
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })

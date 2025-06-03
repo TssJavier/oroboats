@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { vehicleAvailability, bookings, blockedDates } from "@/lib/db/schema"
+import { vehicleAvailability, bookings, blockedDates, vehicles } from "@/lib/db/schema"
 import { eq, and, or } from "drizzle-orm"
+import { generateSlotsForVehicle, BUSINESS_HOURS } from "@/lib/booking-logic"
 
 interface RouteParams {
   params: { id: string }
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
     const vehicleId = Number.parseInt(id)
     const { searchParams } = new URL(request.url)
     const date = searchParams.get("date")
+    const duration = searchParams.get("duration")
 
     if (isNaN(vehicleId)) {
       return NextResponse.json({ error: "Invalid vehicle ID" }, { status: 400 })
@@ -22,9 +24,18 @@ export async function GET(request: NextRequest, context: RouteParams) {
       return NextResponse.json({ error: "Date is required" }, { status: 400 })
     }
 
-    console.log(`🔍 Buscando slots para vehículo ${vehicleId} en fecha ${date}`)
+    console.log(`🔍 Buscando slots para vehículo ${vehicleId} en fecha ${date}, duración: ${duration}`)
 
-    // 1. Verificar si la fecha está bloqueada
+    // 1. Obtener información del vehículo
+    const vehicle = await db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1)
+    if (vehicle.length === 0) {
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 })
+    }
+
+    const vehicleInfo = vehicle[0]
+    console.log(`🚤 Tipo de vehículo: ${vehicleInfo.type}`)
+
+    // 2. Verificar si la fecha está bloqueada
     const isBlocked = await db
       .select()
       .from(blockedDates)
@@ -35,18 +46,16 @@ export async function GET(request: NextRequest, context: RouteParams) {
       return NextResponse.json({ slots: [], message: "Fecha bloqueada" })
     }
 
-    // 2. Obtener el día de la semana (0=Domingo, 6=Sábado)
+    // 3. Obtener el día de la semana
     const dayOfWeek = new Date(date).getDay()
-    console.log(`📅 Día de la semana: ${dayOfWeek}`)
 
-    // 3. Obtener la disponibilidad del vehículo para este día
+    // 4. Obtener la disponibilidad del vehículo
     const availability = await db
       .select()
       .from(vehicleAvailability)
       .where(and(eq(vehicleAvailability.vehicleId, vehicleId), eq(vehicleAvailability.dayOfWeek, dayOfWeek)))
 
     if (availability.length === 0) {
-      console.log(`⚠️ No hay disponibilidad configurada para el vehículo ${vehicleId} el día ${dayOfWeek}`)
       return NextResponse.json({
         slots: [],
         message: "No hay disponibilidad configurada para este día",
@@ -55,28 +64,21 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
     const schedule = availability[0]
     if (!schedule.isAvailable) {
-      console.log(`❌ El vehículo ${vehicleId} no está disponible los ${dayOfWeek}`)
       return NextResponse.json({
         slots: [],
         message: "El vehículo no está disponible este día de la semana",
       })
     }
 
-    // 4. Definir horario máximo (21:00)
-    const maxEndTime = "21:00"
-    let endTime = schedule.endTime
-    const scheduleEndHour = Number.parseInt(endTime.split(":")[0])
-    const maxEndHour = Number.parseInt(maxEndTime.split(":")[0])
-
-    // Usar el menor entre el horario configurado y las 21:00
-    if (scheduleEndHour > maxEndHour) {
-      endTime = maxEndTime
-      console.log(`⏰ Limitando horario a ${maxEndTime} (era ${schedule.endTime})`)
+    // 5. Usar horarios de negocio fijos (9:00 - 21:00)
+    const businessSchedule = {
+      startTime: BUSINESS_HOURS.START,
+      endTime: BUSINESS_HOURS.END,
     }
 
-    console.log(`✅ Horario: ${schedule.startTime} - ${endTime}`)
+    console.log(`✅ Horario de negocio: ${businessSchedule.startTime} - ${businessSchedule.endTime}`)
 
-    // 5. Obtener reservas existentes para esta fecha
+    // 6. Obtener reservas existentes
     const existingBookings = await db
       .select()
       .from(bookings)
@@ -90,50 +92,16 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
     console.log(`📋 Reservas existentes: ${existingBookings.length}`)
 
-    // 6. Generar slots de 30 minutos
-    const slots = []
-    const startHour = Number.parseInt(schedule.startTime.split(":")[0])
-    const startMinute = Number.parseInt(schedule.startTime.split(":")[1])
-    const finalEndHour = Number.parseInt(endTime.split(":")[0])
-    const finalEndMinute = Number.parseInt(endTime.split(":")[1])
+    // 7. Generar slots usando la nueva lógica
+    const slots = generateSlotsForVehicle(vehicleInfo.type, businessSchedule, existingBookings, duration || "regular")
 
-    let currentTime = startHour * 60 + startMinute // minutos desde medianoche
-    const endTimeMinutes = finalEndHour * 60 + finalEndMinute
-
-    console.log(
-      `⏰ Generando slots desde ${Math.floor(currentTime / 60)}:${(currentTime % 60).toString().padStart(2, "0")} hasta ${Math.floor(endTimeMinutes / 60)}:${(endTimeMinutes % 60).toString().padStart(2, "0")}`,
-    )
-
-    while (currentTime < endTimeMinutes) {
-      const hours = Math.floor(currentTime / 60)
-      const minutes = currentTime % 60
-      const timeString = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`
-
-      // Verificar si este slot está ocupado por alguna reserva
-      const isOccupied = existingBookings.some((booking) => {
-        const bookingStart = booking.startTime
-        const bookingEnd = booking.endTime
-        return timeString >= bookingStart && timeString < bookingEnd
-      })
-
-      slots.push({
-        time: timeString,
-        available: !isOccupied,
-      })
-
-      currentTime += 30 // Incrementar 30 minutos
-    }
-
-    console.log(`⏰ Generados ${slots.length} slots, ${slots.filter((s) => s.available).length} disponibles`)
-    console.log(`🕐 Último slot: ${slots[slots.length - 1]?.time} (máximo permitido: ${endTime})`)
+    console.log(`⏰ Generados ${slots.length} slots para ${vehicleInfo.type}`)
 
     return NextResponse.json({
       slots,
-      schedule: {
-        startTime: schedule.startTime,
-        endTime: endTime, // Devolver el horario limitado
-        dayOfWeek,
-      },
+      schedule: businessSchedule,
+      vehicleType: vehicleInfo.type,
+      customDurationEnabled: vehicleInfo.customDurationEnabled, // NUEVO CAMPO
       existingBookings: existingBookings.length,
     })
   } catch (error) {
