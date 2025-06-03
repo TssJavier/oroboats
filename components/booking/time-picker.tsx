@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Euro, Loader2 } from "lucide-react"
+import { Clock, Euro, Loader2, AlertCircle } from "lucide-react"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
 
@@ -30,19 +30,15 @@ interface TimeSlot {
   time: string
   available: boolean
   type?: string
+  restricted?: boolean
+  restrictionReason?: string
+  endTime?: string
 }
 
 interface PricingOption {
   duration: string
   price: number
   label: string
-  isCustom?: boolean
-}
-
-interface Schedule {
-  startTime: string
-  endTime: string
-  dayOfWeek: number
 }
 
 const translations = {
@@ -51,19 +47,18 @@ const translations = {
     availableSlots: "Horarios disponibles",
     noSlots: "No hay horarios disponibles para esta fecha",
     loading: "Cargando horarios...",
-    from: "Desde",
-    to: "Hasta",
+    from: "De",
+    to: "a",
     price: "Precio",
     selected: "Seleccionado",
-    customDuration: "Duración personalizada",
-    selectCustomTime: "Selecciona horas y minutos",
-    customDurationTitle: "Selecciona la duración exacta",
-    hours: "Horas",
-    minutes: "Minutos",
-    estimatedPrice: "Precio estimado",
-    apply: "Aplicar",
-    todayInfo: "Hoy - Solo desde 30min después de la hora actual",
-    businessHours: "Horario: 09:00 - 21:00",
+    businessHours: "Horario: 10:00 - 21:00",
+    restrictedSlot: "Horario restringido",
+    selectDurationFirst: "Selecciona una duración primero",
+    morning: "Mañana",
+    afternoon: "Tarde",
+    fullDay: "Todo el día",
+    restrictedJetski: "Motos sin licencia: No disponible de 14:00 a 16:00",
+    restrictedBoat: "Barcos sin licencia: No disponible de 14:00 a 16:00 (solo medio día)",
   },
   en: {
     selectDuration: "Select duration",
@@ -71,18 +66,17 @@ const translations = {
     noSlots: "No time slots available for this date",
     loading: "Loading time slots...",
     from: "From",
-    to: "To",
+    to: "to",
     price: "Price",
     selected: "Selected",
-    customDuration: "Custom duration",
-    selectCustomTime: "Select hours and minutes",
-    customDurationTitle: "Select exact duration",
-    hours: "Hours",
-    minutes: "Minutes",
-    estimatedPrice: "Estimated price",
-    apply: "Apply",
-    todayInfo: "Today - Only from 30min after current time",
-    businessHours: "Hours: 09:00 - 21:00",
+    businessHours: "Hours: 10:00 - 21:00",
+    restrictedSlot: "Restricted hours",
+    selectDurationFirst: "Select a duration first",
+    morning: "Morning",
+    afternoon: "Afternoon",
+    fullDay: "Full day",
+    restrictedJetski: "Jet skis without license: Not available from 14:00 to 16:00",
+    restrictedBoat: "Boats without license: Not available from 14:00 to 16:00 (half-day only)",
   },
 }
 
@@ -92,126 +86,70 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   const [selectedDuration, setSelectedDuration] = useState<PricingOption | null>(null)
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
-  const [schedule, setSchedule] = useState<Schedule | null>(null)
   const [loading, setLoading] = useState(false)
-  const [customDuration, setCustomDuration] = useState<{ hours: number; minutes: number }>({ hours: 1, minutes: 0 })
-  const [showCustomDuration, setShowCustomDuration] = useState(false)
-  const [customRatePerMinute, setCustomRatePerMinute] = useState<number>(0)
-  const [vehicleType, setVehicleType] = useState<string>("other")
-  const [customDurationEnabled, setCustomDurationEnabled] = useState<boolean>(true) // NUEVO ESTADO
+  const [vehicleCategory, setVehicleCategory] = useState<string>("")
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (selectedDate) {
+    if (selectedDate && selectedDuration) {
       fetchAvailableSlots()
-      fetchCustomRate()
     }
   }, [selectedDate, vehicleId, selectedDuration])
 
   const fetchAvailableSlots = async () => {
+    if (!selectedDuration) return
+
     setLoading(true)
+    setError(null)
+
     try {
-      const durationParam = selectedDuration ? `&duration=${selectedDuration.duration}` : ""
-      const response = await fetch(`/api/availability/${vehicleId}/slots?date=${selectedDate}${durationParam}`)
+      // Verificar que vehicleId sea válido
+      if (!vehicleId || isNaN(Number(vehicleId))) {
+        console.error("❌ vehicleId inválido:", vehicleId)
+        setError("ID de vehículo inválido")
+        setLoading(false)
+        return
+      }
+
+      // Formatear la fecha correctamente (YYYY-MM-DD)
+      const formattedDate = selectedDate.includes("T") ? selectedDate.split("T")[0] : selectedDate
+
+      console.log(`🔍 Solicitando slots:`)
+      console.log(`   - Vehicle ID: ${vehicleId}`)
+      console.log(`   - Fecha: ${formattedDate}`)
+      console.log(`   - Duración: ${selectedDuration.duration}`)
+
+      const url = `/api/availability/${vehicleId}/slots?date=${encodeURIComponent(formattedDate)}&duration=${encodeURIComponent(selectedDuration.duration)}`
+      console.log(`🌐 URL: ${url}`)
+
+      const response = await fetch(url)
+
       if (response.ok) {
         const data = await response.json()
+        console.log("📊 Datos recibidos:", data)
         setAvailableSlots(data.slots || [])
-        setSchedule(data.schedule || null)
-        setVehicleType(data.vehicleType || "other")
-        setCustomDurationEnabled(data.customDurationEnabled ?? true) // NUEVO CAMPO
+        setVehicleCategory(data.vehicleCategory || "")
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        console.error(`❌ Error ${response.status}:`, errorData)
+        setError(`Error ${response.status}: ${errorData.error || "No se pudieron cargar los horarios"}`)
+        setAvailableSlots([])
       }
     } catch (error) {
-      console.error("Error fetching time slots:", error)
+      console.error("❌ Error de conexión:", error)
+      setError("Error de conexión: No se pudieron cargar los horarios")
       setAvailableSlots([])
-      setSchedule(null)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchCustomRate = async () => {
-    try {
-      const response = await fetch(`/api/pricing/${vehicleId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setCustomRatePerMinute(data.customRatePerMinute || 0)
-      }
-    } catch (error) {
-      console.error("Error fetching custom rate:", error)
-    }
-  }
-
-  const calculateCustomPrice = (hours: number, minutes: number): number => {
-    const totalMinutes = hours * 60 + minutes
-
-    if (customRatePerMinute > 0) {
-      return Math.round(customRatePerMinute * totalMinutes)
-    } else {
-      const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
-      const hourlyOption = pricingOptions.find((option) => option.duration === "1hour")
-
-      if (!hourlyOption) {
-        const halfdayOption = pricingOptions.find((option) => option.duration === "halfday")
-        if (halfdayOption) {
-          const hourlyRate = halfdayOption.price / 6
-          return Math.round((hourlyRate / 60) * totalMinutes)
-        }
-      } else {
-        const hourlyRate = hourlyOption.price / 60
-        return Math.round(hourlyRate * totalMinutes)
-      }
-
-      return Math.round(2 * totalMinutes)
-    }
-  }
-
-  const calculateEndTime = (startTime: string, duration: string): string => {
-    const [hours, minutes] = startTime.split(":").map(Number)
-    let totalMinutes = hours * 60 + minutes
-
-    if (duration.startsWith("custom_")) {
-      const durationPart = duration.substring(7)
-      const hoursMatch = durationPart.match(/(\d+)h/)
-      const minutesMatch = durationPart.match(/h(\d+)/)
-
-      const durationHours = hoursMatch ? Number.parseInt(hoursMatch[1]) : 0
-      const durationMinutes = minutesMatch ? Number.parseInt(minutesMatch[1]) : 0
-
-      totalMinutes += durationHours * 60 + durationMinutes
-    } else {
-      switch (duration) {
-        case "30min":
-          totalMinutes += 30
-          break
-        case "1hour":
-          totalMinutes += 60
-          break
-        case "2hour":
-          totalMinutes += 120
-          break
-        case "halfday":
-          totalMinutes += 360
-          break
-        case "fullday":
-          totalMinutes += 720
-          break
-        default:
-          totalMinutes += 60
-      }
-    }
-
-    const endHours = Math.floor(totalMinutes / 60)
-    const endMinutes = totalMinutes % 60
-    return `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`
-  }
-
-  const handleTimeSlotClick = (startTime: string) => {
-    if (!selectedDuration) return
-
-    const endTime = calculateEndTime(startTime, selectedDuration.duration)
+  const handleTimeSlotClick = (slot: TimeSlot) => {
+    if (!selectedDuration || !slot.available) return
 
     onTimeSelect({
-      start: startTime,
-      end: endTime,
+      start: slot.time,
+      end: slot.endTime || slot.time,
       duration: selectedDuration.duration,
       price: selectedDuration.price,
     })
@@ -224,21 +162,17 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   const isToday = (dateString: string): boolean => {
     const spainTime = getSpainTime()
     const selectedDate = new Date(dateString + "T00:00:00")
-
     const todayInSpain = new Date(spainTime.getFullYear(), spainTime.getMonth(), spainTime.getDate())
     const selectedDateOnly = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())
-
     return todayInSpain.getTime() === selectedDateOnly.getTime()
   }
 
-  const getAvailableSlotsForDuration = () => {
-    if (!selectedDuration) return []
-
+  const getFilteredSlots = () => {
     const spainTime = getSpainTime()
     const isSelectedDateToday = isToday(selectedDate)
 
-    const filteredSlots = availableSlots.filter((slot) => {
-      if (!slot.available) return false
+    return availableSlots.filter((slot) => {
+      if (!slot.available || slot.restricted) return false
 
       if (!isSelectedDateToday) return true
 
@@ -249,11 +183,31 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
       return slotTimeInMinutes >= minimumTimeInMinutes
     })
+  }
 
-    return filteredSlots
+  const getSlotLabel = (slot: TimeSlot) => {
+    if (slot.type === "boat-halfday") return `${slot.time} - ${slot.endTime}`
+    if (slot.type === "fullday") return `${t.fullDay} (${slot.time} - ${slot.endTime})`
+
+    // Para slots regulares, mostrar el rango de tiempo
+    if (slot.endTime) {
+      return `${slot.time} - ${slot.endTime}`
+    }
+
+    return slot.time
   }
 
   const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
+
+  // Función para obtener el mensaje de restricción apropiado
+  const getRestrictionMessage = () => {
+    if (vehicleCategory === "jetski_no_license") {
+      return t.restrictedJetski
+    } else if (vehicleCategory === "boat_no_license") {
+      return t.restrictedBoat
+    }
+    return ""
+  }
 
   return (
     <div className="space-y-6">
@@ -287,99 +241,27 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 </div>
               </button>
             ))}
-
-            {/* Opción de duración personalizada - SOLO SI ESTÁ HABILITADA */}
-            {customDurationEnabled && (
-              <button
-                onClick={() => setShowCustomDuration(!showCustomDuration)}
-                className={`
-                  p-4 rounded-lg border-2 transition-all duration-200 text-left
-                  ${showCustomDuration ? "border-gold bg-gold/10" : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"}
-                `}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold text-black">{t.customDuration}</div>
-                    <div className="text-sm text-gray-600">{t.selectCustomTime}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-gold">+</div>
-                  </div>
-                </div>
-              </button>
-            )}
-
-            {showCustomDuration && customDurationEnabled && (
-              <div className="p-4 rounded-lg border-2 border-gold bg-gold/5">
-                <div className="mb-3 font-medium text-black">{t.customDurationTitle}</div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">{t.hours}</label>
-                    <select
-                      value={customDuration.hours}
-                      onChange={(e) => setCustomDuration({ ...customDuration, hours: Number.parseInt(e.target.value) })}
-                      className="w-full p-2 border border-gray-200 rounded-md"
-                    >
-                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((hour) => (
-                        <option key={hour} value={hour}>
-                          {hour}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">{t.minutes}</label>
-                    <select
-                      value={customDuration.minutes}
-                      onChange={(e) =>
-                        setCustomDuration({ ...customDuration, minutes: Number.parseInt(e.target.value) })
-                      }
-                      className="w-full p-2 border border-gray-200 rounded-md"
-                    >
-                      {[0, 15, 30, 45].map((minute) => (
-                        <option key={minute} value={minute}>
-                          {minute}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {(customDuration.hours > 0 || customDuration.minutes > 0) && (
-                  <div className="mt-4 flex justify-between items-center">
-                    <div>
-                      <div className="text-sm text-gray-600">{t.estimatedPrice}:</div>
-                      <div className="text-xl font-bold text-gold">
-                        €{calculateCustomPrice(customDuration.hours, customDuration.minutes)}
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        const durationStr = `${customDuration.hours}h${customDuration.minutes > 0 ? customDuration.minutes : ""}`
-                        const customOption = {
-                          duration: `custom_${durationStr}`,
-                          price: calculateCustomPrice(customDuration.hours, customDuration.minutes),
-                          label: `${customDuration.hours}h ${customDuration.minutes > 0 ? `${customDuration.minutes}min` : ""}`,
-                          isCustom: true,
-                        }
-                        setSelectedDuration(customOption)
-                        setShowCustomDuration(false)
-                      }}
-                      disabled={customDuration.hours === 0 && customDuration.minutes === 0}
-                      className="bg-gold text-black hover:bg-black hover:text-white"
-                    >
-                      {t.apply}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Información de restricciones para vehículos sin licencia */}
+      {(vehicleCategory === "jetski_no_license" || vehicleCategory === "boat_no_license") && (
+        <Card className="bg-orange-50 border border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-orange-600 mr-3" />
+              <div>
+                <h4 className="font-semibold text-orange-800">Horario restringido</h4>
+                <p className="text-orange-700 text-sm">{getRestrictionMessage()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Time Slots */}
-      {selectedDuration && (
+      {selectedDuration ? (
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -395,28 +277,33 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 <Loader2 className="h-8 w-8 animate-spin text-gold mx-auto mb-2" />
                 <p className="text-gray-500">{t.loading}</p>
               </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <p className="text-red-500 font-medium">{error}</p>
+                <Button
+                  onClick={fetchAvailableSlots}
+                  variant="outline"
+                  className="mt-4 border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  Reintentar
+                </Button>
+              </div>
             ) : (
               <div className="space-y-4">
-                {getAvailableSlotsForDuration().length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {getAvailableSlotsForDuration().map((slot) => {
-                      const endTime = calculateEndTime(slot.time, selectedDuration.duration)
+                {getFilteredSlots().length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {getFilteredSlots().map((slot, index) => {
                       const isSelected =
                         selectedTime?.start === slot.time && selectedTime?.duration === selectedDuration.duration
 
-                      // Etiquetas especiales para slots fijos de barcos
-                      let slotLabel = slot.time
-                      if (slot.type === "morning-half") slotLabel = "Mañana (09:00)"
-                      if (slot.type === "afternoon-half") slotLabel = "Tarde (15:00)"
-                      if (slot.type === "fullday") slotLabel = "Todo el día (09:00)"
-
                       return (
                         <Button
-                          key={slot.time}
+                          key={`${slot.time}-${index}`}
                           variant={isSelected ? "default" : "outline"}
-                          onClick={() => handleTimeSlotClick(slot.time)}
+                          onClick={() => handleTimeSlotClick(slot)}
                           className={`
-                            h-auto p-3 flex flex-col items-center
+                            h-auto p-4 flex flex-col items-center justify-center min-h-[80px]
                             ${
                               isSelected
                                 ? "bg-gold text-black hover:bg-gold/90"
@@ -424,11 +311,8 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                             }
                           `}
                         >
-                          <div className="font-semibold">{slotLabel}</div>
-                          <div className="text-xs opacity-75">
-                            {t.to} {endTime}
-                          </div>
-                          {isSelected && <Badge className="mt-1 bg-black text-white text-xs">{t.selected}</Badge>}
+                          <div className="font-semibold text-center">{getSlotLabel(slot)}</div>
+                          {isSelected && <Badge className="mt-2 bg-black text-white text-xs">{t.selected}</Badge>}
                         </Button>
                       )
                     })}
@@ -441,6 +325,13 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="bg-gray-50 border border-gray-200">
+          <CardContent className="p-8 text-center">
+            <Clock className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500">{t.selectDurationFirst}</p>
           </CardContent>
         </Card>
       )}
@@ -457,9 +348,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
                     {selectedTime.start} - {selectedTime.end}
                   </div>
                   <div className="text-sm text-gray-600">
-                    {selectedTime.duration.startsWith("custom_")
-                      ? selectedTime.duration.replace("custom_", "").replace("h", "h ")
-                      : pricingOptions.find((p) => p.duration === selectedTime.duration)?.label}
+                    {pricingOptions.find((p) => p.duration === selectedTime.duration)?.label}
                   </div>
                 </div>
               </div>
