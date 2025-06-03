@@ -1,5 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createBooking } from "@/lib/db/queries"
+import { createBooking, getBookings } from "@/lib/db/queries"
+
+export async function GET(request: NextRequest) {
+  try {
+    console.log("📅 API: Fetching bookings...")
+    const bookings = await getBookings()
+    console.log(`✅ API: Found ${bookings.length} bookings`)
+    
+    return NextResponse.json(bookings)
+  } catch (error) {
+    console.error("❌ API Error fetching bookings:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to fetch bookings",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
