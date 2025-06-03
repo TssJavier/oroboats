@@ -4,9 +4,24 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Ship, Zap, Users, Clock, Calendar, Fuel, Award, AlertCircle, X, CheckCircle, FileText, Check } from 'lucide-react'
-import Link from "next/link"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Ship,
+  Zap,
+  Users,
+  Clock,
+  Calendar,
+  Fuel,
+  Award,
+  AlertCircle,
+  X,
+  CheckCircle,
+  FileText,
+  Phone,
+  MessageCircle,
+  HelpCircle,
+  Mail,
+} from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import { useRouter } from "next/navigation"
@@ -59,6 +74,11 @@ interface Translations {
   understand: string
   cancel: string
   continueReservation: string
+  needHelp: string
+  contactUs: string
+  call: string
+  whatsapp: string
+  email: string
 }
 
 const translations = {
@@ -84,11 +104,17 @@ const translations = {
     restrictedInfo: "No disponible de 14:00 a 16:00 (descanso del personal)",
     licenseWarningTitle: "Licencia de Navegación Requerida",
     licenseWarningMessage: "Has seleccionado un vehículo que requiere licencia de navegación.",
-    licenseWarningRequirements: "Deberás presentar tu licencia de navegación válida en el momento del alquiler. Sin la licencia correspondiente, no podremos proceder con el alquiler del vehículo.",
+    licenseWarningRequirements:
+      "Deberás presentar tu licencia de navegación válida en el momento del alquiler. Sin la licencia correspondiente, no podremos proceder con el alquiler del vehículo.",
     licenseWarningNote: "Asegúrate de traer tu documentación original el día de la reserva.",
     understand: "Entendido",
     cancel: "Cancelar",
     continueReservation: "Continuar con la Reserva",
+    needHelp: "¿Necesitas ayuda?",
+    contactUs: "Háblanos o llámanos",
+    call: "Llamar",
+    whatsapp: "WhatsApp",
+    email: "Email",
   },
   en: {
     title: "Our Fleet",
@@ -112,27 +138,33 @@ const translations = {
     restrictedInfo: "Not available from 14:00 to 16:00 (staff break)",
     licenseWarningTitle: "Navigation License Required",
     licenseWarningMessage: "You have selected a vehicle that requires a navigation license.",
-    licenseWarningRequirements: "You must present your valid navigation license at the time of rental. Without the corresponding license, we cannot proceed with the vehicle rental.",
+    licenseWarningRequirements:
+      "You must present your valid navigation license at the time of rental. Without the corresponding license, we cannot proceed with the vehicle rental.",
     licenseWarningNote: "Make sure to bring your original documentation on the day of the reservation.",
     understand: "Understood",
     cancel: "Cancel",
     continueReservation: "Continue with Reservation",
+    needHelp: "Need help?",
+    contactUs: "Talk to us or call us",
+    call: "Call",
+    whatsapp: "WhatsApp",
+    email: "Email",
   },
 }
 
 // Modal de advertencia de licencia
-function LicenseWarningModal({ 
-  isOpen, 
-  onClose, 
-  onContinue, 
-  vehicle, 
-  t 
-}: { 
+function LicenseWarningModal({
+  isOpen,
+  onClose,
+  onContinue,
+  vehicle,
+  t,
+}: {
   isOpen: boolean
   onClose: () => void
   onContinue: () => void
   vehicle: Vehicle
-  t: Translations 
+  t: Translations
 }) {
   if (!isOpen) return null
 
@@ -148,10 +180,7 @@ function LicenseWarningModal({
               </div>
               <h3 className="text-lg font-bold text-black">{t.licenseWarningTitle}</h3>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -171,17 +200,13 @@ function LicenseWarningModal({
           {/* Warning Message */}
           <div className="space-y-4 mb-6">
             <p className="text-gray-700">{t.licenseWarningMessage}</p>
-            
+
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-start">
                 <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="text-yellow-800 text-sm font-medium mb-2">
-                    {t.licenseWarningRequirements}
-                  </p>
-                  <p className="text-yellow-700 text-sm">
-                    {/*{t.licenseWarningNote}*/}
-                  </p>
+                  <p className="text-yellow-800 text-sm font-medium mb-2">{t.licenseWarningRequirements}</p>
+                  <p className="text-yellow-700 text-sm">{/*{t.licenseWarningNote}*/}</p>
                 </div>
               </div>
             </div>
@@ -196,16 +221,110 @@ function LicenseWarningModal({
             >
               {t.cancel}
             </Button>
-            <Button
-              onClick={onContinue}
-              className="flex-1 bg-blue-600 text-white hover:bg-blue-700"
-            >
+            <Button onClick={onContinue} className="flex-1 bg-blue-600 text-white hover:bg-blue-700">
               <CheckCircle className="h-4 w-4 mr-2" />
               {t.continueReservation}
             </Button>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Widget de contacto flotante
+function FloatingContactWidget({ t }: { t: Translations }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const handleCall = () => {
+    window.location.href = "tel:+34655527988"
+  }
+
+  const handleWhatsApp = () => {
+    const message = encodeURIComponent("Hola, necesito ayuda con el alquiler de embarcaciones")
+    window.open(`https://wa.me/34643442364?text=${message}`, "_blank")
+  }
+
+  const handleEmail = () => {
+    window.location.href = "mailto:info@oroboats.com"
+  }
+
+  return (
+    <div className="fixed bottom-4 right-4 z-40 sm:bottom-6 sm:right-6">
+      {!isOpen ? (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="bg-gold hover:bg-yellow-500 text-black p-4 sm:p-5 rounded-full shadow-xl transition-all duration-300 hover:scale-105 group border-2 border-white"
+          aria-label={t.needHelp}
+        >
+          <HelpCircle className="h-6 w-6 sm:h-8 sm:w-8" />
+
+          {/* Tooltip solo en desktop */}
+          <div className="absolute right-full mr-3 top-1/2 transform -translate-y-1/2 bg-black text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none hidden sm:block">
+            {t.needHelp}
+          </div>
+        </button>
+      ) : (
+        <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-72 sm:w-80 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="p-4 sm:p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <div className="bg-gold p-2 rounded-full mr-3">
+                  <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 text-black" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{t.needHelp}</h3>
+                  <p className="text-xs sm:text-sm text-gray-600">{t.contactUs}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                aria-label="Cerrar"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+            </div>
+
+            {/* Contact Options */}
+            <div className="space-y-2 sm:space-y-3">
+              <button
+                onClick={handleCall}
+                className="w-full flex items-center bg-blue-500 hover:bg-blue-600 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg transition-colors duration-200"
+              >
+                <Phone className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-sm sm:text-base">{t.call}</div>
+                  <div className="text-xs sm:text-sm opacity-90">+34 655 52 79 88</div>
+                </div>
+              </button>
+
+              <button
+                onClick={handleWhatsApp}
+                className="w-full flex items-center bg-green-500 hover:bg-green-600 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg transition-colors duration-200"
+              >
+                <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-sm sm:text-base">{t.whatsapp}</div>
+                  <div className="text-xs sm:text-sm opacity-90">+34 643 44 23 64</div>
+                </div>
+              </button>
+
+              <button
+                onClick={handleEmail}
+                className="w-full flex items-center bg-gray-600 hover:bg-gray-700 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg transition-colors duration-200"
+              >
+                <Mail className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-sm sm:text-base">{t.email}</div>
+                  <div className="text-xs sm:text-sm opacity-90">info@oroboats.com</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -256,7 +375,7 @@ export function BoatsSection() {
 
   // Filtrar vehículos por categoría
   const getVehiclesByCategory = (type: string, hasLicense: boolean) => {
-    const category = `${type}_${hasLicense ? 'with_license' : 'no_license'}`
+    const category = `${type}_${hasLicense ? "with_license" : "no_license"}`
     return vehicles.filter((v) => v.category === category)
   }
 
@@ -286,47 +405,54 @@ export function BoatsSection() {
 
   if (error) {
     return (
-      <section className="py-24 bg-white min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
-            <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
+      <>
+        <section className="py-24 bg-white min-h-screen">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
+              <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
+            </div>
+            <Card className="bg-red-50 border border-red-200">
+              <CardContent className="text-center py-12">
+                <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
+                <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
+                  Reintentar
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-          <Card className="bg-red-50 border border-red-200">
-            <CardContent className="text-center py-12">
-              <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
-              <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
-                Reintentar
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+        </section>
+        <FloatingContactWidget t={t} />
+      </>
     )
   }
 
   if (loading) {
     return (
-      <section className="py-24 bg-white min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
-            <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.loading}</p>
+      <>
+        <section className="py-24 bg-white min-h-screen">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
+              <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.loading}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[...Array(3)].map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-72 bg-gray-200"></div>
+                  <CardHeader>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </CardHeader>
+                  <CardContent></CardContent> {/* Added closing tag for CardContent */}
+                </Card>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(3)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <div className="h-72 bg-gray-200"></div>
-                <CardHeader>
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+        <FloatingContactWidget t={t} />
+      </>
     )
   }
 
@@ -363,17 +489,16 @@ export function BoatsSection() {
           <div className="flex justify-center mb-12">
             <div className="bg-gray-100 p-2 rounded-lg border border-gray-200">
               <div className="grid grid-cols-2 gap-2">
-<button
-  onClick={() => setActiveLicense("without")}
-  className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center ${
-    activeLicense === "without"
-      ? "bg-gold text-black shadow-md"
-      : "text-gray-600 hover:text-black hover:bg-gray-50"
-  }`}
->
-  <Check className="h-4 w-4 mr-2" />
-  {t.withoutLicense}
-</button>
+                <button
+                  onClick={() => setActiveLicense("without")}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center ${
+                    activeLicense === "without"
+                      ? "bg-gold text-black shadow-md"
+                      : "text-gray-600 hover:text-black hover:bg-gray-50"
+                  }`}
+                >
+                  {t.withoutLicense}
+                </button>
                 <button
                   onClick={() => setActiveLicense("with")}
                   className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center ${
@@ -409,18 +534,13 @@ export function BoatsSection() {
           {/* Lista de Vehículos */}
           <div className="max-w-6xl mx-auto">
             {currentVehicles.length > 0 ? (
-              <div className={`grid gap-8 ${
-                activeTab === "boats" 
-                  ? "grid-cols-1 max-w-4xl mx-auto" 
-                  : "grid-cols-1 md:grid-cols-2"
-              }`}>
+              <div
+                className={`grid gap-8 ${
+                  activeTab === "boats" ? "grid-cols-1 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"
+                }`}
+              >
                 {currentVehicles.map((vehicle) => (
-                  <VehicleCard 
-                    key={vehicle.id} 
-                    vehicle={vehicle} 
-                    t={t} 
-                    onReserveClick={handleReserveClick}
-                  />
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} t={t} onReserveClick={handleReserveClick} />
                 ))}
               </div>
             ) : (
@@ -437,6 +557,9 @@ export function BoatsSection() {
         </div>
       </section>
 
+      {/* Widget de contacto flotante */}
+      <FloatingContactWidget t={t} />
+
       {/* Modal de advertencia de licencia */}
       {selectedVehicle && (
         <LicenseWarningModal
@@ -451,11 +574,11 @@ export function BoatsSection() {
   )
 }
 
-function VehicleCard({ 
-  vehicle, 
-  t, 
-  onReserveClick 
-}: { 
+function VehicleCard({
+  vehicle,
+  t,
+  onReserveClick,
+}: {
   vehicle: Vehicle
   t: Translations
   onReserveClick: (vehicle: Vehicle) => void
@@ -480,13 +603,13 @@ function VehicleCard({
           />
         </div>
         <Badge className="absolute top-4 right-4 bg-gold text-black font-semibold">{t.available}</Badge>
-        
+
         {/* Badge de licencia */}
-        <Badge className={`absolute top-4 left-4 font-semibold ${
-          vehicle.requiresLicense 
-            ? "bg-blue-600 text-white" 
-            : "bg-green-600 text-white"
-        }`}>
+        <Badge
+          className={`absolute top-4 left-4 font-semibold ${
+            vehicle.requiresLicense ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+          }`}
+        >
           {vehicle.requiresLicense ? t.licenseRequired : t.noLicenseNeeded}
         </Badge>
 
