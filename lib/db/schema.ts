@@ -5,14 +5,17 @@ export const vehicles = pgTable("vehicles", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").notNull(), // 'jetski' | 'boat'
+  category: text("category").notNull(), // 'boat_no_license' | 'boat_with_license' | 'jetski_no_license' | 'jetski_with_license'
+  requiresLicense: boolean("requires_license").default(false),
   capacity: integer("capacity").notNull(),
   pricing: jsonb("pricing").notNull(), // Array de PricingOption
+  availableDurations: jsonb("available_durations").notNull(), // ["30min", "1hour", "halfday", "fullday"]
   includes: jsonb("includes").notNull(), // Array de strings
   fuelIncluded: boolean("fuel_included").notNull(),
   description: text("description").notNull(),
   image: text("image").notNull(),
   available: boolean("available").default(true),
-  customDurationEnabled: boolean("custom_duration_enabled").default(true), // NUEVO CAMPO
+  customDurationEnabled: boolean("custom_duration_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })

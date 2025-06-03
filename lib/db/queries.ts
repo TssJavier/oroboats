@@ -32,6 +32,40 @@ export async function getAllVehicles() {
   }
 }
 
+// Función para obtener vehículos por categoría
+export async function getVehiclesByCategory(category: string) {
+  try {
+    console.log(`🔍 DB: Fetching vehicles for category ${category}...`)
+    const result = await db
+      .select()
+      .from(vehicles)
+      .where(and(eq(vehicles.category, category), eq(vehicles.available, true)))
+      .orderBy(vehicles.name)
+    console.log(`✅ DB: Found ${result.length} vehicles for category ${category}`)
+    return result
+  } catch (error) {
+    console.error(`❌ DB Error fetching vehicles for category ${category}:`, error)
+    throw error
+  }
+}
+
+// Función para verificar restricciones horarias
+export async function getTimeRestrictions(vehicleCategory: string, date: string) {
+  try {
+    // Solo motos sin licencia tienen restricciones
+    if (vehicleCategory === 'jetski_no_license') {
+      return {
+        blockedHours: { start: "14:00", end: "16:00" },
+        reason: "Staff lunch break"
+      }
+    }
+    return null
+  } catch (error) {
+    console.error("Error getting time restrictions:", error)
+    return null
+  }
+}
+
 export async function getVehicleById(id: number) {
   try {
     console.log(`🔍 DB: Fetching vehicle ${id}...`)
