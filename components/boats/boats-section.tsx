@@ -92,6 +92,7 @@ interface Translations {
   includes: string
   available: string
   fuelSeparate: string
+  fuelIncluded: string
   noVehicles: string
   loading: string
   licenseRequired: string
@@ -112,6 +113,20 @@ interface Translations {
   whatsapp: string
   email: string
   securityDeposit: string
+  prices: string
+  people: string
+  // ✅ NUEVAS TRADUCCIONES PARA EXTRAS
+  photoSession: string
+  bluetoothMusic: string
+  safetyRing: string
+  champagne: string
+  snorkelingGear: string
+  coolerDrinks: string
+  // ✅ TRADUCCIONES PARA FRANJAS HORARIAS
+  halfDayMorning: string
+  halfDayAfternoon: string
+  halfDayEvening: string
+  fullDay: string
 }
 
 const translations = {
@@ -128,6 +143,7 @@ const translations = {
     includes: "Incluye",
     available: "Disponible",
     fuelSeparate: "Gasolina aparte",
+    fuelIncluded: "Gasolina incluida",
     noVehicles: "No hay vehículos disponibles en esta categoría",
     loading: "Cargando...",
     licenseRequired: "Licencia requerida",
@@ -149,6 +165,20 @@ const translations = {
     whatsapp: "WhatsApp",
     email: "Email",
     securityDeposit: "Fianza",
+    prices: "Precios",
+    people: "personas",
+    // Extras en español
+    photoSession: "Sesión de fotos",
+    bluetoothMusic: "Música Bluetooth",
+    safetyRing: "Rosco de seguridad",
+    champagne: "Champán",
+    snorkelingGear: "Equipo de snorkel",
+    coolerDrinks: "Nevera con bebidas",
+    // Franjas horarias en español
+    halfDayMorning: "Medio día mañana",
+    halfDayAfternoon: "Medio día tarde",
+    halfDayEvening: "Medio día noche",
+    fullDay: "Día completo",
   },
   en: {
     title: "Our Fleet",
@@ -163,6 +193,7 @@ const translations = {
     includes: "Includes",
     available: "Available",
     fuelSeparate: "Fuel separate",
+    fuelIncluded: "Fuel included",
     noVehicles: "No vehicles available in this category",
     loading: "Loading...",
     licenseRequired: "License required",
@@ -184,7 +215,58 @@ const translations = {
     whatsapp: "WhatsApp",
     email: "Email",
     securityDeposit: "Security Deposit",
+    prices: "Prices",
+    people: "people",
+    // ✅ EXTRAS EN INGLÉS
+    photoSession: "Photo session",
+    bluetoothMusic: "Bluetooth Music",
+    safetyRing: "Safety ring",
+    champagne: "Champagne",
+    snorkelingGear: "Snorkel equipment",
+    coolerDrinks: "Cooler with drinks",
+    // ✅ FRANJAS HORARIAS EN INGLÉS
+    halfDayMorning: "Half day morning",
+    halfDayAfternoon: "Half day afternoon",
+    halfDayEvening: "Half day evening",
+    fullDay: "Full day",
   },
+}
+
+// ✅ FUNCIÓN PARA TRADUCIR NOMBRES DE EXTRAS
+function translateExtraName(extraId: string, t: Translations): string {
+  switch (extraId) {
+    case "photo_session":
+      return t.photoSession
+    case "bluetooth_music":
+      return t.bluetoothMusic
+    case "safety_ring":
+      return t.safetyRing
+    case "champagne":
+      return t.champagne
+    case "snorkeling_gear":
+      return t.snorkelingGear
+    case "cooler_drinks":
+      return t.coolerDrinks
+    default:
+      return extraId.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+  }
+}
+
+// ✅ FUNCIÓN PARA TRADUCIR ETIQUETAS DE TIEMPO
+function translateTimeLabel(label: string, t: Translations): string {
+  if (label.includes("Medio día mañana") || label.includes("Half day morning")) {
+    return `${t.halfDayMorning} (10:00 - 14:00)`
+  }
+  if (label.includes("Medio día tarde") || label.includes("Half day afternoon")) {
+    return `${t.halfDayAfternoon} (16:00 - 20:00)`
+  }
+  if (label.includes("Medio día noche") || label.includes("Half day evening")) {
+    return `${t.halfDayEvening} (17:00 - 21:00)`
+  }
+  if (label.includes("Día completo") || label.includes("Full day")) {
+    return `${t.fullDay} (10:00 - 21:00)`
+  }
+  return label
 }
 
 // ✅ FUNCIÓN MEJORADA CON ICONOS MÁS ESPECÍFICOS
@@ -708,7 +790,7 @@ function VehicleCard({
         {vehicle.fuelIncluded ? (
           <Badge className="absolute top-16 left-4 bg-green-500 text-white font-semibold">
             <Fuel className="h-3 w-3 mr-1" />
-            Gasolina incluida
+            {t.fuelIncluded}
           </Badge>
         ) : (
           <Badge className="absolute top-16 left-4 bg-orange-500 text-white font-semibold">
@@ -732,19 +814,21 @@ function VehicleCard({
               <Users className="h-5 w-5 mr-2 text-gold" />
               {t.capacity}
             </span>
-            <span className="text-black font-semibold">{vehicle.capacity} personas</span>
+            <span className="text-black font-semibold">
+              {vehicle.capacity} {t.people}
+            </span>
           </div>
 
           <div className="space-y-3">
             <span className="flex items-center text-gray-500 text-base font-medium">
               <Clock className="h-5 w-5 mr-2 text-gold" />
-              Precios:
+              {t.prices}:
             </span>
             <div className="grid grid-cols-2 gap-3">
               {vehicle.pricing.map((option, index) => (
                 <div key={index} className="bg-gray-50 rounded-lg p-4 text-center border border-gray-200">
                   <div className="text-xl font-bold text-gold">€{option.price}</div>
-                  <div className="text-sm text-gray-600 font-medium">{option.label}</div>
+                  <div className="text-sm text-gray-600 font-medium">{translateTimeLabel(option.label, t)}</div>
                 </div>
               ))}
             </div>
@@ -761,7 +845,7 @@ function VehicleCard({
             </div>
           </div>
 
-          {/* ✅ EXTRAS CON ICONOS MEJORADOS */}
+          {/* ✅ EXTRAS CON ICONOS MEJORADOS Y TRADUCCIONES */}
           {enabledExtras.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
               {enabledExtras.map((extra, index) => (
@@ -771,7 +855,7 @@ function VehicleCard({
                   title={extra.description}
                 >
                   {getExtraIcon(extra.id)}
-                  <span className="text-xs text-purple-700 ml-2 font-medium">{extra.name}</span>
+                  <span className="text-xs text-purple-700 ml-2 font-medium">{translateExtraName(extra.id, t)}</span>
                   {extra.price && extra.price > 0 && (
                     <span className="text-xs text-purple-600 ml-1">(+{extra.price}€)</span>
                   )}
