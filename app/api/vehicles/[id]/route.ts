@@ -71,6 +71,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       securityDeposit: securityDeposit || 0,
     })
 
+    // ✅ AQUÍ ESTABA EL PROBLEMA - AHORA INCLUIMOS TODOS LOS CAMPOS
     const result = await db
       .update(vehicles)
       .set({
@@ -87,6 +88,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         image,
         available,
         customDurationEnabled,
+        // ✅ AÑADIDOS LOS CAMPOS QUE FALTABAN
+        extraFeatures: extraFeatures || [],
+        securityDeposit: securityDeposit !== undefined && securityDeposit !== null ? String(securityDeposit) : "0",
       })
       .where(eq(vehicles.id, id))
       .returning()
