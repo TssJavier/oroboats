@@ -1,0 +1,27 @@
+{
+  "name": "OroBoats Granada - Alquiler de Barcos y Motos de Agua",
+  "short_name": "OroBoats",
+  "description": "Alquila barcos y motos de agua en Granada con OroBoats",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["travel", "lifestyle", "sports"],
+  "lang": "es",
+  "dir": "ltr"
+}
