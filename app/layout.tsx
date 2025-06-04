@@ -9,8 +9,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
 
 export const metadata: Metadata = {
-  title: "OroBoats - Luxury Boat & Jet Ski Rental",
-  description: "Experience luxury on the water. Premium boat and jet ski rentals with unmatched elegance and service.",
+  title: "OroBoats - Barcos y Motos de Agua Granada",
+  description: "Alquila barcos y motos de agua en Granada. Disfruta de una experiencia única en la costa con OroBoats.",
 }
 
 export default function RootLayout({
