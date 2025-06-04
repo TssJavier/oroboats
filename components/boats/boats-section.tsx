@@ -667,7 +667,9 @@ function VehicleCard({
     }
 
     const filtered = vehicle.extraFeatures.filter((extra) => {
-      const isEnabled = extra.enabled === true || extra.enabled === "true"
+      const isEnabled =
+        (typeof extra.enabled === "boolean" && extra.enabled === true) ||
+        (typeof extra.enabled === "string" && extra.enabled === "true")
       console.log(`🔧 Extra ${extra.name}: enabled=${extra.enabled} (${typeof extra.enabled}) -> ${isEnabled}`)
       return isEnabled
     })
@@ -702,7 +704,13 @@ function VehicleCard({
           {vehicle.requiresLicense ? t.licenseRequired : t.noLicenseNeeded}
         </Badge>
 
-        {!vehicle.fuelIncluded && (
+        {/* ✅ BADGE DE GASOLINA - SIEMPRE VISIBLE */}
+        {vehicle.fuelIncluded ? (
+          <Badge className="absolute top-16 left-4 bg-green-500 text-white font-semibold">
+            <Fuel className="h-3 w-3 mr-1" />
+            Gasolina incluida
+          </Badge>
+        ) : (
           <Badge className="absolute top-16 left-4 bg-orange-500 text-white font-semibold">
             <Fuel className="h-3 w-3 mr-1" />
             {t.fuelSeparate}
@@ -750,17 +758,6 @@ function VehicleCard({
                   {item}
                 </Badge>
               ))}
-
-              {/* ✅ AÑADIR GASOLINA SI ESTÁ INCLUIDA */}
-              {vehicle.fuelIncluded && (
-                <Badge
-                  variant="outline"
-                  className="text-sm py-1 px-3 flex items-center gap-1 bg-amber-50 border-amber-200"
-                >
-                  <Fuel className="h-3 w-3 text-amber-600" />
-                  Gasolina
-                </Badge>
-              )}
             </div>
           </div>
 
@@ -775,7 +772,9 @@ function VehicleCard({
                 >
                   {getExtraIcon(extra.id)}
                   <span className="text-xs text-purple-700 ml-2 font-medium">{extra.name}</span>
-                  {extra.price && <span className="text-xs text-purple-600 ml-1">(+{extra.price}€)</span>}
+                  {extra.price && extra.price > 0 && (
+                    <span className="text-xs text-purple-600 ml-1">(+{extra.price}€)</span>
+                  )}
                 </div>
               ))}
             </div>
