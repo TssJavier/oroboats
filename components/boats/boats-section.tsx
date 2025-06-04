@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FiltersPanel, type FilterState } from "./filters-panel"
 import {
   Ship,
   Zap,
@@ -28,9 +29,9 @@ import {
   Waves,
   CreditCard,
   Wine,
-  Droplets,
   Coffee,
   Package,
+  Filter,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -77,6 +78,15 @@ interface Vehicle {
   available: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  isAvailable?: boolean
+  availableSlots?: Array<{
+    startTime: string
+    endTime: string
+    duration: string
+    label: string
+    price: number
+  }>
+  minHourlyPrice?: number
 }
 
 interface Translations {
@@ -115,18 +125,27 @@ interface Translations {
   securityDeposit: string
   prices: string
   people: string
-  // ✅ NUEVAS TRADUCCIONES PARA EXTRAS
   photoSession: string
   bluetoothMusic: string
   safetyRing: string
   champagne: string
   snorkelingGear: string
   coolerDrinks: string
-  // ✅ TRADUCCIONES PARA FRANJAS HORARIAS
   halfDayMorning: string
   halfDayAfternoon: string
   halfDayEvening: string
   fullDay: string
+  availableAt: string
+  notAvailableAtTime: string
+  checkAvailability: string
+  selectTimeSlot: string
+  noAvailableSlots: string
+  pricePerHour: string
+  searchResults: string
+  showingResults: string
+  noResultsFound: string
+  filterByAvailability: string
+  adjustFilters: string
 }
 
 const translations = {
@@ -167,18 +186,27 @@ const translations = {
     securityDeposit: "Fianza",
     prices: "Precios",
     people: "personas",
-    // Extras en español
     photoSession: "Sesión de fotos",
     bluetoothMusic: "Música Bluetooth",
     safetyRing: "Rosco de seguridad",
     champagne: "Champán",
     snorkelingGear: "Equipo de snorkel",
     coolerDrinks: "Nevera con bebidas",
-    // Franjas horarias en español
     halfDayMorning: "Medio día mañana",
     halfDayAfternoon: "Medio día tarde",
     halfDayEvening: "Medio día noche",
     fullDay: "Día completo",
+    availableAt: "Disponible a las",
+    notAvailableAtTime: "No disponible en el horario seleccionado",
+    checkAvailability: "Ver disponibilidad",
+    selectTimeSlot: "Seleccionar horario",
+    noAvailableSlots: "Sin horarios disponibles",
+    pricePerHour: "€/hora",
+    searchResults: "Resultados de búsqueda",
+    showingResults: "Mostrando resultados",
+    noResultsFound: "No se encontraron resultados",
+    filterByAvailability: "Filtrar por disponibilidad",
+    adjustFilters: "Intenta ajustar los filtros de búsqueda",
   },
   en: {
     title: "Our Fleet",
@@ -217,18 +245,27 @@ const translations = {
     securityDeposit: "Security Deposit",
     prices: "Prices",
     people: "people",
-    // ✅ EXTRAS EN INGLÉS
     photoSession: "Photo session",
     bluetoothMusic: "Bluetooth Music",
     safetyRing: "Safety ring",
     champagne: "Champagne",
     snorkelingGear: "Snorkel equipment",
     coolerDrinks: "Cooler with drinks",
-    // ✅ FRANJAS HORARIAS EN INGLÉS
     halfDayMorning: "Half day morning",
     halfDayAfternoon: "Half day afternoon",
     halfDayEvening: "Half day evening",
     fullDay: "Full day",
+    availableAt: "Available at",
+    notAvailableAtTime: "Not available at selected time",
+    checkAvailability: "Check availability",
+    selectTimeSlot: "Select time slot",
+    noAvailableSlots: "No available slots",
+    pricePerHour: "€/hour",
+    searchResults: "Search results",
+    showingResults: "Showing results",
+    noResultsFound: "No results found",
+    filterByAvailability: "Filter by availability",
+    adjustFilters: "Try adjusting the search filters",
   },
 }
 
@@ -283,22 +320,16 @@ function getExtraIcon(featureId: string) {
     case "snorkeling_gear":
       return <Waves className="h-4 w-4 text-cyan-600" />
     case "cooler_drinks":
-      return <Coffee className="h-4 w-4 text-orange-600\" />
-      {
-        /* Icono de bebidas */
-      }
+      return <Coffee className="h-4 w-4 text-orange-600" />
     case "fuel_included":
     case "extra_fuel":
     case "gasoline":
     case "fuel_tank":
-      return <Fuel className="h-4 w-4 text-red-600\" />
-      {
-        /* Icono de combustible */
-      }
+      return <Fuel className="h-4 w-4 text-red-600" />
     case "towels":
       return <Package className="h-4 w-4 text-blue-400" />
     case "water_sports":
-      return <Droplets className="h-4 w-4 text-blue-500" />
+      return <Waves className="h-4 w-4 text-blue-500" />
     default:
       return <Star className="h-4 w-4 text-gray-600" />
   }
@@ -358,7 +389,7 @@ function LicenseWarningModal({
                 <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-yellow-800 text-sm font-medium mb-2">{t.licenseWarningRequirements}</p>
-                  <p className="text-yellow-700 text-sm">{/*{t.licenseWarningNote}*/}</p>
+                  <p className="text-yellow-700 text-sm">{t.licenseWarningNote}</p>
                 </div>
               </div>
             </div>
@@ -488,10 +519,16 @@ export function BoatsSection() {
   const [activeTab, setActiveTab] = useState("boats")
   const [activeLicense, setActiveLicense] = useState("with")
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showLicenseModal, setShowLicenseModal] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
+
+  // ✅ REF PARA EL SCROLL AUTOMÁTICO
+  const productsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchVehicles()
@@ -508,9 +545,15 @@ export function BoatsSection() {
 
       const data = await response.json()
 
-      // Verificar que la respuesta sea un array
       if (Array.isArray(data)) {
-        setVehicles(data)
+        // Calcular precio mínimo por hora para cada vehículo
+        const vehiclesWithMinPrice = data.map((vehicle) => ({
+          ...vehicle,
+          minHourlyPrice: getMinHourlyPrice(vehicle.pricing),
+        }))
+
+        setVehicles(vehiclesWithMinPrice)
+        setFilteredVehicles(vehiclesWithMinPrice)
       } else {
         console.error("API returned non-array data:", data)
         setVehicles([])
@@ -525,10 +568,108 @@ export function BoatsSection() {
     }
   }
 
+  const getMinHourlyPrice = (pricing: PricingOption[]): number => {
+    if (!pricing || pricing.length === 0) return 0
+
+    // Convertir precios a precio por hora
+    const hourlyPrices = pricing.map((option) => {
+      const duration = option.duration
+      let hours = 1
+
+      if (duration === "30min") hours = 0.5
+      else if (duration === "1hour") hours = 1
+      else if (duration === "2hour") hours = 2
+      else if (duration.includes("halfday")) hours = 4
+      else if (duration.includes("fullday")) hours = 8
+
+      return option.price / hours
+    })
+
+    return Math.min(...hourlyPrices)
+  }
+
+  // ✅ FUNCIÓN PARA SCROLL AUTOMÁTICO
+  const scrollToProducts = () => {
+    if (productsRef.current) {
+      productsRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      })
+    }
+  }
+
+  const handleFiltersChange = async (filters: FilterState) => {
+    setSearchLoading(true)
+    setHasSearched(true)
+
+    try {
+      let results = [...vehicles]
+
+      // Si hay filtros de fecha/hora, verificar disponibilidad
+      if (filters.date && filters.startTime && filters.endTime) {
+        console.log("🔍 Checking availability with filters:", filters)
+
+        const response = await fetch("/api/vehicles/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: filters.date,
+            startTime: filters.startTime,
+            endTime: filters.endTime,
+            vehicleIds: results.map((v) => v.id),
+          }),
+        })
+
+        if (response.ok) {
+          const availabilityData = await response.json()
+          results = availabilityData.map((item: any) => ({
+            ...item,
+            isAvailable: item.isAvailable,
+            minHourlyPrice: getMinHourlyPrice(item.pricing),
+          }))
+
+          // Filtrar solo los disponibles si se especificó fecha/hora
+          results = results.filter((v) => v.isAvailable)
+        }
+      }
+
+      // Aplicar filtro de precio máximo
+      if (filters.maxPrice) {
+        results = results.filter((v) => (v.minHourlyPrice ?? 0) <= filters.maxPrice!)
+      }
+
+      // Aplicar ordenación
+      results.sort((a, b) => {
+        let comparison = 0
+
+        switch (filters.sortBy) {
+          case "price":
+            comparison = (a.minHourlyPrice ?? 0) - (b.minHourlyPrice ?? 0)
+            break
+          case "name":
+            comparison = a.name.localeCompare(b.name)
+            break
+          case "capacity":
+            comparison = a.capacity - b.capacity
+            break
+        }
+
+        return filters.sortOrder === "desc" ? -comparison : comparison
+      })
+
+      setFilteredVehicles(results)
+    } catch (error) {
+      console.error("Error applying filters:", error)
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
   // Filtrar vehículos por categoría
   const getVehiclesByCategory = (type: string, hasLicense: boolean) => {
     const category = `${type}_${hasLicense ? "with_license" : "no_license"}`
-    return vehicles.filter((v) => v.category === category)
+    return filteredVehicles.filter((v) => v.category === category)
   }
 
   const currentVehicles = getVehiclesByCategory(activeTab === "boats" ? "boat" : "jetski", activeLicense === "with")
@@ -617,6 +758,16 @@ export function BoatsSection() {
             <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
           </div>
 
+          {/* ✅ PANEL DE FILTROS CON SCROLL AUTOMÁTICO */}
+          <div className="mb-8">
+            <FiltersPanel
+              onFiltersChange={handleFiltersChange}
+              isLoading={searchLoading}
+              language={language}
+              onSearchClick={scrollToProducts}
+            />
+          </div>
+
           {/* Selector de Tipo de Vehículo */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
             <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-2 mb-8 bg-gray-100 border border-gray-200 h-16 p-2">
@@ -683,8 +834,29 @@ export function BoatsSection() {
             </div>
           )}
 
-          {/* Lista de Vehículos */}
-          <div className="max-w-6xl mx-auto">
+          {/* ✅ INDICADOR DE RESULTADOS */}
+          {hasSearched && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Filter className="h-5 w-5 text-blue-600 mr-2" />
+                  <span className="text-blue-800 font-medium">
+                    {t.showingResults}: {currentVehicles.length}{" "}
+                    {activeTab === "boats" ? t.boats.toLowerCase() : t.jetskis.toLowerCase()}
+                  </span>
+                </div>
+                {searchLoading && (
+                  <div className="flex items-center text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Buscando...
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ✅ LISTA DE VEHÍCULOS CON REF PARA SCROLL */}
+          <div ref={productsRef} className="max-w-6xl mx-auto" id="products-section" data-section="products">
             {currentVehicles.length > 0 ? (
               <div
                 className={`grid gap-8 ${
@@ -697,12 +869,22 @@ export function BoatsSection() {
               </div>
             ) : (
               <div className="text-center py-12">
-                {activeTab === "boats" ? (
-                  <Ship className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                {hasSearched ? (
+                  <>
+                    <Filter className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 text-lg">{t.noResultsFound}</p>
+                    <p className="text-gray-400 text-sm mt-2">{t.adjustFilters}</p>
+                  </>
                 ) : (
-                  <Zap className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <>
+                    {activeTab === "boats" ? (
+                      <Ship className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    ) : (
+                      <Zap className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    )}
+                    <p className="text-gray-500 text-lg">{t.noVehicles}</p>
+                  </>
                 )}
-                <p className="text-gray-500 text-lg">{t.noVehicles}</p>
               </div>
             )}
           </div>
@@ -775,7 +957,19 @@ function VehicleCard({
             }}
           />
         </div>
-        <Badge className="absolute top-4 right-4 bg-gold text-black font-semibold">{t.available}</Badge>
+
+        {/* ✅ BADGE DE DISPONIBILIDAD MEJORADO */}
+        {vehicle.isAvailable !== undefined ? (
+          <Badge
+            className={`absolute top-4 right-4 font-semibold ${
+              vehicle.isAvailable ? "bg-green-500 text-white" : "bg-red-500 text-white"
+            }`}
+          >
+            {vehicle.isAvailable ? t.available : t.notAvailableAtTime}
+          </Badge>
+        ) : (
+          <Badge className="absolute top-4 right-4 bg-gold text-black font-semibold">{t.available}</Badge>
+        )}
 
         {/* Badge de licencia */}
         <Badge
@@ -818,6 +1012,19 @@ function VehicleCard({
               {vehicle.capacity} {t.people}
             </span>
           </div>
+
+          {/* ✅ PRECIO POR HORA DESTACADO 
+          {vehicle.minHourlyPrice && (
+            <div className="bg-gold bg-opacity-10 border border-gold border-opacity-30 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">Desde</span>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-gold">€{Math.round(vehicle.minHourlyPrice)}</div>
+                  <div className="text-xs text-gray-600">{t.pricePerHour}</div>
+                </div>
+              </div>
+            </div>
+          )}*/}
 
           <div className="space-y-3">
             <span className="flex items-center text-gray-500 text-base font-medium">
@@ -863,6 +1070,7 @@ function VehicleCard({
               ))}
             </div>
           )}
+
           {/* Fianza */}
           {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -886,10 +1094,11 @@ function VehicleCard({
 
         <Button
           onClick={() => onReserveClick(vehicle)}
-          className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg py-3 h-12"
+          disabled={vehicle.isAvailable === false}
+          className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg py-3 h-12 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Calendar className="h-5 w-5 mr-2" />
-          {t.reserve}
+          {vehicle.isAvailable === false ? t.notAvailableAtTime : t.reserve}
         </Button>
       </CardContent>
     </Card>
