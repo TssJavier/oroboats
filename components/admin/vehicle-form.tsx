@@ -139,6 +139,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
   })
   const [newInclude, setNewInclude] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (vehicle) {
@@ -166,13 +167,18 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError(null)
 
     try {
       // Preparar datos para envío
       const dataToSend = {
         ...formData,
         availableDurations: formData.pricing.map((p) => p.duration),
+        extraFeatures: formData.extraFeatures || [],
+        securityDeposit: formData.securityDeposit || 0,
       }
+
+      console.log("📤 Sending data:", dataToSend)
 
       const url = vehicle ? `/api/vehicles/${vehicle.id}` : "/api/vehicles"
       const method = vehicle ? "PUT" : "POST"
@@ -184,10 +190,16 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
       })
 
       if (response.ok) {
+        console.log("✅ Operation successful")
         onSuccess()
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Error desconocido" }))
+        console.error("❌ Server error:", errorData)
+        setError(`Error ${response.status}: ${errorData.error || "Error desconocido"}`)
       }
     } catch (error) {
-      console.error("Error saving vehicle:", error)
+      console.error("❌ Connection error:", error)
+      setError("Error de conexión: " + (error instanceof Error ? error.message : "Error desconocido"))
     } finally {
       setLoading(false)
     }
@@ -245,6 +257,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
   }
 
   const updateExtraFeature = (featureId: string, field: keyof ExtraFeature, value: boolean | number) => {
+    console.log("🔧 Updating extra feature:", featureId, field, value)
     setFormData((prev) => ({
       ...prev,
       extraFeatures:
@@ -269,6 +282,16 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
           </p>
         </div>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -656,3 +679,6 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     </div>
   )
 }
+
+// ✅ EXPORTACIÓN CORRECTA - ESTO ERA LO QUE FALTABA
+export default VehicleForm

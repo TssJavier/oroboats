@@ -5,90 +5,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { VehicleForm } from "./vehicle-form"
-import { Plus, Edit, Trash2, Ship, Zap, Eye, EyeOff, AlertTriangle } from "lucide-react"
+import { Edit, Trash2, Plus, Ship, Zap, Users, Euro, AlertTriangle, RefreshCw, Eye, EyeOff } from "lucide-react"
 import Image from "next/image"
+import { toast } from "sonner"
+
+interface PricingOption {
+  duration: string
+  price: number
+  label: string
+}
+
+interface ExtraFeature {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  price?: number
+}
 
 interface Vehicle {
   id: number
   name: string
   type: string
+  category: string
+  requiresLicense: boolean
   capacity: number
-  pricing: Array<{ duration: string; price: number; label: string }>
+  pricing: PricingOption[]
+  availableDurations: string[]
   includes: string[]
   fuelIncluded: boolean
   description: string
   image: string
   available: boolean
-}
-
-function isValidUrl(string: string): boolean {
-  try {
-    new URL(string)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function isValidImageUrl(url: string): boolean {
-  if (!url) return false
-
-  if (!isValidUrl(url) && !url.startsWith("/")) {
-    return false
-  }
-
-  const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
-  const hasValidExtension = imageExtensions.some((ext) => url.toLowerCase().includes(ext))
-
-  return url.startsWith("/") || hasValidExtension
-}
-
-function SafeImage({
-  src,
-  alt,
-  width,
-  height,
-  className,
-}: {
-  src: string
-  alt: string
-  width: number
-  height: number
-  className?: string
-}) {
-  const [imageError, setImageError] = useState(false)
-  const [imageSrc, setImageSrc] = useState(src)
-
-  useEffect(() => {
-    setImageError(false)
-    setImageSrc(src)
-  }, [src])
-
-  const isValid = isValidImageUrl(src)
-
-  if (!isValid || imageError) {
-    return (
-      <div className={`${className} bg-gray-100 flex flex-col items-center justify-center text-gray-400`}>
-        <AlertTriangle className="h-8 w-8 mb-2" />
-        <span className="text-xs text-center px-2">{!isValid ? "URL inválida" : "Error al cargar imagen"}</span>
-        <span className="text-xs text-gray-300 mt-1 px-2 break-all">
-          {src.length > 30 ? `${src.substring(0, 30)}...` : src}
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <Image
-      src={imageSrc || "/placeholder.svg"}
-      alt={alt}
-      width={width}
-      height={height}
-      className={className}
-      onError={() => setImageError(true)}
-      onLoad={() => setImageError(false)}
-    />
-  )
+  customDurationEnabled: boolean
+  extraFeatures?: ExtraFeature[]
+  securityDeposit?: number
 }
 
 export function VehicleManagement() {
@@ -97,6 +48,7 @@ export function VehicleManagement() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
     fetchVehicles()
@@ -105,6 +57,9 @@ export function VehicleManagement() {
   const fetchVehicles = async () => {
     try {
       setError(null)
+      setLoading(true)
+
+      console.log("🚗 Fetching vehicles from API...")
       const response = await fetch("/api/vehicles?all=true")
 
       if (!response.ok) {
@@ -112,54 +67,72 @@ export function VehicleManagement() {
       }
 
       const data = await response.json()
+      console.log("✅ Vehicles fetched:", data)
 
       if (Array.isArray(data)) {
         setVehicles(data)
       } else {
-        console.error("API returned non-array data:", data)
-        setVehicles([])
+        console.error("❌ API returned non-array data:", data)
         setError("Error: Los datos recibidos no son válidos")
       }
-    } catch (err) {
-      console.error("Error fetching vehicles:", err)
-      setVehicles([])
+    } catch (error) {
+      console.error("❌ Error fetching vehicles:", error)
       setError("Error al cargar los vehículos. Verifica la conexión a la base de datos.")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este producto?")) return
-
-    try {
-      const response = await fetch(`/api/vehicles/${id}`, { method: "DELETE" })
-      if (response.ok) {
-        fetchVehicles()
-      } else {
-        setError("Error al eliminar el producto")
-      }
-    } catch (err) {
-      console.error("Error deleting vehicle:", err)
-      setError("Error al eliminar el producto")
-    }
+  const handleEdit = (vehicle: Vehicle) => {
+    console.log("✏️ Editing vehicle:", vehicle)
+    setEditingVehicle(vehicle)
+    setShowForm(true)
   }
 
-  const handleToggleAvailability = async (vehicle: Vehicle) => {
+  const handleDelete = async (id: number) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este vehículo?")) {
+      return
+    }
+
+    setDeletingId(id)
+    console.log("🗑️ Attempting to delete vehicle with ID:", id)
+
     try {
-      const response = await fetch(`/api/vehicles/${vehicle.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ available: !vehicle.available }),
+      const response = await fetch(`/api/vehicles/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
       })
-      if (response.ok) {
-        fetchVehicles()
-      } else {
-        setError("Error al actualizar la disponibilidad")
+
+      console.log("🔄 Delete response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("❌ Delete failed with error:", errorData)
+
+        // Mostrar error específico basado en el código de estado
+        if (response.status === 500) {
+          throw new Error("Error del servidor. Verifica que la base de datos esté conectada y que las tablas existan.")
+        } else if (response.status === 404) {
+          throw new Error("El vehículo no existe o ya fue eliminado.")
+        } else {
+          throw new Error(errorData.error || `Error ${response.status}: No se pudo eliminar el vehículo`)
+        }
       }
-    } catch (err) {
-      console.error("Error toggling availability:", err)
-      setError("Error al actualizar la disponibilidad")
+
+      const result = await response.json()
+      console.log("✅ Vehicle deleted successfully:", result)
+
+      toast.success("Vehículo eliminado correctamente")
+      await fetchVehicles() // Recargar la lista
+    } catch (error) {
+      console.error("❌ Error deleting vehicle:", error)
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido al eliminar el vehículo"
+      toast.error(errorMessage)
+      setError(errorMessage)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -167,60 +140,64 @@ export function VehicleManagement() {
     setShowForm(false)
     setEditingVehicle(null)
     fetchVehicles()
+    toast.success(editingVehicle ? "Vehículo actualizado correctamente" : "Vehículo creado correctamente")
   }
 
-  if (error) {
-    return (
-      <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
-            <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
-          </div>
-          <Button
-            onClick={() => setShowForm(true)}
-            className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </Button>
-        </div>
+  const handleFormCancel = () => {
+    setShowForm(false)
+    setEditingVehicle(null)
+  }
 
-        <Card className="bg-red-50 border border-red-200">
-          <CardContent className="text-center py-12">
-            <div className="text-red-600 mb-4">⚠️ Error de Conexión</div>
-            <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
-            <p className="text-red-600 mb-6">Verifica que la base de datos esté conectada y que las tablas existan.</p>
-            <div className="flex gap-4 justify-center">
-              <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
-                Reintentar
-              </Button>
-              <Button
-                onClick={() => setShowForm(true)}
-                variant="outline"
-                className="border-red-300 text-red-600 hover:bg-red-50"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir Producto
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  const toggleAvailability = async (vehicle: Vehicle) => {
+    try {
+      const response = await fetch(`/api/vehicles/${vehicle.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...vehicle,
+          available: !vehicle.available,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al actualizar disponibilidad")
+      }
+
+      toast.success(`Vehículo ${!vehicle.available ? "activado" : "desactivado"} correctamente`)
+      fetchVehicles()
+    } catch (error) {
+      console.error("Error updating availability:", error)
+      toast.error("Error al actualizar la disponibilidad")
+    }
+  }
+
+  const isValidImageUrl = (url: string): boolean => {
+    if (!url) return false
+    try {
+      new URL(url)
+      return true
+    } catch {
+      return url.startsWith("/")
+    }
+  }
+
+  if (showForm) {
+    return <VehicleForm vehicle={editingVehicle} onSuccess={handleFormSuccess} onCancel={handleFormCancel} />
   }
 
   if (loading) {
     return (
       <div className="space-y-8">
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
-            <p className="text-gray-600">Cargando productos...</p>
+            <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(3)].map((__, i) => (
+          {[...Array(3)].map((_, i) => (
             <Card key={i} className="animate-pulse">
               <div className="h-48 bg-gray-200"></div>
               <CardHeader>
@@ -234,159 +211,190 @@ export function VehicleManagement() {
     )
   }
 
-  if (showForm) {
+  if (error) {
     return (
-      <VehicleForm
-        vehicle={editingVehicle}
-        onSuccess={handleFormSuccess}
-        onCancel={() => {
-          setShowForm(false)
-          setEditingVehicle(null)
-        }}
-      />
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
+            <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
+          </div>
+          <Button onClick={() => setShowForm(true)} className="bg-black text-white hover:bg-gold hover:text-black">
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Producto
+          </Button>
+        </div>
+
+        <Card className="bg-red-50 border border-red-200">
+          <CardContent className="text-center py-12">
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-red-800 mb-2">Error al eliminar el producto</h3>
+            <p className="text-red-600 mb-4">{error}</p>
+            <div className="flex gap-4 justify-center">
+              <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reintentar
+              </Button>
+              <Button onClick={() => setShowForm(true)} variant="outline" className="border-red-300 text-red-600">
+                <Plus className="h-4 w-4 mr-2" />
+                Añadir Producto
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     )
   }
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
           <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
         </div>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium"
-        >
+        <Button onClick={() => setShowForm(true)} className="bg-black text-white hover:bg-gold hover:text-black">
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Producto
         </Button>
       </div>
 
-      {Array.isArray(vehicles) && vehicles.length > 0 ? (
+      {vehicles.length === 0 ? (
+        <Card className="bg-gray-50 border border-gray-200">
+          <CardContent className="text-center py-12">
+            <Ship className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay productos</h3>
+            <p className="text-gray-500 mb-4">Comienza añadiendo tu primer barco o moto de agua</p>
+            <Button onClick={() => setShowForm(true)} className="bg-black text-white hover:bg-gold hover:text-black">
+              <Plus className="h-4 w-4 mr-2" />
+              Añadir Primer Producto
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {vehicles.map((vehicle) => (
-            <Card
-              key={vehicle.id}
-              className={`bg-white border transition-all duration-300 hover:shadow-lg ${
-                vehicle.available ? "border-gray-200 hover:border-gold" : "border-red-200 opacity-75"
-              }`}
-            >
+            <Card key={vehicle.id} className="bg-white border border-gray-200 hover:shadow-lg transition-shadow">
               <div className="relative">
-                <div className="w-full h-48 bg-gray-50 flex items-center justify-center overflow-hidden">
-                  <SafeImage
-                    src={vehicle.image || "/placeholder.svg"}
-                    alt={vehicle.name}
-                    width={300}
-                    height={200}
-                    className="max-w-full max-h-full object-contain p-4"
-                  />
+                <div className="h-48 bg-gray-50 flex items-center justify-center overflow-hidden rounded-t-lg">
+                  {isValidImageUrl(vehicle.image) ? (
+                    <Image
+                      src={vehicle.image || "/placeholder.svg"}
+                      alt={vehicle.name}
+                      width={300}
+                      height={200}
+                      className="max-w-full max-h-full object-contain p-4"
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <AlertTriangle className="h-12 w-12 text-orange-500 mx-auto mb-2" />
+                      <span className="text-sm text-orange-600">URL inválida</span>
+                    </div>
+                  )}
                 </div>
+
                 <div className="absolute top-2 right-2 flex gap-2">
-                  <Badge className={vehicle.available ? "bg-green-600 text-white" : "bg-red-600 text-white"}>
+                  <Badge className={vehicle.available ? "bg-green-500 text-white" : "bg-gray-500 text-white"}>
                     {vehicle.available ? "Disponible" : "No disponible"}
                   </Badge>
-                  <Badge className="bg-gray-600 text-white">
-                    {vehicle.type === "jetski" ? <Zap className="h-3 w-3" /> : <Ship className="h-3 w-3" />}
+                  {!isValidImageUrl(vehicle.image) && (
+                    <Badge className="bg-orange-500 text-white">Imagen inválida</Badge>
+                  )}
+                </div>
+
+                <div className="absolute top-2 left-2">
+                  <Badge className={`${vehicle.requiresLicense ? "bg-blue-600" : "bg-green-600"} text-white`}>
+                    {vehicle.requiresLicense ? "Licencia requerida" : "Sin licencia"}
                   </Badge>
                 </div>
-                {!isValidImageUrl(vehicle.image) && (
-                  <div className="absolute top-2 left-2">
-                    <Badge className="bg-orange-500 text-white text-xs">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Imagen inválida
-                    </Badge>
-                  </div>
-                )}
               </div>
 
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-bold text-black">{vehicle.name}</CardTitle>
-                <CardDescription className="text-gray-600">{vehicle.description}</CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-bold text-black flex items-center">
+                  {vehicle.type === "boat" ? (
+                    <Ship className="h-5 w-5 mr-2 text-gold" />
+                  ) : (
+                    <Zap className="h-5 w-5 mr-2 text-gold" />
+                  )}
+                  {vehicle.name}
+                </CardTitle>
+                <CardDescription className="text-sm text-gray-600">{vehicle.description}</CardDescription>
               </CardHeader>
 
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Capacidad:</span>
-                    <span className="font-semibold text-black">{vehicle.capacity} personas</span>
-                  </div>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center text-gray-500">
+                    <Users className="h-4 w-4 mr-1" />
+                    Capacidad
+                  </span>
+                  <span className="font-semibold">{vehicle.capacity} personas</span>
+                </div>
 
+                {vehicle.pricing && vehicle.pricing.length > 0 && (
                   <div className="space-y-2">
-                    <span className="text-gray-500 text-sm">Precios:</span>
+                    <span className="text-sm text-gray-500 flex items-center">
+                      <Euro className="h-4 w-4 mr-1" />
+                      Precios:
+                    </span>
                     <div className="grid grid-cols-2 gap-2">
-                      {Array.isArray(vehicle.pricing) &&
-                        vehicle.pricing.map((price, index) => (
-                          <div key={index} className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                            <div className="text-sm font-bold text-gold">€{price.price}</div>
-                            <div className="text-xs text-gray-600">{price.label}</div>
-                          </div>
-                        ))}
+                      {vehicle.pricing.slice(0, 2).map((price, index) => (
+                        <div key={index} className="bg-gray-50 rounded p-2 text-center">
+                          <div className="text-lg font-bold text-gold">€{price.price}</div>
+                          <div className="text-xs text-gray-600">{price.label}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <span className="text-gray-500 text-sm">Incluye:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {Array.isArray(vehicle.includes) &&
-                        vehicle.includes.map((item, index) => (
-                          <Badge key={index} variant="outline" className="text-xs py-1 px-2">
-                            {item}
-                          </Badge>
-                        ))}
-                    </div>
+                {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                    <span className="text-sm text-blue-800 font-medium">Fianza: €{vehicle.securityDeposit}</span>
                   </div>
+                )}
 
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingVehicle(vehicle)
-                        setShowForm(true)
-                      }}
-                      className="flex-1 border-gray-300 hover:border-gold hover:text-gold"
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleAvailability(vehicle)}
-                      className="border-gray-300 hover:border-blue-500 hover:text-blue-500"
-                    >
-                      {vehicle.available ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(vehicle.id)}
-                      className="border-gray-300 hover:border-red-500 hover:text-red-500"
-                    >
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    onClick={() => handleEdit(vehicle)}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 border-gray-300 hover:border-gold hover:text-gold"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar
+                  </Button>
+
+                  <Button
+                    onClick={() => toggleAvailability(vehicle)}
+                    variant="outline"
+                    size="sm"
+                    className={`border-gray-300 ${
+                      vehicle.available
+                        ? "hover:border-gray-500 hover:text-gray-700"
+                        : "hover:border-green-500 hover:text-green-600"
+                    }`}
+                  >
+                    {vehicle.available ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+
+                  <Button
+                    onClick={() => handleDelete(vehicle.id)}
+                    variant="outline"
+                    size="sm"
+                    disabled={deletingId === vehicle.id}
+                    className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+                  >
+                    {deletingId === vehicle.id ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
                       <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    )}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-      ) : (
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="text-center py-12">
-            <Ship className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay productos</h3>
-            <p className="text-gray-500 mb-6">Añade tu primer barco o moto de agua</p>
-            <Button
-              onClick={() => setShowForm(true)}
-              className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Añadir Producto
-            </Button>
-          </CardContent>
-        </Card>
       )}
     </div>
   )

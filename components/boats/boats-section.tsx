@@ -21,15 +21,41 @@ import {
   MessageCircle,
   HelpCircle,
   Mail,
+  Camera,
+  Music,
+  Shield,
+  Star,
+  Waves,
+  CreditCard,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import { useRouter } from "next/navigation"
 
+// Función para validar URLs de imágenes
+function isValidImageUrl(url: string): boolean {
+  if (!url) return false
+
+  try {
+    new URL(url)
+    return true
+  } catch {
+    return url.startsWith("/")
+  }
+}
+
 interface PricingOption {
   duration: string
   price: number
   label: string
+}
+
+interface ExtraFeature {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  price?: number
 }
 
 interface Vehicle {
@@ -45,6 +71,8 @@ interface Vehicle {
   category: string
   requiresLicense: boolean
   available: boolean
+  extraFeatures?: ExtraFeature[]
+  securityDeposit?: number
 }
 
 interface Translations {
@@ -79,6 +107,7 @@ interface Translations {
   call: string
   whatsapp: string
   email: string
+  securityDeposit: string
 }
 
 const translations = {
@@ -115,6 +144,7 @@ const translations = {
     call: "Llamar",
     whatsapp: "WhatsApp",
     email: "Email",
+    securityDeposit: "Fianza",
   },
   en: {
     title: "Our Fleet",
@@ -149,7 +179,28 @@ const translations = {
     call: "Call",
     whatsapp: "WhatsApp",
     email: "Email",
+    securityDeposit: "Security Deposit",
   },
+}
+
+// Función para obtener el icono del extra
+function getExtraIcon(featureId: string) {
+  switch (featureId) {
+    case "photo_session":
+      return <Camera className="h-4 w-4 text-purple-600" />
+    case "bluetooth_music":
+      return <Music className="h-4 w-4 text-blue-600" />
+    case "safety_ring":
+      return <Shield className="h-4 w-4 text-green-600" />
+    case "champagne":
+      return <Star className="h-4 w-4 text-yellow-600" />
+    case "snorkeling_gear":
+      return <Waves className="h-4 w-4 text-cyan-600" />
+    case "cooler_drinks":
+      return <Fuel className="h-4 w-4 text-orange-600" />
+    default:
+      return <Star className="h-4 w-4 text-gray-600" />
+  }
 }
 
 // Modal de advertencia de licencia
@@ -445,7 +496,7 @@ export function BoatsSection() {
                     <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                     <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                   </CardHeader>
-                  <CardContent></CardContent> {/* Added closing tag for CardContent */}
+                  <CardContent></CardContent>
                 </Card>
               ))}
             </div>
@@ -536,7 +587,7 @@ export function BoatsSection() {
             {currentVehicles.length > 0 ? (
               <div
                 className={`grid gap-8 ${
-                  activeTab === "boats" ? "grid-cols-1 max-w-4xl mx-auto" : "grid-cols-1 md:grid-cols-2"
+                  activeTab === "boats" ? "grid-cols-1 lg:grid-cols-2 max-w-6xl mx-auto" : "grid-cols-1 md:grid-cols-2"
                 }`}
               >
                 {currentVehicles.map((vehicle) => (
@@ -587,12 +638,15 @@ function VehicleCard({
     return Math.min(...vehicle.pricing.map((p) => p.price))
   }
 
+  // Obtener extras habilitados
+  const enabledExtras = vehicle.extraFeatures?.filter((f) => f.enabled) || []
+
   return (
     <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden">
       <div className="relative">
         <div className="w-full h-72 bg-gray-50 flex items-center justify-center overflow-hidden">
           <Image
-            src={vehicle.image || "/placeholder.svg"}
+            src={isValidImageUrl(vehicle.image) ? vehicle.image : "/placeholder.svg"}
             alt={vehicle.name}
             width={500}
             height={300}
@@ -662,7 +716,36 @@ function VehicleCard({
                 </Badge>
               ))}
             </div>
+
+            {/* Extras con iconitos */}
+            {enabledExtras.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {enabledExtras.map((extra, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center bg-purple-50 border border-purple-200 rounded-lg px-2 py-1"
+                    title={extra.description}
+                  >
+                    {getExtraIcon(extra.id)}
+                    <span className="text-xs text-purple-700 ml-1 font-medium">{extra.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Fianza */}
+          {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <CreditCard className="h-4 w-4 text-blue-600 mr-2" />
+                  <span className="text-sm font-medium text-blue-800">{t.securityDeposit}</span>
+                </div>
+                <Badge className="bg-blue-600 text-white text-sm">€{vehicle.securityDeposit}</Badge>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between mb-6">

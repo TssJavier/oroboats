@@ -90,6 +90,14 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   const [vehicleCategory, setVehicleCategory] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
 
+  // Log inicial para verificar props
+  useEffect(() => {
+    console.log("🔍 TimePicker Props:")
+    console.log("   - vehicleId:", vehicleId, typeof vehicleId)
+    console.log("   - selectedDate:", selectedDate)
+    console.log("   - vehicle:", vehicle)
+  }, [vehicleId, selectedDate, vehicle])
+
   useEffect(() => {
     if (selectedDate && selectedDuration) {
       fetchAvailableSlots()
@@ -104,6 +112,8 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
     try {
       // Verificar que vehicleId sea válido
+      console.log("🔍 Verificando vehicleId:", vehicleId, typeof vehicleId)
+
       if (!vehicleId || isNaN(Number(vehicleId))) {
         console.error("❌ vehicleId inválido:", vehicleId)
         setError("ID de vehículo inválido")
@@ -114,15 +124,19 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
       // Formatear la fecha correctamente (YYYY-MM-DD)
       const formattedDate = selectedDate.includes("T") ? selectedDate.split("T")[0] : selectedDate
 
+      // Añadir logs para depuración
       console.log(`🔍 Solicitando slots:`)
-      console.log(`   - Vehicle ID: ${vehicleId}`)
+      console.log(`   - Vehicle ID: ${vehicleId} (tipo: ${typeof vehicleId})`)
       console.log(`   - Fecha: ${formattedDate}`)
       console.log(`   - Duración: ${selectedDuration.duration}`)
 
+      // Usar la ruta correcta con [Id]
       const url = `/api/availability/${vehicleId}/slots?date=${encodeURIComponent(formattedDate)}&duration=${encodeURIComponent(selectedDuration.duration)}`
-      console.log(`🌐 URL: ${url}`)
+      console.log(`🌐 URL completa: ${url}`)
 
       const response = await fetch(url)
+
+      console.log(`🔄 Respuesta: ${response.status} ${response.statusText}`)
 
       if (response.ok) {
         const data = await response.json()
@@ -186,8 +200,9 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
   }
 
   const getSlotLabel = (slot: TimeSlot) => {
-    if (slot.type === "boat-halfday") return `${slot.time} - ${slot.endTime}`
-    if (slot.type === "fullday") return `${t.fullDay} (${slot.time} - ${slot.endTime})`
+    if (slot.type === "morning-half") return `${t.morning} (10:00 - 15:00)`
+    if (slot.type === "afternoon-half") return `${t.afternoon} (15:00 - 21:00)`
+    if (slot.type === "fullday") return `${t.fullDay} (10:00 - 21:00)`
 
     // Para slots regulares, mostrar el rango de tiempo
     if (slot.endTime) {
@@ -211,6 +226,23 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   return (
     <div className="space-y-6">
+      {/* Debug Info - Solo en desarrollo */}
+      {process.env.NODE_ENV === "development" && (
+        <Card className="bg-blue-50 border border-blue-200">
+          <CardContent className="p-4">
+            <h4 className="font-semibold text-blue-800 mb-2">Debug Info:</h4>
+            <div className="text-sm text-blue-700 space-y-1">
+              <div>
+                Vehicle ID: {vehicleId} (tipo: {typeof vehicleId})
+              </div>
+              <div>Vehicle Name: {vehicle?.name}</div>
+              <div>Selected Date: {selectedDate}</div>
+              <div>Selected Duration: {selectedDuration?.duration}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Duration Selection */}
       <Card className="bg-white border border-gray-200">
         <CardContent className="p-6">
