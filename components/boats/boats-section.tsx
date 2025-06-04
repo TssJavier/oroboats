@@ -27,6 +27,10 @@ import {
   Star,
   Waves,
   CreditCard,
+  Wine,
+  Droplets,
+  Coffee,
+  Package,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -183,21 +187,36 @@ const translations = {
   },
 }
 
-// Función para obtener el icono del extra
+// ✅ FUNCIÓN MEJORADA CON ICONOS MÁS ESPECÍFICOS
 function getExtraIcon(featureId: string) {
   switch (featureId) {
     case "photo_session":
-      return <Camera className="h-4 w-4 text-purple-600" />
+      return <Camera className="h-4 w-4 text-pink-600" />
     case "bluetooth_music":
       return <Music className="h-4 w-4 text-blue-600" />
     case "safety_ring":
       return <Shield className="h-4 w-4 text-green-600" />
     case "champagne":
-      return <Star className="h-4 w-4 text-yellow-600" />
+      return <Wine className="h-4 w-4 text-purple-600" />
     case "snorkeling_gear":
       return <Waves className="h-4 w-4 text-cyan-600" />
     case "cooler_drinks":
-      return <Fuel className="h-4 w-4 text-orange-600" />
+      return <Coffee className="h-4 w-4 text-orange-600\" />
+      {
+        /* Icono de bebidas */
+      }
+    case "fuel_included":
+    case "extra_fuel":
+    case "gasoline":
+    case "fuel_tank":
+      return <Fuel className="h-4 w-4 text-red-600\" />
+      {
+        /* Icono de combustible */
+      }
+    case "towels":
+      return <Package className="h-4 w-4 text-blue-400" />
+    case "water_sports":
+      return <Droplets className="h-4 w-4 text-blue-500" />
     default:
       return <Star className="h-4 w-4 text-gray-600" />
   }
@@ -638,8 +657,24 @@ function VehicleCard({
     return Math.min(...vehicle.pricing.map((p) => p.price))
   }
 
-  // Obtener extras habilitados
-  const enabledExtras = vehicle.extraFeatures?.filter((f) => f.enabled) || []
+  // Obtener extras habilitados - VERSIÓN MEJORADA
+  const enabledExtras = (() => {
+    console.log("🔍 Processing extras for vehicle:", vehicle.name, vehicle.extraFeatures)
+
+    if (!vehicle.extraFeatures || !Array.isArray(vehicle.extraFeatures)) {
+      console.log("⚠️ No valid extraFeatures found")
+      return []
+    }
+
+    const filtered = vehicle.extraFeatures.filter((extra) => {
+      const isEnabled = extra.enabled === true || extra.enabled === "true"
+      console.log(`🔧 Extra ${extra.name}: enabled=${extra.enabled} (${typeof extra.enabled}) -> ${isEnabled}`)
+      return isEnabled
+    })
+
+    console.log("✅ Enabled extras:", filtered)
+    return filtered
+  })()
 
   return (
     <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden">
@@ -715,25 +750,36 @@ function VehicleCard({
                   {item}
                 </Badge>
               ))}
-            </div>
 
-            {/* Extras con iconitos */}
-            {enabledExtras.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {enabledExtras.map((extra, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center bg-purple-50 border border-purple-200 rounded-lg px-2 py-1"
-                    title={extra.description}
-                  >
-                    {getExtraIcon(extra.id)}
-                    <span className="text-xs text-purple-700 ml-1 font-medium">{extra.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+              {/* ✅ AÑADIR GASOLINA SI ESTÁ INCLUIDA */}
+              {vehicle.fuelIncluded && (
+                <Badge
+                  variant="outline"
+                  className="text-sm py-1 px-3 flex items-center gap-1 bg-amber-50 border-amber-200"
+                >
+                  <Fuel className="h-3 w-3 text-amber-600" />
+                  Gasolina
+                </Badge>
+              )}
+            </div>
           </div>
 
+          {/* ✅ EXTRAS CON ICONOS MEJORADOS */}
+          {enabledExtras.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {enabledExtras.map((extra, index) => (
+                <div
+                  key={index}
+                  className="flex items-center bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg px-3 py-2 hover:shadow-sm transition-shadow"
+                  title={extra.description}
+                >
+                  {getExtraIcon(extra.id)}
+                  <span className="text-xs text-purple-700 ml-2 font-medium">{extra.name}</span>
+                  {extra.price && <span className="text-xs text-purple-600 ml-1">(+{extra.price}€)</span>}
+                </div>
+              ))}
+            </div>
+          )}
           {/* Fianza */}
           {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
