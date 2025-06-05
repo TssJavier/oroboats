@@ -15,6 +15,7 @@ import Image from "next/image"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
 import { useRouter } from "next/navigation"
+import { StripePayment } from "./stripe-payment"
 
 interface BookingFormProps {
   vehicle: Vehicle
@@ -175,66 +176,9 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     setError("")
   }
 
-  const handleBooking = async () => {
-    setLoading(true)
-    setError("")
-
-    // Verificar si la fecha y hora son válidas
-    const now = new Date()
-    const bookingDateTime = new Date(`${bookingData.bookingDate}T${bookingData.startTime}`)
-
-    if (bookingDateTime < now) {
-      setError(t.pastBookingError)
-      setLoading(false)
-      return
-    }
-
-    // ✅ VERIFICAR QUE TODOS LOS CAMPOS OBLIGATORIOS ESTÉN PRESENTES
-    const requiredFields = {
-      vehicleId: bookingData.vehicleId,
-      customerName: bookingData.customerName,
-      customerEmail: bookingData.customerEmail,
-      customerPhone: bookingData.customerPhone,
-      bookingDate: bookingData.bookingDate,
-      startTime: bookingData.startTime,
-      endTime: bookingData.endTime,
-      timeSlot: bookingData.timeSlot,
-      duration: bookingData.duration,
-      totalPrice: bookingData.totalPrice,
-    }
-
-    console.log("🚀 Enviando reserva con datos:", requiredFields)
-
-    try {
-      const response = await fetch("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...requiredFields,
-          notes: bookingData.notes || null,
-          status: "pending",
-          paymentStatus: "pending",
-        }),
-      })
-
-      console.log("📡 Respuesta del servidor:", response.status, response.statusText)
-
-      if (response.ok) {
-        const result = await response.json()
-        console.log("✅ Reserva creada:", result)
-        alert(t.bookingSuccess)
-        router.push("/") // Redirigir a la página principal
-      } else {
-        const data = await response.json()
-        console.error("❌ Error del servidor:", data)
-        setError(data.error || "Error al crear la reserva")
-      }
-    } catch (err) {
-      console.error("❌ Error de conexión:", err)
-      setError("Error de conexión")
-    } finally {
-      setLoading(false)
-    }
+  const handleBooking = () => {
+    // No crear reserva aquí, solo pasar al paso de pago
+    setCurrentStep(4) // Nuevo paso de pago
   }
 
   return (
@@ -259,7 +203,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         {/* Progress Steps */}
         <div className="flex items-center justify-center mb-12">
           <div className="flex items-center space-x-4">
-            {[1, 2, 3].map((step) => (
+            {[1, 2, 3, 4].map((step) => (
               <div key={step} className="flex items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
@@ -268,7 +212,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                 >
                   {step}
                 </div>
-                {step < 3 && <div className={`w-16 h-1 mx-2 ${currentStep > step ? "bg-gold" : "bg-gray-200"}`} />}
+                {step < 4 && <div className={`w-16 h-1 mx-2 ${currentStep > step ? "bg-gold" : "bg-gray-200"}`} />}
               </div>
             ))}
           </div>
@@ -337,6 +281,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                   {currentStep === 1 && t.step1}
                   {currentStep === 2 && t.step2}
                   {currentStep === 3 && t.step3}
+                  {currentStep === 4 && "Pago"}
                 </CardTitle>
               </CardHeader>
 
@@ -436,6 +381,31 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                   </div>
                 )}
 
+                {/* Step 4: Payment */}
+                {currentStep === 4 && (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold text-black mb-2">Pago Seguro</h3>
+                      <p className="text-gray-600">
+                        Total a pagar: <span className="font-bold text-2xl">€{bookingData.totalPrice}</span>
+                      </p>
+                    </div>
+
+                    <StripePayment
+                      amount={bookingData.totalPrice}
+                      bookingData={bookingData}
+                      onSuccess={() => {
+                        alert("¡Reserva confirmada y pago procesado exitosamente!")
+                        router.push("/")
+                      }}
+                      onError={(error) => {
+                        setError(error)
+                        setCurrentStep(3) // Volver al paso anterior
+                      }}
+                    />
+                  </div>
+                )}
+
                 {/* Navigation Buttons */}
                 <div className="flex justify-between pt-6 border-t border-gray-200">
                   {currentStep > 1 && (
@@ -454,16 +424,15 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                         Siguiente
                         <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
                       </Button>
-                    ) : (
+                    ) : currentStep === 3 ? (
                       <Button
                         onClick={handleBooking}
-                        disabled={loading}
                         className="bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg px-8 py-3"
                       >
                         <CreditCard className="h-5 w-5 mr-2" />
-                        {loading ? t.loading : t.payNow}
+                        Proceder al Pago
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </CardContent>

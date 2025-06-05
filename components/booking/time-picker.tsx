@@ -226,7 +226,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   return (
     <div className="space-y-6">
-      {/* Debug Info - Solo en desarrollo */}
+      {/* Debug Info - Solo en desarrollo 
       {process.env.NODE_ENV === "development" && (
         <Card className="bg-blue-50 border border-blue-200">
           <CardContent className="p-4">
@@ -241,7 +241,7 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
             </div>
           </CardContent>
         </Card>
-      )}
+      )}*/}
 
       {/* Duration Selection */}
       <Card className="bg-white border border-gray-200">

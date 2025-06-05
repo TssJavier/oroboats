@@ -283,7 +283,7 @@ export function CalendarPicker({ vehicleId, selectedDate, onDateSelect }: Calend
         </div>
 
         {/* Legend */}
-        <div className="flex items-center justify-center gap-6 mt-6 text-xs">
+        <div className="flex items-center justify-center gap-3 mt-6 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             <span className="text-gray-600">{t.available}</span>

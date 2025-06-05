@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
 
         // Registrar uso
         await db.insert(discountUsage).values({
-          discountCodeId: validDiscountCode.id,
+          discountCodeId: validDiscountCode.id, // Use the correct property name as defined in your schema
           bookingId: booking[0].id,
           customerEmail: body.customerEmail,
           discountAmount: discountAmount.toString(),
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
     // ✅ NUEVA FUNCIONALIDAD: ENVIAR EMAILS (NO BLOQUEAR SI FALLAN)
     const emailData = {
-      bookingId: booking[0].id,
+      bookingId: Number(booking[0].id),
       customerName: body.customerName,
       customerEmail: body.customerEmail,
       customerPhone: body.customerPhone,
