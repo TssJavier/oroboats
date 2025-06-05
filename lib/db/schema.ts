@@ -1,4 +1,16 @@
-import { pgTable, serial, text, integer, boolean, timestamp, decimal, jsonb, date, time } from "drizzle-orm/pg-core"
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  boolean,
+  timestamp,
+  decimal,
+  jsonb,
+  date,
+  time,
+  varchar,
+} from "drizzle-orm/pg-core"
 
 // Tabla de vehículos (completamente gestionable por admin)
 export const vehicles = pgTable("vehicles", {
@@ -23,7 +35,35 @@ export const vehicles = pgTable("vehicles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 })
 
-// Tabla de reservas (sin registro obligatorio)
+// ✅ TABLA DE CÓDIGOS DE DESCUENTO
+export const discountCodes = pgTable("discount_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 50 }).unique().notNull(),
+  description: text("description").notNull(),
+  discountType: varchar("discount_type", { length: 20 }).notNull(), // 'percentage' | 'fixed'
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
+  minAmount: decimal("min_amount", { precision: 10, scale: 2 }).default("0"),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").default(0),
+  validFrom: timestamp("valid_from").defaultNow(),
+  validUntil: timestamp("valid_until"),
+  active: boolean("active").default(true),
+  createdBy: varchar("created_by", { length: 100 }).default("admin"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+// ✅ TABLA DE USO DE CÓDIGOS DE DESCUENTO
+export const discountUsage = pgTable("discount_usage", {
+  id: serial("id").primaryKey(),
+  discountCodeId: integer("discount_code_id").references(() => discountCodes.id),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  customerEmail: varchar("customer_email", { length: 255 }),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
+  usedAt: timestamp("used_at").defaultNow(),
+})
+
+// Tabla de reservas (sin registro obligatorio) - ✅ ACTUALIZADA
 export const bookings = pgTable("bookings", {
   id: serial("id").primaryKey(),
   vehicleId: integer("vehicle_id").references(() => vehicles.id),
@@ -39,7 +79,25 @@ export const bookings = pgTable("bookings", {
   paymentStatus: text("payment_status").default("pending"), // 'pending', 'paid', 'failed', 'refunded'
   paymentId: text("payment_id"),
   notes: text("notes"),
+  // ✅ NUEVAS COLUMNAS PARA DESCUENTOS Y PAGOS
+  discountCode: varchar("discount_code", { length: 50 }),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0"),
+  originalPrice: decimal("original_price", { precision: 10, scale: 2 }),
+  depositPaymentIntentId: varchar("deposit_payment_intent_id", { length: 255 }),
+  securityDeposit: decimal("security_deposit", { precision: 10, scale: 2 }).default("0"),
+  inspectionStatus: varchar("inspection_status", { length: 50 }).default("pending"),
+  damageDescription: text("damage_description"),
+  damageCost: decimal("damage_cost", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+// ✅ TABLA DE CONFIGURACIÓN DE EMAILS
+export const emailSettings = pgTable("email_settings", {
+  id: serial("id").primaryKey(),
+  settingKey: varchar("setting_key", { length: 100 }).unique().notNull(),
+  settingValue: text("setting_value").notNull(),
+  description: text("description"),
   updatedAt: timestamp("updated_at").defaultNow(),
 })
 
@@ -112,11 +170,17 @@ export const pricingRules = pgTable("pricing_rules", {
   updatedAt: timestamp("updated_at").defaultNow(),
 })
 
-// Tipos TypeScript
+// ✅ TIPOS TYPESCRIPT ACTUALIZADOS
 export type Vehicle = typeof vehicles.$inferSelect
 export type NewVehicle = typeof vehicles.$inferInsert
 export type Booking = typeof bookings.$inferSelect
 export type NewBooking = typeof bookings.$inferInsert
+export type DiscountCode = typeof discountCodes.$inferSelect
+export type NewDiscountCode = typeof discountCodes.$inferInsert
+export type DiscountUsage = typeof discountUsage.$inferSelect
+export type NewDiscountUsage = typeof discountUsage.$inferInsert
+export type EmailSetting = typeof emailSettings.$inferSelect
+export type NewEmailSetting = typeof emailSettings.$inferInsert
 export type VehicleAvailability = typeof vehicleAvailability.$inferSelect
 export type NewVehicleAvailability = typeof vehicleAvailability.$inferInsert
 export type BlockedDate = typeof blockedDates.$inferSelect
