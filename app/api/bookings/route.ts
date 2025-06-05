@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log("📅 API: Creating booking...")
     const body = await request.json()
+    console.log("📅 API: Received data:", body)
 
     // ✅ MANTENER TU VALIDACIÓN ORIGINAL DE FECHAS
     const bookingDate = new Date(body.bookingDate)
@@ -102,18 +103,21 @@ export async function POST(request: NextRequest) {
       console.log(`✅ Discount applied: €${discountAmount}`)
     }
 
-    // ✅ PREPARAR DATOS PARA TU FUNCIÓN ORIGINAL
+    // ✅ PREPARAR DATOS PARA TU FUNCIÓN ORIGINAL - AÑADIENDO timeSlot
     const bookingData = {
       ...body,
+      timeSlot: body.timeSlot || `${body.startTime}-${body.endTime}`, // ✅ AÑADIR timeSlot
       discountCode: body.discountCode || null,
       discountAmount: discountAmount,
       originalPrice: originalPrice,
       totalPrice: originalPrice - discountAmount, // Precio final con descuento
     }
 
+    console.log("📅 API: Prepared booking data:", bookingData)
+
     // ✅ USAR TU FUNCIÓN ORIGINAL PARA CREAR LA RESERVA
     const booking = await createBooking(bookingData)
-    console.log("✅ API: Booking created successfully")
+    console.log("✅ API: Booking created successfully", booking[0])
 
     // ✅ NUEVA FUNCIONALIDAD: ACTUALIZAR CONTADOR DE CÓDIGO DE DESCUENTO
     if (validDiscountCode && booking[0]) {
@@ -126,12 +130,12 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(discountCodes.id, validDiscountCode.id))
 
-        // Registrar uso - CORREGIDO
+        // Registrar uso
         await db.insert(discountUsage).values({
           discountCodeId: validDiscountCode.id,
           bookingId: booking[0].id,
           customerEmail: body.customerEmail,
-          discountAmount: discountAmount.toString(), // Convertir a string
+          discountAmount: discountAmount.toString(),
         })
 
         console.log("✅ Discount code usage updated")

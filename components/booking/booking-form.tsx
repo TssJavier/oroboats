@@ -28,6 +28,7 @@ interface BookingData {
   bookingDate: string
   startTime: string
   endTime: string
+  timeSlot: string // ✅ AÑADIDO: Campo obligatorio
   duration: string
   totalPrice: number
   notes: string
@@ -111,6 +112,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     bookingDate: "",
     startTime: "",
     endTime: "",
+    timeSlot: "", // ✅ AÑADIDO: Campo obligatorio
     duration: "",
     totalPrice: 0,
     notes: "",
@@ -120,14 +122,27 @@ export function BookingForm({ vehicle }: BookingFormProps) {
 
   useEffect(() => {
     if (selectedDate && selectedTime) {
+      // ✅ GENERAR timeSlot CORRECTAMENTE
+      const timeSlot = `${selectedTime.start}-${selectedTime.end}`
+
       setBookingData((prev) => ({
         ...prev,
         bookingDate: selectedDate,
         startTime: selectedTime.start,
         endTime: selectedTime.end,
+        timeSlot: timeSlot, // ✅ AÑADIDO
         duration: selectedTime.duration,
         totalPrice: selectedTime.price,
       }))
+
+      console.log("📅 Datos de reserva actualizados:", {
+        bookingDate: selectedDate,
+        startTime: selectedTime.start,
+        endTime: selectedTime.end,
+        timeSlot: timeSlot,
+        duration: selectedTime.duration,
+        totalPrice: selectedTime.price,
+      })
     }
   }, [selectedDate, selectedTime])
 
@@ -174,23 +189,48 @@ export function BookingForm({ vehicle }: BookingFormProps) {
       return
     }
 
+    // ✅ VERIFICAR QUE TODOS LOS CAMPOS OBLIGATORIOS ESTÉN PRESENTES
+    const requiredFields = {
+      vehicleId: bookingData.vehicleId,
+      customerName: bookingData.customerName,
+      customerEmail: bookingData.customerEmail,
+      customerPhone: bookingData.customerPhone,
+      bookingDate: bookingData.bookingDate,
+      startTime: bookingData.startTime,
+      endTime: bookingData.endTime,
+      timeSlot: bookingData.timeSlot,
+      duration: bookingData.duration,
+      totalPrice: bookingData.totalPrice,
+    }
+
+    console.log("🚀 Enviando reserva con datos:", requiredFields)
+
     try {
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingData),
+        body: JSON.stringify({
+          ...requiredFields,
+          notes: bookingData.notes || null,
+          status: "pending",
+          paymentStatus: "pending",
+        }),
       })
 
+      console.log("📡 Respuesta del servidor:", response.status, response.statusText)
+
       if (response.ok) {
-        // Redirigir a página de éxito o mostrar modal
+        const result = await response.json()
+        console.log("✅ Reserva creada:", result)
         alert(t.bookingSuccess)
         router.push("/") // Redirigir a la página principal
       } else {
         const data = await response.json()
+        console.error("❌ Error del servidor:", data)
         setError(data.error || "Error al crear la reserva")
       }
     } catch (err) {
-      console.error("Booking error:", err)
+      console.error("❌ Error de conexión:", err)
       setError("Error de conexión")
     } finally {
       setLoading(false)

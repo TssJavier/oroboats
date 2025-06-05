@@ -1,7 +1,7 @@
 import { db } from "./index"
 import { vehicles, bookings, settings } from "./schema"
-import { eq, desc, and, gte, lte } from "drizzle-orm"
-import type { NewVehicle, NewBooking } from "./schema"
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm"
+import type { NewVehicle } from "./schema"
 
 // ===== VEHICLES =====
 export async function getVehicles() {
@@ -53,10 +53,10 @@ export async function getVehiclesByCategory(category: string) {
 export async function getTimeRestrictions(vehicleCategory: string, date: string) {
   try {
     // Solo motos sin licencia tienen restricciones
-    if (vehicleCategory === 'jetski_no_license') {
+    if (vehicleCategory === "jetski_no_license") {
       return {
         blockedHours: { start: "14:00", end: "16:00" },
-        reason: "Staff lunch break"
+        reason: "Staff lunch break",
       }
     }
     return null
@@ -147,16 +147,60 @@ export async function getBookingsByDate(date: Date) {
   return await db
     .select()
     .from(bookings)
-    .where(
-      and(
-        gte(bookings.bookingDate, startOfDay.toISOString()),
-        lte(bookings.bookingDate, endOfDay.toISOString())
-      )
-    )
+    .where(and(gte(bookings.bookingDate, startOfDay.toISOString()), lte(bookings.bookingDate, endOfDay.toISOString())))
 }
 
-export async function createBooking(booking: NewBooking) {
-  return await db.insert(bookings).values(booking).returning()
+// ✅ FUNCIÓN CREATEBOOKING CON DRIZZLE SQL TEMPLATE
+export async function createBooking(bookingData: any) {
+  try {
+    console.log("🔍 DB: Creating booking with data:", JSON.stringify(bookingData, null, 2))
+
+    // ✅ VERIFICAR QUE timeSlot EXISTE
+    if (!bookingData.timeSlot) {
+      console.log("⚠️ timeSlot missing, generating from start/end times...")
+      bookingData.timeSlot = `${bookingData.startTime}-${bookingData.endTime}`
+    }
+
+    console.log("🔍 DB: timeSlot value:", bookingData.timeSlot)
+
+    // ✅ USAR DRIZZLE SQL TEMPLATE
+    const result = await db.execute(sql`
+      INSERT INTO bookings (
+        vehicle_id, customer_name, customer_email, customer_phone,
+        booking_date, time_slot, start_time, end_time, duration,
+        total_price, status, payment_status, notes,
+        discount_code, discount_amount, original_price, security_deposit,
+        created_at, updated_at
+      ) VALUES (
+        ${Number(bookingData.vehicleId)},
+        ${bookingData.customerName},
+        ${bookingData.customerEmail},
+        ${bookingData.customerPhone},
+        ${bookingData.bookingDate},
+        ${bookingData.timeSlot},
+        ${bookingData.startTime},
+        ${bookingData.endTime},
+        ${bookingData.duration},
+        ${String(bookingData.totalPrice)},
+        ${bookingData.status || "pending"},
+        ${bookingData.paymentStatus || "pending"},
+        ${bookingData.notes || null},
+        ${bookingData.discountCode || null},
+        ${String(bookingData.discountAmount || 0)},
+        ${String(bookingData.originalPrice || bookingData.totalPrice)},
+        ${String(bookingData.securityDeposit || 0)},
+        NOW(),
+        NOW()
+      ) RETURNING *;
+    `)
+
+    console.log("✅ DB: Booking created successfully:", result)
+    return [result[0]] // Mantener formato compatible
+  } catch (error) {
+    console.error("❌ DB Error creating booking:", error)
+    console.error("❌ Original data:", bookingData)
+    throw error
+  }
 }
 
 export async function updateBookingStatus(id: number, status: string) {
