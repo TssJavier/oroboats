@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tag, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 interface DiscountInputProps {
@@ -86,17 +85,14 @@ export function DiscountInput({ totalAmount, onDiscountApplied }: DiscountInputP
               ¿Tienes un código de descuento?
             </label>
             <div className="flex space-x-2">
-              <div className="relative flex-grow">
-                <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                <Input
-                  id="discount-code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="Introduce tu código"
-                  className="pl-9"
-                  disabled={loading || !!appliedDiscount}
-                />
-              </div>
+              <Input
+                id="discount-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="Introduce tu código"
+                className="flex-grow"
+                disabled={loading || !!appliedDiscount}
+              />
               {appliedDiscount ? (
                 <Button
                   type="button"
@@ -105,7 +101,6 @@ export function DiscountInput({ totalAmount, onDiscountApplied }: DiscountInputP
                   className="shrink-0"
                   disabled={loading}
                 >
-                  <XCircle className="h-4 w-4 mr-1" />
                   Quitar
                 </Button>
               ) : (
@@ -115,25 +110,15 @@ export function DiscountInput({ totalAmount, onDiscountApplied }: DiscountInputP
                   className="bg-gold text-black hover:bg-black hover:text-white shrink-0"
                   disabled={loading}
                 >
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                  {loading ? "..." : "Aplicar"}
                 </Button>
               )}
             </div>
           </div>
 
-          {error && (
-            <div className="flex items-center text-red-500 text-sm">
-              <XCircle className="h-4 w-4 mr-1" />
-              {error}
-            </div>
-          )}
+          {error && <div className="text-red-500 text-sm">{error}</div>}
 
-          {success && (
-            <div className="flex items-center text-green-600 text-sm">
-              <CheckCircle className="h-4 w-4 mr-1" />
-              {success}
-            </div>
-          )}
+          {success && <div className="text-green-600 text-sm">{success}</div>}
 
 
         </div>

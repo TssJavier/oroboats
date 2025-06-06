@@ -9,7 +9,7 @@ import { loadStripe } from "@stripe/stripe-js"
 import { Elements, useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreditCard, Lock, Loader2, Gift, AlertTriangle } from "lucide-react"
+import { SuccessModal } from "./success-modal"
 import { DiscountInput } from "./discount-input"
 
 // 🔍 DETECTAR ENTORNO Y CONFIGURAR STRIPE
@@ -50,6 +50,7 @@ function PaymentFormWithElements({
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -98,7 +99,8 @@ function PaymentFormWithElements({
         })
 
         if (confirmResponse.ok) {
-          onSuccess()
+          // Mostrar modal de éxito en lugar de alert
+          setShowSuccessModal(true)
         } else {
           const errorData = await confirmResponse.json()
           onError(errorData.error || "Error confirmando la reserva")
@@ -113,53 +115,56 @@ function PaymentFormWithElements({
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <CreditCard className="h-5 w-5 mr-2 text-gold" />
-          Pago Seguro
-        </CardTitle>
-        <p className="text-sm text-gray-600">Acepta tarjetas, PayPal y más</p>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-            <PaymentElement
-              options={{
-                layout: "tabs",
-                wallets: {
-                  applePay: "auto",
-                  googlePay: "auto",
-                },
-              }}
-            />
-          </div>
+    <>
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader>
+          <CardTitle>Pago Seguro</CardTitle>
+          <p className="text-sm text-gray-600">Acepta tarjetas, PayPal y más</p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <PaymentElement
+                options={{
+                  layout: "tabs",
+                  wallets: {
+                    applePay: "auto",
+                    googlePay: "auto",
+                  },
+                }}
+              />
+            </div>
 
-          <div className="flex items-center justify-center text-sm text-gray-500">
-            <Lock className="h-4 w-4 mr-2" />
-            Pago seguro con cifrado SSL
-          </div>
+            <div className="flex items-center justify-center text-sm text-gray-500">Pago seguro con cifrado SSL</div>
 
-          <Button
-            type="submit"
-            disabled={!stripe || loading}
-            className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <CreditCard className="h-5 w-5 mr-2" />
-                Pagar €{amount}
-              </>
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+            <Button
+              type="submit"
+              disabled={!stripe || loading}
+              className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
+            >
+              {loading ? "Procesando..." : `Pagar €${amount}`}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Modal de éxito */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false)
+          onSuccess()
+        }}
+        bookingData={{
+          customerEmail: bookingData.customerEmail,
+          bookingDate: bookingData.bookingDate,
+          startTime: bookingData.startTime,
+          endTime: bookingData.endTime,
+          vehicleName: bookingData.vehicleName,
+          totalPrice: amount,
+        }}
+      />
+    </>
   )
 }
 
@@ -172,6 +177,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
   const [discountData, setDiscountData] = useState<any>(null)
   const [error, setError] = useState<string>("")
   const [environment, setEnvironment] = useState<string>("unknown")
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
 
   // Verificar si es reserva gratuita (100% descuento)
   const isFreeBooking = finalAmount <= 0
@@ -269,7 +275,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
 
       if (response.ok) {
         console.log("✅ Free booking created successfully")
-        onSuccess()
+        setShowSuccessModal(true)
       } else {
         const errorData = await response.json()
         onError(errorData.error || "Error creando reserva gratuita")
@@ -310,8 +316,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
         <Card className="w-full max-w-md mx-auto">
           <CardContent className="p-6 text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Preparando pago...</p>
+            <p className="mb-2">Preparando pago...</p>
             {environment && <p className="text-xs mt-2 text-gray-500">Entorno: {environment}</p>}
           </CardContent>
         </Card>
@@ -320,110 +325,114 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
   }
 
   return (
-    <div className="space-y-6">
-      {/* Indicador de entorno */}
-      {environment === "test" && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-3">
-            <div className="flex items-center text-yellow-800">
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              <span className="text-sm font-medium">Modo de prueba - No se cobrará dinero real</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+    <>
+      <div className="space-y-6">
+        {/* Indicador de entorno */}
+        {environment === "test" && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="p-3">
+              <div className="text-yellow-800">
+                <span className="text-sm font-medium">Modo de prueba - No se cobrará dinero real</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Código de descuento */}
-      <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
+        {/* Código de descuento */}
+        <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
 
-      {/* Resumen de precio */}
-      <Card className="bg-gray-50">
-        <CardContent className="p-4">
-          <div className="space-y-2">
-            {discountData && (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span>Precio original:</span>
-                  <span>€{amount}</span>
-                </div>
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>Descuento ({discountData.code}):</span>
-                  <span>-€{discountData.discountAmount}</span>
-                </div>
-                <hr className="my-2" />
-              </>
-            )}
-            <div className="flex justify-between font-bold text-lg">
-              <span>Total a pagar:</span>
-              <span className={isFreeBooking ? "text-green-600" : ""}>
-                {isFreeBooking ? "¡GRATIS!" : `€${finalAmount}`}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Formulario de pago o confirmación gratuita */}
-      {isFreeBooking ? (
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Gift className="h-5 w-5 mr-2 text-green-600" />
-              Reserva Gratuita
-            </CardTitle>
-            <p className="text-sm text-gray-600">¡Tu reserva es completamente gratuita!</p>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 border border-green-200 rounded-lg bg-green-50 text-center mb-6">
-              <Gift className="h-12 w-12 mx-auto text-green-600 mb-2" />
-              <p className="text-green-800 font-medium">¡Reserva 100% gratuita!</p>
-              <p className="text-green-600 text-sm">No se requiere pago</p>
-            </div>
-            <Button
-              onClick={handleFreeBooking}
-              disabled={loading}
-              className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
-            >
-              {loading ? (
+        {/* Resumen de precio */}
+        <Card className="bg-gray-50">
+          <CardContent className="p-4">
+            <div className="space-y-2">
+              {discountData && (
                 <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <Gift className="h-5 w-5 mr-2" />
-                  Confirmar Reserva Gratuita
+                  <div className="flex justify-between text-sm">
+                    <span>Precio original:</span>
+                    <span>€{amount}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Descuento ({discountData.code}):</span>
+                    <span>-€{discountData.discountAmount}</span>
+                  </div>
+                  <hr className="my-2" />
                 </>
               )}
-            </Button>
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total a pagar:</span>
+                <span className={isFreeBooking ? "text-green-600" : ""}>
+                  {isFreeBooking ? "¡GRATIS!" : `€${finalAmount}`}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        // Renderizar el formulario de pago con Elements
-        <Elements
-          stripe={stripePromise}
-          options={{
-            clientSecret,
-            appearance: {
-              theme: "stripe" as const,
-              variables: {
-                colorPrimary: "#D4AF37",
+
+        {/* Formulario de pago o confirmación gratuita */}
+        {isFreeBooking ? (
+          <Card className="w-full max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle>Reserva Gratuita</CardTitle>
+              <p className="text-sm text-gray-600">¡Tu reserva es completamente gratuita!</p>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 border border-green-200 rounded-lg bg-green-50 text-center mb-6">
+                <p className="text-green-800 font-medium">¡Reserva 100% gratuita!</p>
+                <p className="text-green-600 text-sm">No se requiere pago</p>
+              </div>
+              <Button
+                onClick={handleFreeBooking}
+                disabled={loading}
+                className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
+              >
+                {loading ? "Procesando..." : "Confirmar Reserva Gratuita"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          // Renderizar el formulario de pago con Elements
+          <Elements
+            stripe={stripePromise}
+            options={{
+              clientSecret,
+              appearance: {
+                theme: "stripe" as const,
+                variables: {
+                  colorPrimary: "#D4AF37",
+                },
               },
-            },
-          }}
-        >
-          <PaymentFormWithElements
-            amount={finalAmount}
-            bookingData={bookingData}
-            onSuccess={onSuccess}
-            onError={onError}
-            clientSecret={clientSecret}
-            environment={environment}
-            onRetry={() => createPaymentIntent(finalAmount)}
-          />
-        </Elements>
-      )}
-    </div>
+            }}
+          >
+            <PaymentFormWithElements
+              amount={finalAmount}
+              bookingData={bookingData}
+              onSuccess={onSuccess}
+              onError={onError}
+              clientSecret={clientSecret}
+              environment={environment}
+              onRetry={() => createPaymentIntent(finalAmount)}
+            />
+          </Elements>
+        )}
+      </div>
+
+      {/* Modal de éxito para reservas gratuitas */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false)
+          onSuccess()
+        }}
+        bookingData={{
+          customerEmail: bookingData.customerEmail,
+          bookingDate: bookingData.bookingDate,
+          startTime: bookingData.startTime,
+          endTime: bookingData.endTime,
+          vehicleName: bookingData.vehicleName,
+          totalPrice: finalAmount,
+        }}
+      />
+    </>
   )
 }
 
