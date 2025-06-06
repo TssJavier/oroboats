@@ -30,9 +30,21 @@ export function DiscountInput({ totalAmount, onDiscountApplied }: DiscountInputP
 
     try {
       const response = await fetch(`/api/discount/validate?code=${encodeURIComponent(code)}&amount=${totalAmount}`)
-      const data = await response.json()
 
-      if (response.ok && data.valid) {
+      // Verificar si la respuesta es válida
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Response is not JSON")
+      }
+
+      const data = await response.json()
+      console.log("🎫 Discount validation response:", data)
+
+      if (data.valid) {
         setSuccess(`¡Código aplicado! ${data.description}`)
         setAppliedDiscount(data)
         onDiscountApplied({
@@ -43,13 +55,13 @@ export function DiscountInput({ totalAmount, onDiscountApplied }: DiscountInputP
           value: data.value,
         })
       } else {
-        setError(data.message || "Código no válido")
+        setError(data.error || "Código no válido")
         setAppliedDiscount(null)
         onDiscountApplied(null)
       }
     } catch (err) {
       console.error("Error validating discount code:", err)
-      setError("Error al validar el código")
+      setError("Error al validar el código. Inténtalo de nuevo.")
       setAppliedDiscount(null)
       onDiscountApplied(null)
     } finally {
@@ -123,19 +135,11 @@ export function DiscountInput({ totalAmount, onDiscountApplied }: DiscountInputP
             </div>
           )}
 
-          {/*<div className="text-xs text-gray-500">
-            <p>Prueba estos códigos:</p>
-            <ul className="list-disc list-inside mt-1">
-              <li>VERANO2024: 15% de descuento</li>
-              <li>ADMIN100: €100 de descuento</li>
-              <li>BIENVENIDO: 10% de descuento</li>
-            </ul>
-          </div>*/}
+
         </div>
       </CardContent>
     </Card>
   )
 }
 
-// También exportar como default por si acaso
 export default DiscountInput
