@@ -9,7 +9,7 @@ import { loadStripe } from "@stripe/stripe-js"
 import { Elements, useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreditCard, Lock, Loader2 } from "lucide-react"
+import { CreditCard, Lock, Loader2, Gift } from "lucide-react"
 import { DiscountInput } from "./discount-input"
 
 // Verificar que tenemos la clave pública
@@ -37,10 +37,15 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
   const [discountData, setDiscountData] = useState<any>(null)
   const [error, setError] = useState<string>("")
 
-  // Crear Payment Intent cuando se monta el componente
+  // Verificar si es reserva gratuita (100% descuento)
+  const isFreeBooking = finalAmount <= 0
+
+  // Crear Payment Intent cuando se monta el componente (solo si no es gratis)
   React.useEffect(() => {
-    createPaymentIntent(finalAmount)
-  }, [finalAmount])
+    if (!isFreeBooking) {
+      createPaymentIntent(finalAmount)
+    }
+  }, [finalAmount, isFreeBooking])
 
   const createPaymentIntent = async (payAmount: number) => {
     try {
@@ -96,8 +101,48 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
     }
   }
 
+  // Manejar reserva gratuita (sin Stripe)
+  const handleFreeBooking = async () => {
+    setLoading(true)
+    try {
+      console.log("🎁 Processing free booking...")
+
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...bookingData,
+          finalAmount: 0,
+          discountCode: discountData?.code,
+          discountAmount: discountData?.discountAmount,
+          originalPrice: amount,
+          paymentStatus: "free_booking",
+        }),
+      })
+
+      if (response.ok) {
+        console.log("✅ Free booking created successfully")
+        onSuccess()
+      } else {
+        const errorData = await response.json()
+        onError(errorData.error || "Error creando reserva gratuita")
+      }
+    } catch (error) {
+      console.error("❌ Error creating free booking:", error)
+      onError("Error procesando reserva gratuita")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+
+    // Si es reserva gratuita, no usar Stripe
+    if (isFreeBooking) {
+      handleFreeBooking()
+      return
+    }
 
     if (!stripe || !elements || !clientSecret) {
       return
@@ -144,7 +189,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
   }
 
   // Mostrar error si no se puede crear el payment intent
-  if (error) {
+  if (error && !isFreeBooking) {
     return (
       <Card className="w-full max-w-md mx-auto">
         <CardContent className="p-6 text-center">
@@ -160,7 +205,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
     )
   }
 
-  if (!clientSecret) {
+  if (!clientSecret && !isFreeBooking) {
     return (
       <Card className="w-full max-w-md mx-auto">
         <CardContent className="p-6 text-center">
@@ -195,50 +240,78 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
             )}
             <div className="flex justify-between font-bold text-lg">
               <span>Total a pagar:</span>
-              <span>€{finalAmount}</span>
+              <span className={isFreeBooking ? "text-green-600" : ""}>
+                {isFreeBooking ? "¡GRATIS!" : `€${finalAmount}`}
+              </span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Formulario de pago */}
+      {/* Formulario de pago o confirmación gratuita */}
       <Card className="w-full max-w-md mx-auto">
         <CardHeader>
           <CardTitle className="flex items-center">
-            <CreditCard className="h-5 w-5 mr-2 text-gold" />
-            Pago Seguro
+            {isFreeBooking ? (
+              <>
+                <Gift className="h-5 w-5 mr-2 text-green-600" />
+                Reserva Gratuita
+              </>
+            ) : (
+              <>
+                <CreditCard className="h-5 w-5 mr-2 text-gold" />
+                Pago Seguro
+              </>
+            )}
           </CardTitle>
-          <p className="text-sm text-gray-600">Acepta tarjetas, PayPal y más</p>
+          <p className="text-sm text-gray-600">
+            {isFreeBooking ? "¡Tu reserva es completamente gratuita!" : "Acepta tarjetas, PayPal y más"}
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Payment Element */}
-            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-              <PaymentElement
-                options={{
-                  layout: "tabs",
-                  wallets: {
-                    applePay: "auto",
-                    googlePay: "auto",
-                  },
-                }}
-              />
-            </div>
+            {/* Payment Element o mensaje gratuito */}
+            {isFreeBooking ? (
+              <div className="p-4 border border-green-200 rounded-lg bg-green-50 text-center">
+                <Gift className="h-12 w-12 mx-auto text-green-600 mb-2" />
+                <p className="text-green-800 font-medium">¡Reserva 100% gratuita!</p>
+                <p className="text-green-600 text-sm">No se requiere pago</p>
+              </div>
+            ) : (
+              <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <PaymentElement
+                  options={{
+                    layout: "tabs",
+                    wallets: {
+                      applePay: "auto",
+                      googlePay: "auto",
+                    },
+                  }}
+                />
+              </div>
+            )}
 
-            <div className="flex items-center justify-center text-sm text-gray-500">
-              <Lock className="h-4 w-4 mr-2" />
-              Pago seguro con cifrado SSL
-            </div>
+            {!isFreeBooking && (
+              <div className="flex items-center justify-center text-sm text-gray-500">
+                <Lock className="h-4 w-4 mr-2" />
+                Pago seguro con cifrado SSL
+              </div>
+            )}
 
             <Button
               type="submit"
-              disabled={!stripe || loading}
+              disabled={(!stripe && !isFreeBooking) || loading}
               className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
             >
               {loading ? (
                 <>
                   <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Procesando...
+                </>
+              ) : isFreeBooking ? (
+                <>
+                  <Gift className="h-5 w-5 mr-2" />
+                  Confirmar Reserva Gratuita
                 </>
               ) : (
                 <>
