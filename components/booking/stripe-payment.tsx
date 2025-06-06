@@ -9,14 +9,20 @@ import { loadStripe } from "@stripe/stripe-js"
 import { Elements, useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreditCard, Lock, Loader2, Gift } from "lucide-react"
+import { CreditCard, Lock, Loader2, Gift, AlertTriangle } from "lucide-react"
 import { DiscountInput } from "./discount-input"
 
-// Verificar que tenemos la clave pública
-const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-if (!stripePublishableKey) {
-  console.error("❌ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY not found")
-}
+// 🔍 DETECTAR ENTORNO Y CONFIGURAR STRIPE
+const isProduction = process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production"
+const stripePublishableKey = isProduction
+  ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE
+  : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
+
+console.log("🌍 Stripe client environment:", {
+  isProduction,
+  hasKey: !!stripePublishableKey,
+  keyPrefix: stripePublishableKey?.substring(0, 7),
+})
 
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null
 
@@ -36,6 +42,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
   const [finalAmount, setFinalAmount] = useState(amount)
   const [discountData, setDiscountData] = useState<any>(null)
   const [error, setError] = useState<string>("")
+  const [environment, setEnvironment] = useState<string>("unknown")
 
   // Verificar si es reserva gratuita (100% descuento)
   const isFreeBooking = finalAmount <= 0
@@ -76,14 +83,16 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
       if (!response.ok) {
         const errorData = await response.json()
         console.error("❌ API Error:", errorData)
+        setEnvironment(errorData.environment || "unknown")
         throw new Error(errorData.details || errorData.error || "Error creating payment intent")
       }
 
-      const { clientSecret: cs, paymentIntentId: piId } = await response.json()
+      const { clientSecret: cs, paymentIntentId: piId, environment: env } = await response.json()
       console.log("✅ Payment intent created successfully")
 
       setClientSecret(cs)
       setPaymentIntentId(piId)
+      setEnvironment(env)
     } catch (error) {
       console.error("❌ Error creating payment intent:", error)
       const errorMessage = error instanceof Error ? error.message : "Error preparando el pago"
@@ -196,6 +205,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
           <div className="text-red-600 mb-4">
             <p className="font-semibold">Error de configuración</p>
             <p className="text-sm">{error}</p>
+            {environment && <p className="text-xs mt-2 text-gray-500">Entorno: {environment}</p>}
           </div>
           <Button onClick={() => createPaymentIntent(finalAmount)} variant="outline">
             Reintentar
@@ -211,6 +221,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
         <CardContent className="p-6 text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p>Preparando pago...</p>
+          {environment && <p className="text-xs mt-2 text-gray-500">Entorno: {environment}</p>}
         </CardContent>
       </Card>
     )
@@ -218,6 +229,18 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
 
   return (
     <div className="space-y-6">
+      {/* Indicador de entorno */}
+      {environment === "test" && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-3">
+            <div className="flex items-center text-yellow-800">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              <span className="text-sm font-medium">Modo de prueba - No se cobrará dinero real</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Código de descuento */}
       <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
 

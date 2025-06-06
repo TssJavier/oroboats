@@ -1,62 +1,78 @@
 import { type NextRequest, NextResponse } from "next/server"
-import Stripe from "stripe"
+import stripe, { stripeEnvironment } from "@/lib/stripe-config"
 
 export async function POST(request: NextRequest) {
   try {
+    // 🛡️ VERIFICAR CONFIGURACIÓN
+    if (!stripe) {
+      console.error("❌ Stripe not configured:", stripeEnvironment)
+      return NextResponse.json(
+        {
+          error: "Stripe not configured",
+          environment: stripeEnvironment.environment,
+          details: "Please configure Stripe keys for this environment",
+          debug: stripeEnvironment,
+        },
+        { status: 500 },
+      )
+    }
+
     const body = await request.json()
-    console.log("💳 Creating payment intent for:", body)
+    console.log(`💳 Creating payment intent (${stripeEnvironment.environment}):`, {
+      amount: body.amount,
+      environment: stripeEnvironment.environment,
+      hasValidConfig: stripeEnvironment.hasValidConfig,
+    })
 
     const { amount, currency = "eur", metadata = {} } = body
 
-    // Verificar que tenemos la clave de Stripe
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
-    if (!stripeSecretKey) {
-      console.error("❌ STRIPE_SECRET_KEY not found in environment variables")
-      return NextResponse.json({ error: "Stripe not configured" }, { status: 500 })
+    // 🚨 VERIFICACIÓN DE SEGURIDAD EN PRODUCCIÓN
+    if (stripeEnvironment.isProduction && amount < 0.5) {
+      return NextResponse.json(
+        {
+          error: "Invalid amount for production",
+          details: "Minimum amount in production is €0.50",
+          environment: stripeEnvironment.environment,
+        },
+        { status: 400 },
+      )
     }
 
-    console.log("✅ STRIPE_SECRET_KEY found, first 4 chars:", stripeSecretKey.substring(0, 4))
-
-    // Inicializar Stripe con la versión más estable
-    const stripe = new Stripe(stripeSecretKey, {
-      apiVersion: "2025-05-28.basil", // Versión más estable como mencionaste
-    })
-
-    console.log("✅ Stripe initialized successfully")
-
-    // Crear Payment Intent - CORREGIDO: Solo usar automatic_payment_methods
+    // ✅ CREAR PAYMENT INTENT
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Convertir a centavos
+      amount: Math.round(amount * 100),
       currency,
       automatic_payment_methods: {
         enabled: true,
       },
-      // ❌ ELIMINADO: payment_method_types (conflicto con automatic_payment_methods)
       metadata: {
         ...metadata,
-        bookingData: JSON.stringify(body.bookingData), // Guardar datos de reserva
+        environment: stripeEnvironment.environment,
+        bookingData: JSON.stringify(body.bookingData),
       },
     })
 
-    console.log("✅ Payment Intent created:", paymentIntent.id)
+    console.log(`✅ Payment Intent created (${stripeEnvironment.environment}):`, paymentIntent.id)
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
+      environment: stripeEnvironment.environment,
+      debug: {
+        isProduction: stripeEnvironment.isProduction,
+        isDevelopment: stripeEnvironment.isDevelopment,
+        hasValidConfig: stripeEnvironment.hasValidConfig,
+      },
     })
   } catch (error) {
     console.error("❌ Error creating payment intent:", error)
 
-    // Log más detallado del error
-    if (error instanceof Error) {
-      console.error("Error message:", error.message)
-      console.error("Error stack:", error.stack)
-    }
-
     return NextResponse.json(
       {
         error: "Failed to create payment intent",
+        environment: stripeEnvironment.environment,
         details: error instanceof Error ? error.message : "Unknown error",
+        debug: stripeEnvironment,
       },
       { status: 500 },
     )
