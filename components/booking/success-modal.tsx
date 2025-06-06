@@ -62,7 +62,7 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
       >
         <CardContent className="p-0">
           {/* Header */}
-          <div className="bg-gold p-6 text-center">
+          <div className="bg-gold p-6 text-center rounded-t-lg">
             <Button
               variant="ghost"
               size="sm"
@@ -76,7 +76,7 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
                 <span className="text-2xl">✓</span>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-black mb-2">¡Reserva Confirmada! 🎉</h2>
+            <h2 className="text-2xl font-bold text-black mb-2">¡Reserva Confirmada!</h2>
             <p className="text-black/80">¡Prepárate para momentos increíbles!</p>
           </div>
 
@@ -108,7 +108,7 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
 
             {/* Mensaje motivacional */}
             <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
-              <h3 className="font-bold text-gray-900 mb-2">🌊 ¡La aventura te espera! 🌊</h3>
+              <h3 className="font-bold text-gray-900 mb-2">¡La aventura te espera!</h3>
               <p className="text-sm text-gray-700 leading-relaxed">
                 Prepárate para vivir momentos únicos en el agua. No olvides traer protector solar, toalla y muchas ganas
                 de diversión.
@@ -128,7 +128,7 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
               onClick={handleClose}
               className="w-full bg-gold text-black hover:bg-black hover:text-white font-semibold py-3"
             >
-              ¡Perfecto! 🚤
+              Aceptar
             </Button>
           </div>
         </CardContent>

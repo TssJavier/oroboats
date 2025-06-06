@@ -181,7 +181,7 @@ export function DiscountCodesManager() {
                   type="text"
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  placeholder="VERANO2024"
+                  placeholder=""
                   className="w-full px-3 py-2 border rounded-md"
                   required
                   disabled={!!editingCode}

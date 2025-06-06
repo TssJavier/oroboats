@@ -92,23 +92,7 @@ export function DiscountTest() {
         )}
       </div>
 
-      <div className="mt-6 text-sm text-gray-600">
-        <h4 className="font-medium mb-2">📋 Códigos para probar:</h4>
-        <ul className="space-y-1">
-          <li>
-            • <code>ADMIN100</code> - 100% descuento
-          </li>
-          <li>
-            • <code>VERANO2024</code> - 15% descuento
-          </li>
-          <li>
-            • <code>PRIMERAVEZ</code> - €20 descuento
-          </li>
-          <li>
-            • <code>FINDE50</code> - €50 descuento
-          </li>
-        </ul>
-      </div>
+
     </div>
   )
 }
