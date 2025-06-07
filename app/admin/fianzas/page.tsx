@@ -15,6 +15,7 @@ export default function SecurityDepositsPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   useEffect(() => {
     fetchBookings()
@@ -25,41 +26,66 @@ export default function SecurityDepositsPage() {
       setLoading(true)
       setError(null)
 
+      // Usar el endpoint normal de bookings
       const response = await fetch("/api/bookings")
       if (!response.ok) {
         throw new Error("Error al cargar las reservas")
       }
 
       const data = await response.json()
+      console.log("All bookings from API:", data)
 
-      // Filtrar solo reservas con fianza
-      const bookingsWithDeposit = data.filter(
-        (booking: any) => booking.security_deposit && Number(booking.security_deposit) > 0,
-      )
+      // Filtrar reservas con fianza - usar la estructura correcta
+      const bookingsWithDeposit = data.filter((item: any) => {
+        // Los datos vienen en formato { booking: {...}, vehicle: {...} }
+        const booking = item.booking || item
+        const deposit = Number(booking.securityDeposit || 0)
+        console.log(`Booking ${booking.id}: securityDeposit=${booking.securityDeposit}, deposit=${deposit}`)
+        return deposit > 0
+      })
 
+      console.log("Bookings with deposit:", bookingsWithDeposit)
       setBookings(bookingsWithDeposit)
+      setDebugInfo({
+        total: data.length,
+        withDeposit: bookingsWithDeposit.length,
+        sample: bookingsWithDeposit.slice(0, 3),
+      })
     } catch (error) {
       console.error("Error fetching bookings:", error)
-      setError("Error al cargar las reservas")
+      setError("Error al cargar las reservas. Verifica la conexión a la base de datos.")
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredBookings = bookings.filter((booking) => {
+  const filteredBookings = bookings.filter((item) => {
+    const booking = item.booking || item
     const searchLower = searchTerm.toLowerCase()
     return (
-      booking.customer_name?.toLowerCase().includes(searchLower) ||
-      booking.customer_email?.toLowerCase().includes(searchLower) ||
+      booking.customerName?.toLowerCase().includes(searchLower) ||
+      booking.customerEmail?.toLowerCase().includes(searchLower) ||
       booking.id?.toString().includes(searchLower)
     )
   })
 
-  const pendingBookings = filteredBookings.filter((booking) => booking.inspection_status === "pending")
-  const approvedBookings = filteredBookings.filter((booking) => booking.inspection_status === "approved")
-  const damagedBookings = filteredBookings.filter((booking) => booking.inspection_status === "damaged")
+  const pendingBookings = filteredBookings.filter((item) => {
+    const booking = item.booking || item
+    return booking.inspectionStatus === "pending"
+  })
+
+  const approvedBookings = filteredBookings.filter((item) => {
+    const booking = item.booking || item
+    return booking.inspectionStatus === "approved"
+  })
+
+  const damagedBookings = filteredBookings.filter((item) => {
+    const booking = item.booking || item
+    return booking.inspectionStatus === "damaged"
+  })
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "Fecha no disponible"
     const date = new Date(dateString)
     return date.toLocaleDateString("es-ES", {
       year: "numeric",
@@ -95,6 +121,25 @@ export default function SecurityDepositsPage() {
         <p className="text-gray-600">Administra las fianzas de seguridad y inspecciones de daños</p>
       </div>
 
+      {/* Debug Info */}
+      {debugInfo && (
+        <Card className="mb-6 bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <h3 className="font-semibold mb-2">Debug Info:</h3>
+            <p>Total reservas: {debugInfo.total || 0}</p>
+            <p>Con fianza: {debugInfo.withDeposit || 0}</p>
+            {debugInfo.sample && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-blue-600">Ver muestra de datos</summary>
+                <div className="mt-2 text-xs bg-white p-2 rounded overflow-auto max-h-60">
+                  <pre>{JSON.stringify(debugInfo.sample, null, 2)}</pre>
+                </div>
+              </details>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Buscador */}
       <div className="mb-6">
         <Input
@@ -121,12 +166,36 @@ export default function SecurityDepositsPage() {
           <p>Cargando reservas...</p>
         </div>
       ) : (
-        <Tabs defaultValue="pending" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="all">Todas ({filteredBookings.length})</TabsTrigger>
             <TabsTrigger value="pending">Pendientes ({pendingBookings.length})</TabsTrigger>
             <TabsTrigger value="approved">Aprobadas ({approvedBookings.length})</TabsTrigger>
             <TabsTrigger value="damaged">Con Daños ({damagedBookings.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="all" className="space-y-4">
+            {filteredBookings.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-gray-500">No hay reservas con fianza</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Las reservas con fianza aparecerán aquí cuando tengan security_deposit {">"} 0
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredBookings.map((item) => (
+                <BookingCard
+                  key={item.booking?.id || item.id}
+                  item={item}
+                  onInspect={() => setSelectedBooking(item)}
+                  formatDate={formatDate}
+                  getStatusBadge={getStatusBadge}
+                />
+              ))
+            )}
+          </TabsContent>
 
           <TabsContent value="pending" className="space-y-4">
             {pendingBookings.length === 0 ? (
@@ -136,11 +205,11 @@ export default function SecurityDepositsPage() {
                 </CardContent>
               </Card>
             ) : (
-              pendingBookings.map((booking) => (
+              pendingBookings.map((item) => (
                 <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onInspect={() => setSelectedBooking(booking)}
+                  key={item.booking?.id || item.id}
+                  item={item}
+                  onInspect={() => setSelectedBooking(item)}
                   formatDate={formatDate}
                   getStatusBadge={getStatusBadge}
                 />
@@ -152,15 +221,15 @@ export default function SecurityDepositsPage() {
             {approvedBookings.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center">
-                  <p className="text-gray-500">No hay fianzas aprobadas para devolución</p>
+                  <p className="text-gray-500">No hay fianzas aprobadas</p>
                 </CardContent>
               </Card>
             ) : (
-              approvedBookings.map((booking) => (
+              approvedBookings.map((item) => (
                 <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onInspect={() => setSelectedBooking(booking)}
+                  key={item.booking?.id || item.id}
+                  item={item}
+                  onInspect={() => setSelectedBooking(item)}
                   formatDate={formatDate}
                   getStatusBadge={getStatusBadge}
                 />
@@ -172,15 +241,15 @@ export default function SecurityDepositsPage() {
             {damagedBookings.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center">
-                  <p className="text-gray-500">No hay reservas con daños registrados</p>
+                  <p className="text-gray-500">No hay reservas con daños</p>
                 </CardContent>
               </Card>
             ) : (
-              damagedBookings.map((booking) => (
+              damagedBookings.map((item) => (
                 <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onInspect={() => setSelectedBooking(booking)}
+                  key={item.booking?.id || item.id}
+                  item={item}
+                  onInspect={() => setSelectedBooking(item)}
                   formatDate={formatDate}
                   getStatusBadge={getStatusBadge}
                 />
@@ -207,17 +276,21 @@ export default function SecurityDepositsPage() {
             <div className="p-4">
               <DamageInspection
                 booking={{
-                  id: selectedBooking.id,
-                  customerName: selectedBooking.customer_name,
-                  customerEmail: selectedBooking.customer_email,
-                  vehicleName: selectedBooking.vehicle_name || "Vehículo",
-                  bookingDate: selectedBooking.booking_date,
-                  startTime: selectedBooking.start_time,
-                  endTime: selectedBooking.end_time,
-                  securityDeposit: Number(selectedBooking.security_deposit),
-                  inspectionStatus: selectedBooking.inspection_status,
-                  damageDescription: selectedBooking.damage_description,
-                  damageCost: Number(selectedBooking.damage_cost || 0),
+                  id: selectedBooking.booking?.id || selectedBooking.id,
+                  customerName: selectedBooking.booking?.customerName || selectedBooking.customerName,
+                  customerEmail: selectedBooking.booking?.customerEmail || selectedBooking.customerEmail || "",
+                  vehicleName: selectedBooking.vehicle?.name || "Vehículo",
+                  bookingDate: selectedBooking.booking?.bookingDate || selectedBooking.bookingDate || "",
+                  startTime: selectedBooking.booking?.startTime || selectedBooking.startTime || "",
+                  endTime: selectedBooking.booking?.endTime || selectedBooking.endTime || "",
+                  securityDeposit: Number(
+                    selectedBooking.booking?.securityDeposit || selectedBooking.securityDeposit || 0,
+                  ),
+                  inspectionStatus:
+                    selectedBooking.booking?.inspectionStatus || selectedBooking.inspectionStatus || "pending",
+                  damageDescription:
+                    selectedBooking.booking?.damageDescription || selectedBooking.damageDescription || "",
+                  damageCost: Number(selectedBooking.booking?.damageCost || selectedBooking.damageCost || 0),
                 }}
                 onInspectionComplete={handleInspectionComplete}
               />
@@ -229,8 +302,11 @@ export default function SecurityDepositsPage() {
   )
 }
 
-function BookingCard({ booking, onInspect, formatDate, getStatusBadge }: any) {
-  const refundAmount = Math.max(0, Number(booking.security_deposit) - Number(booking.damage_cost || 0))
+function BookingCard({ item, onInspect, formatDate, getStatusBadge }: any) {
+  const booking = item.booking || item
+  const vehicle = item.vehicle || {}
+
+  const refundAmount = Math.max(0, Number(booking.securityDeposit) - Number(booking.damageCost || 0))
 
   return (
     <Card>
@@ -238,13 +314,16 @@ function BookingCard({ booking, onInspect, formatDate, getStatusBadge }: any) {
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="text-lg">
-              Reserva #{booking.id} - {booking.customer_name}
+              Reserva #{booking.id} - {booking.customerName}
             </CardTitle>
             <CardDescription>
-              {booking.customer_email} • {formatDate(booking.booking_date)}
+              {booking.customerEmail} • {formatDate(booking.bookingDate)}
+            </CardDescription>
+            <CardDescription className="text-sm text-gray-500">
+              Vehículo: {vehicle.name || "No especificado"}
             </CardDescription>
           </div>
-          <div className="text-right">{getStatusBadge(booking.inspection_status)}</div>
+          <div className="text-right">{getStatusBadge(booking.inspectionStatus)}</div>
         </div>
       </CardHeader>
       <CardContent>
@@ -252,12 +331,12 @@ function BookingCard({ booking, onInspect, formatDate, getStatusBadge }: any) {
           <div>
             <p className="text-sm font-medium text-gray-500">Horario</p>
             <p>
-              {booking.start_time} - {booking.end_time}
+              {booking.startTime || "N/A"} - {booking.endTime || "N/A"}
             </p>
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500">Fianza</p>
-            <p className="text-lg font-semibold">€{booking.security_deposit}</p>
+            <p className="text-lg font-semibold">€{booking.securityDeposit}</p>
           </div>
           <div>
             <p className="text-sm font-medium text-gray-500">A devolver</p>
@@ -267,17 +346,17 @@ function BookingCard({ booking, onInspect, formatDate, getStatusBadge }: any) {
           </div>
         </div>
 
-        {booking.damage_description && (
+        {booking.damageDescription && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
             <p className="text-sm font-medium text-red-800 mb-1">Daños registrados:</p>
-            <p className="text-sm text-red-700">{booking.damage_description}</p>
-            {booking.damage_cost > 0 && <p className="text-sm text-red-700 mt-1">Coste: €{booking.damage_cost}</p>}
+            <p className="text-sm text-red-700">{booking.damageDescription}</p>
+            {booking.damageCost > 0 && <p className="text-sm text-red-700 mt-1">Coste: €{booking.damageCost}</p>}
           </div>
         )}
 
         <div className="flex justify-end">
           <Button onClick={onInspect} variant="outline">
-            {booking.inspection_status === "pending" ? "Realizar Inspección" : "Ver Detalles"}
+            {booking.inspectionStatus === "pending" ? "Realizar Inspección" : "Ver Detalles"}
           </Button>
         </div>
       </CardContent>

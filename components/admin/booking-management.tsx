@@ -1,10 +1,27 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, User, Phone, Mail, Euro, Ship } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import {
+  Calendar,
+  Clock,
+  User,
+  Phone,
+  Mail,
+  Euro,
+  Ship,
+  Shield,
+  CheckCircle,
+  XCircle,
+  Upload,
+  AlertTriangle,
+} from "lucide-react"
 
 interface Booking {
   booking: {
@@ -20,6 +37,10 @@ interface Booking {
     paymentStatus: string
     notes?: string
     createdAt: string
+    securityDeposit: string
+    inspectionStatus: string
+    damageDescription?: string
+    damageCost: string
   }
   vehicle: {
     name: string
@@ -31,6 +52,12 @@ export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [showDepositModal, setShowDepositModal] = useState(false)
+  const [depositAction, setDepositAction] = useState<"approve" | "reject" | null>(null)
+  const [damageDescription, setDamageDescription] = useState("")
+  const [damageCost, setDamageCost] = useState("")
+  const [damageImages, setDamageImages] = useState<File[]>([])
 
   useEffect(() => {
     fetchBookings()
@@ -47,9 +74,12 @@ export function BookingManagement() {
 
       const data = await response.json()
 
-      // Ensure data is an array
       if (Array.isArray(data)) {
-        setBookings(data)
+        // Ordenar por fecha de creación, más recientes primero
+        const sortedBookings = data.sort(
+          (a, b) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
+        )
+        setBookings(sortedBookings)
       } else {
         console.error("API returned non-array data:", data)
         setBookings([])
@@ -66,7 +96,6 @@ export function BookingManagement() {
 
   const updateBookingStatus = async (id: number, status: string) => {
     try {
-      // Si el estado es "cancelled", usar el endpoint específico de cancelación
       if (status === "cancelled") {
         const response = await fetch(`/api/bookings/${id}/cancel`, {
           method: "POST",
@@ -79,7 +108,6 @@ export function BookingManagement() {
           setError("Error al cancelar la reserva")
         }
       } else {
-        // Para otros estados, usar el endpoint normal
         const response = await fetch(`/api/bookings/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -95,6 +123,55 @@ export function BookingManagement() {
     } catch (err) {
       console.error("Error updating booking:", err)
       setError("Error al actualizar la reserva")
+    }
+  }
+
+  const handleDepositAction = (booking: Booking, action: "approve" | "reject") => {
+    setSelectedBooking(booking)
+    setDepositAction(action)
+    setShowDepositModal(true)
+    setDamageDescription("")
+    setDamageCost("")
+    setDamageImages([])
+  }
+
+  const processDepositAction = async () => {
+    if (!selectedBooking || !depositAction) return
+
+    try {
+      const formData = new FormData()
+      formData.append("action", depositAction)
+
+      if (depositAction === "reject") {
+        formData.append("damageDescription", damageDescription)
+        formData.append("damageCost", damageCost)
+        damageImages.forEach((file, index) => {
+          formData.append(`damageImage${index}`, file)
+        })
+      }
+
+      const response = await fetch(`/api/bookings/${selectedBooking.booking.id}/deposit`, {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        setShowDepositModal(false)
+        setSelectedBooking(null)
+        setDepositAction(null)
+        fetchBookings()
+      } else {
+        setError("Error al procesar la fianza")
+      }
+    } catch (err) {
+      console.error("Error processing deposit:", err)
+      setError("Error al procesar la fianza")
+    }
+  }
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setDamageImages(Array.from(e.target.files))
     }
   }
 
@@ -115,11 +192,26 @@ export function BookingManagement() {
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case "paid":
+      case "completed":
         return "bg-green-600 text-white"
       case "pending":
         return "bg-yellow-600 text-white"
       case "failed":
+        return "bg-red-600 text-white"
+      case "free_booking":
+        return "bg-purple-600 text-white"
+      default:
+        return "bg-gray-600 text-white"
+    }
+  }
+
+  const getInspectionStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "bg-green-600 text-white"
+      case "pending":
+        return "bg-yellow-600 text-white"
+      case "damaged":
         return "bg-red-600 text-white"
       default:
         return "bg-gray-600 text-white"
@@ -179,6 +271,57 @@ export function BookingManagement() {
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
 
+      {/* Panel de ayuda para clientes */}
+      <Card className="bg-blue-50 border-blue-200 mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center text-blue-800">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            Información para Clientes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-2">Estados de Reserva:</h4>
+              <ul className="space-y-1 text-blue-700">
+                <li>
+                  <Badge className="bg-yellow-600 text-white mr-2">pending</Badge>Esperando confirmación
+                </li>
+                <li>
+                  <Badge className="bg-green-600 text-white mr-2">confirmed</Badge>Reserva confirmada
+                </li>
+                <li>
+                  <Badge className="bg-blue-600 text-white mr-2">completed</Badge>Servicio completado
+                </li>
+                <li>
+                  <Badge className="bg-red-600 text-white mr-2">cancelled</Badge>Reserva cancelada
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-blue-800 mb-2">Estados de Fianza:</h4>
+              <ul className="space-y-1 text-blue-700">
+                <li>
+                  <Badge className="bg-yellow-600 text-white mr-2">pending</Badge>Pendiente de inspección
+                </li>
+                <li>
+                  <Badge className="bg-green-600 text-white mr-2">approved</Badge>Fianza devuelta
+                </li>
+                <li>
+                  <Badge className="bg-red-600 text-white mr-2">damaged</Badge>Daños encontrados
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-4 p-3 bg-blue-100 rounded-lg">
+            <p className="text-blue-800 text-sm">
+              <strong>💡 Tip:</strong> Las fianzas se procesan automáticamente después de 7 días si no se encuentran
+              daños. Los clientes reciben notificaciones por email sobre el estado de su fianza.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {Array.isArray(bookings) && bookings.length > 0 ? (
         <div className="space-y-6">
           {bookings.map((booking) => (
@@ -195,11 +338,16 @@ export function BookingManagement() {
                       {booking.vehicle?.name || "Producto eliminado"}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Badge className={getStatusColor(booking.booking.status)}>{booking.booking.status}</Badge>
                     <Badge className={getPaymentStatusColor(booking.booking.paymentStatus)}>
                       {booking.booking.paymentStatus}
                     </Badge>
+                    {Number(booking.booking.securityDeposit) > 0 && (
+                      <Badge className={getInspectionStatusColor(booking.booking.inspectionStatus)}>
+                        Fianza: {booking.booking.inspectionStatus}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -246,30 +394,67 @@ export function BookingManagement() {
                       Precio
                     </h4>
                     <div className="text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
+                    {Number(booking.booking.securityDeposit) > 0 && (
+                      <div className="text-sm text-gray-600">
+                        <Shield className="h-3 w-3 inline mr-1" />
+                        Fianza: €{booking.booking.securityDeposit}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <h4 className="font-semibold text-gray-700">Acciones</h4>
                     <div className="flex flex-col gap-2">
+                      {/* Lógica de estados automática */}
                       {booking.booking.status === "pending" && (
                         <Button
                           size="sm"
                           onClick={() => updateBookingStatus(booking.booking.id, "confirmed")}
                           className="bg-green-600 text-white hover:bg-green-700"
                         >
-                          Confirmar
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          Auto-Confirmar
                         </Button>
                       )}
-                      {booking.booking.status === "confirmed" && (
-                        <Button
-                          size="sm"
-                          onClick={() => updateBookingStatus(booking.booking.id, "completed")}
-                          className="bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          Completar
-                        </Button>
-                      )}
-                      {booking.booking.status !== "cancelled" && (
+
+                      {/* Gestión de fianzas */}
+                      {booking.booking.status === "confirmed" &&
+                        Number(booking.booking.securityDeposit) > 0 &&
+                        booking.booking.inspectionStatus === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleDepositAction(booking, "approve")}
+                              className="bg-green-600 text-white hover:bg-green-700"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Completar Fianza
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleDepositAction(booking, "reject")}
+                              className="bg-red-600 text-white hover:bg-red-700"
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Rechazar Fianza
+                            </Button>
+                          </>
+                        )}
+
+                      {/* Completar reserva normal */}
+                      {booking.booking.status === "confirmed" &&
+                        (Number(booking.booking.securityDeposit) === 0 ||
+                          booking.booking.inspectionStatus === "approved") && (
+                          <Button
+                            size="sm"
+                            onClick={() => updateBookingStatus(booking.booking.id, "completed")}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            Completar Reserva
+                          </Button>
+                        )}
+
+                      {booking.booking.status !== "cancelled" && booking.booking.status !== "completed" && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -282,6 +467,20 @@ export function BookingManagement() {
                     </div>
                   </div>
                 </div>
+
+                {/* Información de daños si existe */}
+                {booking.booking.damageDescription && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-1 flex items-center">
+                      <AlertTriangle className="h-4 w-4 mr-1" />
+                      Daños Registrados:
+                    </h5>
+                    <p className="text-red-700 text-sm mb-1">{booking.booking.damageDescription}</p>
+                    {Number(booking.booking.damageCost) > 0 && (
+                      <p className="text-red-700 text-sm font-semibold">Coste: €{booking.booking.damageCost}</p>
+                    )}
+                  </div>
+                )}
 
                 {booking.booking.notes && (
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg">
@@ -305,6 +504,114 @@ export function BookingManagement() {
             <p className="text-gray-500">Las reservas aparecerán aquí cuando los clientes hagan pedidos</p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Modal para gestión de fianzas */}
+      {showDepositModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-semibold">
+                {depositAction === "approve" ? "Completar Fianza" : "Rechazar Fianza"}
+              </h2>
+              <p className="text-gray-600 mt-1">
+                Reserva #{selectedBooking.booking.id} - {selectedBooking.booking.customerName}
+              </p>
+            </div>
+
+            <div className="p-6">
+              {depositAction === "approve" ? (
+                <div className="text-center">
+                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">¿Completar la fianza?</h3>
+                  <p className="text-gray-600 mb-4">
+                    Se devolverá la fianza completa de €{selectedBooking.booking.securityDeposit} al cliente.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Rechazar Fianza</h3>
+                    <p className="text-gray-600">
+                      Documenta los daños encontrados para justificar la retención de la fianza.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium mb-1">Descripción de los daños *</div>
+                    <Textarea
+                      value={damageDescription}
+                      onChange={(e) => setDamageDescription(e.target.value)}
+                      placeholder="Describe detalladamente los daños encontrados..."
+                      className="mt-1"
+                      rows={4}
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium mb-1">Coste de los daños (€)</div>
+                    <Input
+                      type="number"
+                      value={damageCost}
+                      onChange={(e) => setDamageCost(e.target.value)}
+                      placeholder="0.00"
+                      className="mt-1"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-medium mb-1">Fotos de los daños</div>
+                    <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <Input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        id="damageImages"
+                      />
+                      <label htmlFor="damageImages" className="cursor-pointer text-blue-600 hover:text-blue-700">
+                        Subir fotos de los daños
+                      </label>
+                      <p className="text-gray-500 text-sm mt-1">PNG, JPG hasta 10MB cada una</p>
+                    </div>
+                    {damageImages.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-600">{damageImages.length} archivo(s) seleccionado(s)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDepositModal(false)
+                  setSelectedBooking(null)
+                  setDepositAction(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={processDepositAction}
+                className={
+                  depositAction === "approve" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                }
+                disabled={depositAction === "reject" && !damageDescription.trim()}
+              >
+                {depositAction === "approve" ? "Devolver Fianza" : "Rechazar y Retener"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
