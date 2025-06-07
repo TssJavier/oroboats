@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SuccessModal } from "./success-modal"
 import { DiscountInput } from "./discount-input"
+import { OroLoading } from "@/components/ui/oro-loading"
 
 // 🔍 DETECTAR ENTORNO Y CONFIGURAR STRIPE
 const isProduction = process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production"
@@ -53,6 +54,7 @@ function PaymentFormWithElements({
   const elements = useElements()
   const [loading, setLoading] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
 
   // ✅ Añadido: Calcular total con fianza
   const totalAmount = amount + securityDeposit
@@ -77,6 +79,7 @@ function PaymentFormWithElements({
     }
 
     setLoading(true)
+    setPaymentProcessing(true)
 
     try {
       console.log("🔄 Confirming payment with clientSecret:", clientSecret.substring(0, 20) + "...")
@@ -93,6 +96,7 @@ function PaymentFormWithElements({
       if (error) {
         console.error("❌ Payment failed:", error)
         onError(error.message || "Error en el pago")
+        setPaymentProcessing(false)
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         console.log("✅ Payment succeeded:", paymentIntent.id)
 
@@ -106,14 +110,17 @@ function PaymentFormWithElements({
         if (confirmResponse.ok) {
           // Mostrar modal de éxito en lugar de alert
           setShowSuccessModal(true)
+          setPaymentProcessing(false)
         } else {
           const errorData = await confirmResponse.json()
           onError(errorData.error || "Error confirmando la reserva")
+          setPaymentProcessing(false)
         }
       }
     } catch (err) {
       console.error("❌ Payment error:", err)
       onError("Error procesando el pago")
+      setPaymentProcessing(false)
     } finally {
       setLoading(false)
     }
@@ -171,6 +178,9 @@ function PaymentFormWithElements({
           securityDeposit: securityDeposit, // ✅ Añadido: Pasar la fianza al modal
         }}
       />
+
+      {/* Indicador de carga durante el procesamiento del pago */}
+      {paymentProcessing && <OroLoading />}
     </>
   )
 }
@@ -191,6 +201,7 @@ function PaymentForm({
   const [error, setError] = useState<string>("")
   const [environment, setEnvironment] = useState<string>("unknown")
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
 
   // ✅ Añadido: Calcular total con fianza (no se aplica descuento a la fianza)
   const totalWithDeposit = finalAmount + securityDeposit
@@ -287,6 +298,8 @@ function PaymentForm({
   // Manejar reserva gratuita (sin Stripe)
   const handleFreeBooking = async () => {
     setLoading(true)
+    setPaymentProcessing(true)
+
     try {
       console.log("🎁 Processing free booking...")
 
@@ -316,6 +329,7 @@ function PaymentForm({
       onError("Error procesando reserva gratuita")
     } finally {
       setLoading(false)
+      setPaymentProcessing(false)
     }
   }
 
@@ -487,6 +501,9 @@ function PaymentForm({
           securityDeposit: securityDeposit, // ✅ Añadido: Pasar la fianza al modal
         }}
       />
+
+      {/* Indicador de carga durante el procesamiento del pago */}
+      {paymentProcessing && <OroLoading />}
     </>
   )
 }
