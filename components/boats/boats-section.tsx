@@ -36,6 +36,7 @@ import {
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import { useRouter } from "next/navigation"
+import { OroLoading } from "@/components/ui/oro-loading"
 
 // Función para validar URLs de imágenes
 function isValidImageUrl(url: string): boolean {
@@ -526,6 +527,7 @@ export function BoatsSection() {
   const [showLicenseModal, setShowLicenseModal] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const [navigationLoading, setNavigationLoading] = useState(false)
 
   // ✅ REF PARA EL SCROLL AUTOMÁTICO
   const productsRef = useRef<HTMLDivElement>(null)
@@ -679,14 +681,20 @@ export function BoatsSection() {
       setSelectedVehicle(vehicle)
       setShowLicenseModal(true)
     } else {
-      router.push(`/reservar/${vehicle.id}`)
+      setNavigationLoading(true)
+      setTimeout(() => {
+        router.push(`/reservar/${vehicle.id}`)
+      }, 1500)
     }
   }
 
   const handleLicenseModalContinue = () => {
     if (selectedVehicle) {
       setShowLicenseModal(false)
-      router.push(`/reservar/${selectedVehicle.id}`)
+      setNavigationLoading(true)
+      setTimeout(() => {
+        router.push(`/reservar/${selectedVehicle.id}`)
+      }, 1500)
       setSelectedVehicle(null)
     }
   }
@@ -904,6 +912,9 @@ export function BoatsSection() {
           t={t}
         />
       )}
+
+      {/* Loading de navegación */}
+      {navigationLoading && <OroLoading />}
     </>
   )
 }
