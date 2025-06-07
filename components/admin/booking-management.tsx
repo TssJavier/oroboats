@@ -21,6 +21,7 @@ import {
   XCircle,
   Upload,
   AlertTriangle,
+  CalendarDays,
 } from "lucide-react"
 
 interface Booking {
@@ -48,6 +49,8 @@ interface Booking {
   } | null
 }
 
+type DateFilter = "all" | "today" | "tomorrow"
+
 export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +61,7 @@ export function BookingManagement() {
   const [damageDescription, setDamageDescription] = useState("")
   const [damageCost, setDamageCost] = useState("")
   const [damageImages, setDamageImages] = useState<File[]>([])
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all")
 
   useEffect(() => {
     fetchBookings()
@@ -93,6 +97,32 @@ export function BookingManagement() {
       setLoading(false)
     }
   }
+
+  // Función para filtrar reservas por fecha
+  const getFilteredBookings = () => {
+    if (dateFilter === "all") return bookings
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    return bookings.filter((booking) => {
+      const bookingDate = new Date(booking.booking.bookingDate)
+      bookingDate.setHours(0, 0, 0, 0)
+
+      if (dateFilter === "today") {
+        return bookingDate.getTime() === today.getTime()
+      } else if (dateFilter === "tomorrow") {
+        return bookingDate.getTime() === tomorrow.getTime()
+      }
+
+      return true
+    })
+  }
+
+  const filteredBookings = getFilteredBookings()
 
   const updateBookingStatus = async (id: number, status: string) => {
     try {
@@ -271,6 +301,70 @@ export function BookingManagement() {
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
 
+      {/* Filtros de fecha */}
+      <Card className="bg-white border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center text-gray-800">
+            <CalendarDays className="h-5 w-5 mr-2" />
+            Filtrar por Fecha
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant={dateFilter === "all" ? "default" : "outline"}
+              onClick={() => setDateFilter("all")}
+              className={dateFilter === "all" ? "bg-black text-white" : ""}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Todas ({bookings.length})
+            </Button>
+            <Button
+              variant={dateFilter === "today" ? "default" : "outline"}
+              onClick={() => setDateFilter("today")}
+              className={dateFilter === "today" ? "bg-green-600 text-white hover:bg-green-700" : ""}
+            >
+              <Clock className="h-4 w-4 mr-2" />
+              Hoy (
+              {
+                bookings.filter((b) => {
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const bookingDate = new Date(b.booking.bookingDate)
+                  bookingDate.setHours(0, 0, 0, 0)
+                  return bookingDate.getTime() === today.getTime()
+                }).length
+              }
+              )
+            </Button>
+            <Button
+              variant={dateFilter === "tomorrow" ? "default" : "outline"}
+              onClick={() => setDateFilter("tomorrow")}
+              className={dateFilter === "tomorrow" ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Mañana (
+              {
+                bookings.filter((b) => {
+                  const tomorrow = new Date()
+                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  tomorrow.setHours(0, 0, 0, 0)
+                  const bookingDate = new Date(b.booking.bookingDate)
+                  bookingDate.setHours(0, 0, 0, 0)
+                  return bookingDate.getTime() === tomorrow.getTime()
+                }).length
+              }
+              )
+            </Button>
+          </div>
+          {dateFilter !== "all" && (
+            <div className="mt-3 text-sm text-gray-600">
+              Mostrando {filteredBookings.length} reserva(s) para {dateFilter === "today" ? "hoy" : "mañana"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Panel de ayuda para clientes */}
       <Card className="bg-blue-50 border-blue-200 mb-6">
         <CardHeader className="pb-3">
@@ -319,9 +413,9 @@ export function BookingManagement() {
         </CardContent>
       </Card>
 
-      {Array.isArray(bookings) && bookings.length > 0 ? (
+      {Array.isArray(filteredBookings) && filteredBookings.length > 0 ? (
         <div className="space-y-6">
-          {bookings.map((booking) => (
+          {filteredBookings.map((booking) => (
             <Card key={booking.booking.id} className="bg-white border border-gray-200 hover:shadow-lg transition-all">
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -497,8 +591,16 @@ export function BookingManagement() {
         <Card className="bg-white border border-gray-200">
           <CardContent className="text-center py-12">
             <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay reservas</h3>
-            <p className="text-gray-500">Las reservas aparecerán aquí cuando los clientes hagan pedidos</p>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+              {dateFilter === "all"
+                ? "No hay reservas"
+                : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
+            </h3>
+            <p className="text-gray-500">
+              {dateFilter === "all"
+                ? "Las reservas aparecerán aquí cuando los clientes hagan pedidos"
+                : "Prueba con otro filtro de fecha o revisa las reservas de otros días"}
+            </p>
           </CardContent>
         </Card>
       )}
