@@ -285,10 +285,7 @@ export function BookingManagement() {
               <h4 className="font-semibold text-blue-800 mb-2">Estados de Reserva:</h4>
               <ul className="space-y-1 text-blue-700">
                 <li>
-                  <Badge className="bg-yellow-600 text-white mr-2">pending</Badge>Esperando confirmación
-                </li>
-                <li>
-                  <Badge className="bg-green-600 text-white mr-2">confirmed</Badge>Reserva confirmada
+                  <Badge className="bg-green-600 text-white mr-2">confirmed</Badge>Reserva confirmada automáticamente
                 </li>
                 <li>
                   <Badge className="bg-blue-600 text-white mr-2">completed</Badge>Servicio completado
@@ -315,8 +312,8 @@ export function BookingManagement() {
           </div>
           <div className="mt-4 p-3 bg-blue-100 rounded-lg">
             <p className="text-blue-800 text-sm">
-              <strong>💡 Tip:</strong> Las fianzas se procesan automáticamente después de 7 días si no se encuentran
-              daños. Los clientes reciben notificaciones por email sobre el estado de su fianza.
+              <strong>💡 Flujo actual:</strong> Las reservas se confirman automáticamente al pagar. Si hay fianza, debes
+              inspeccionarla antes de completar la reserva. Las fianzas se procesan automáticamente después de 7 días.
             </p>
           </div>
         </CardContent>
