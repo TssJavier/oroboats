@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,14 +25,20 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", // ✅ INCLUIR COOKIES
         body: JSON.stringify({ email, password }),
       })
 
       const data = await response.json()
+      console.log("🔐 Login response:", { status: response.status, data })
+      console.log("🍪 Document cookies:", document.cookie)
 
       if (response.ok) {
-        router.push("/dashboard")
-        router.refresh()
+        console.log("✅ Login exitoso, redirigiendo...")
+        // Cambiar la redirección
+        setTimeout(() => {
+          window.location.href = "/admin"
+        }, 100)
       } else {
         setError(data.error || "Error al iniciar sesión")
       }
@@ -48,18 +53,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        {/* Logo y título */}
         <div className="text-center">
           <div className="flex justify-center">
-            <Ship className="h-12 w-12 text-gold" />
+            <Ship className="h-12 w-12 text-yellow-500" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-black">
-            Oro<span className="text-gold">Boats</span>
+            Oro<span className="text-yellow-500">Boats</span>
           </h2>
           <p className="mt-2 text-sm text-gray-600">Panel de Administración</p>
         </div>
 
-        {/* Formulario de login */}
         <Card className="bg-white border border-gray-200 shadow-lg">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-black text-center">Iniciar Sesión</CardTitle>
@@ -85,7 +88,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Introduce tu email"
+                  placeholder="info@oroboats.com"
                   required
                   disabled={loading}
                   className="bg-gray-50 border-gray-200"
@@ -125,7 +128,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium py-3"
+                className="w-full bg-black text-white hover:bg-yellow-500 hover:text-black transition-all duration-300 font-medium py-3"
               >
                 {loading ? (
                   <>
