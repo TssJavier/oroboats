@@ -29,10 +29,11 @@ interface BookingData {
   bookingDate: string
   startTime: string
   endTime: string
-  timeSlot: string // ✅ AÑADIDO: Campo obligatorio
+  timeSlot: string
   duration: string
   totalPrice: number
   notes: string
+  securityDeposit?: number // ✅ Añadido: Campo para la fianza
 }
 
 const translations = {
@@ -97,6 +98,9 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const t = translations[language]
   const router = useRouter()
 
+  // ✅ Obtener la fianza del vehículo
+  const securityDeposit = Number(vehicle.securityDeposit) || 0
+
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedDate, setSelectedDate] = useState<string>("")
   const [selectedTime, setSelectedTime] = useState<{
@@ -113,17 +117,17 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     bookingDate: "",
     startTime: "",
     endTime: "",
-    timeSlot: "", // ✅ AÑADIDO: Campo obligatorio
+    timeSlot: "",
     duration: "",
     totalPrice: 0,
     notes: "",
+    securityDeposit: securityDeposit, // ✅ Añadido: Incluir la fianza
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (selectedDate && selectedTime) {
-      // ✅ GENERAR timeSlot CORRECTAMENTE
       const timeSlot = `${selectedTime.start}-${selectedTime.end}`
 
       setBookingData((prev) => ({
@@ -131,9 +135,10 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         bookingDate: selectedDate,
         startTime: selectedTime.start,
         endTime: selectedTime.end,
-        timeSlot: timeSlot, // ✅ AÑADIDO
+        timeSlot: timeSlot,
         duration: selectedTime.duration,
         totalPrice: selectedTime.price,
+        securityDeposit: securityDeposit, // ✅ Añadido: Asegurar que la fianza se incluye
       }))
 
       console.log("📅 Datos de reserva actualizados:", {
@@ -143,9 +148,10 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         timeSlot: timeSlot,
         duration: selectedTime.duration,
         totalPrice: selectedTime.price,
+        securityDeposit: securityDeposit, // ✅ Añadido: Log de la fianza
       })
     }
-  }, [selectedDate, selectedTime])
+  }, [selectedDate, selectedTime, securityDeposit])
 
   const handleNextStep = () => {
     setError("")
@@ -177,8 +183,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   }
 
   const handleBooking = () => {
-    // No crear reserva aquí, solo pasar al paso de pago
-    setCurrentStep(4) // Nuevo paso de pago
+    setCurrentStep(4) // Paso de pago
   }
 
   return (
@@ -265,6 +270,15 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                         ))}
                     </div>
                   </div>
+
+                  {/* ✅ Añadido: Mostrar fianza si existe */}
+                  {securityDeposit > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-semibold">Fianza reembolsable:</span> €{securityDeposit}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -386,16 +400,30 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                   <div className="space-y-6">
                     <div className="text-center">
                       <h3 className="text-lg font-semibold text-black mb-2">Pago Seguro</h3>
-                      <p className="text-gray-600">
-                        Total a pagar: <span className="font-bold text-2xl">€{bookingData.totalPrice}</span>
-                      </p>
+
+                      {/* ✅ Modificado: Mostrar precio + fianza */}
+                      <div className="space-y-1">
+                        <p className="text-gray-600">
+                          Precio del alquiler: <span className="font-semibold">€{bookingData.totalPrice}</span>
+                        </p>
+
+                        {securityDeposit > 0 && (
+                          <p className="text-blue-600">
+                            Fianza (reembolsable): <span className="font-semibold">€{securityDeposit}</span>
+                          </p>
+                        )}
+
+                        <p className="text-xl font-bold mt-2">
+                          Total a pagar: €{bookingData.totalPrice + securityDeposit}
+                        </p>
+                      </div>
                     </div>
 
                     <StripePayment
                       amount={bookingData.totalPrice}
+                      securityDeposit={securityDeposit} // ✅ Añadido: Pasar la fianza
                       bookingData={bookingData}
                       onSuccess={() => {
-                        alert("¡Reserva confirmada y pago procesado exitosamente!")
                         router.push("/")
                       }}
                       onError={(error) => {

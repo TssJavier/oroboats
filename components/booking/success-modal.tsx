@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { CheckCircle, Calendar, Clock, Mail, CreditCard, Shield } from "lucide-react"
 
 interface SuccessModalProps {
   isOpen: boolean
@@ -14,6 +15,7 @@ interface SuccessModalProps {
     endTime: string
     vehicleName?: string
     totalPrice: number
+    securityDeposit?: number
   }
 }
 
@@ -28,12 +30,11 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
 
   const handleClose = () => {
     setIsVisible(false)
-    setTimeout(onClose, 300) // Esperar a que termine la animación
+    setTimeout(onClose, 300) // Wait for animation
   }
 
   if (!isOpen) return null
 
-  // Formatear fecha
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("es-ES", {
@@ -42,6 +43,10 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
       month: "long",
       day: "numeric",
     })
+  }
+
+  const formatTime = (time: string) => {
+    return time.substring(0, 5) // Remove seconds if present
   }
 
   return (
@@ -71,64 +76,86 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
             >
               ✕
             </Button>
-            <div className="mb-4 text-center">
-              <div className="mx-auto h-16 w-16 rounded-full bg-white flex items-center justify-center mb-4">
-                <span className="text-2xl">✓</span>
-              </div>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white">
+              <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
             <h2 className="text-2xl font-bold text-black mb-2">¡Reserva Confirmada!</h2>
-            <p className="text-black/80">¡Prepárate para momentos increíbles!</p>
+            <p className="text-black/80">Tu reserva ha sido procesada exitosamente</p>
           </div>
 
-          {/* Contenido */}
-          <div className="p-6 space-y-6">
-            {/* Detalles de la reserva */}
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="font-semibold text-gray-900">Tu aventura será:</p>
-                <p className="text-blue-600 font-medium">{formatDate(bookingData.bookingDate)}</p>
-                <p className="text-sm text-gray-600">
-                  De {bookingData.startTime} a {bookingData.endTime}
-                </p>
+          {/* Content */}
+          <div className="p-6 space-y-4">
+            {/* Booking details */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-sm">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Fecha:</span>
+                <span>{formatDate(bookingData.bookingDate)}</span>
               </div>
 
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="font-semibold text-gray-900">Revisa tu email:</p>
-                <p className="text-green-600 font-medium break-all">{bookingData.customerEmail}</p>
-                <p className="text-sm text-gray-600">Te hemos enviado tu factura y detalles</p>
+              <div className="flex items-center gap-3 text-sm">
+                <Clock className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Horario:</span>
+                <span>
+                  {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+                </span>
               </div>
 
               {bookingData.vehicleName && (
-                <div className="p-3 bg-gold/10 rounded-lg">
-                  <p className="font-semibold text-gray-900">Tu embarcación:</p>
-                  <p className="text-gold font-medium">{bookingData.vehicleName}</p>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="font-medium">Vehículo:</span>
+                  <span>{bookingData.vehicleName}</span>
                 </div>
               )}
+
+              <div className="flex items-center gap-3 text-sm">
+                <CreditCard className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Precio del alquiler:</span>
+                <span className="font-semibold">€{bookingData.totalPrice}</span>
+              </div>
+
+              {/* Security deposit info */}
+              {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Shield className="h-4 w-4 text-blue-500" />
+                  <span className="font-medium">Fianza (reembolsable):</span>
+                  <span className="font-semibold text-blue-600">€{bookingData.securityDeposit}</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 text-sm">
+                <Mail className="h-4 w-4 text-gray-500" />
+                <span className="font-medium">Confirmación enviada a:</span>
+                <span className="break-all">{bookingData.customerEmail}</span>
+              </div>
             </div>
 
-            {/* Mensaje motivacional */}
-            <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
-              <h3 className="font-bold text-gray-900 mb-2">¡La aventura te espera!</h3>
-              <p className="text-sm text-gray-700 leading-relaxed">
-                Prepárate para vivir momentos únicos en el agua. No olvides traer protector solar, toalla y muchas ganas
-                de diversión.
+            {/* Security deposit information */}
+            {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800 mb-1">Información sobre la fianza</p>
+                    <p className="text-blue-700">
+                      La fianza de €{bookingData.securityDeposit} se devolverá al finalizar la reserva, siempre que no haya daños por uso irresponsable.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Additional information */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <p className="text-sm text-gray-700">
+                <span className="font-medium">Importante:</span> Revisa tu email para obtener todos los detalles de tu
+                reserva. Si tienes alguna pregunta, no dudes en contactarnos.
               </p>
             </div>
 
-            {/* Información adicional */}
-            <div className="text-center space-y-2">
-              <p className="text-xs text-gray-500">
-                Total pagado: <span className="font-semibold">€{bookingData.totalPrice}</span>
-              </p>
-              <p className="text-xs text-gray-500">Si tienes alguna duda, contáctanos</p>
-            </div>
-
-            {/* Botón de cierre */}
-            <Button
-              onClick={handleClose}
-              className="w-full bg-gold text-black hover:bg-black hover:text-white font-semibold py-3"
-            >
-              Aceptar
+            {/* Close button */}
+            <Button onClick={handleClose} className="w-full bg-gold text-black hover:bg-black hover:text-white">
+              Entendido
             </Button>
           </div>
         </CardContent>

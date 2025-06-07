@@ -28,6 +28,7 @@ const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : 
 
 interface StripePaymentProps {
   amount: number
+  securityDeposit?: number // ✅ Añadido: Fianza
   bookingData: any
   onSuccess: () => void
   onError: (error: string) => void
@@ -36,6 +37,7 @@ interface StripePaymentProps {
 // Componente interno que maneja el pago con Elements
 function PaymentFormWithElements({
   amount,
+  securityDeposit = 0, // ✅ Añadido: Fianza con valor por defecto
   bookingData,
   onSuccess,
   onError,
@@ -51,6 +53,9 @@ function PaymentFormWithElements({
   const elements = useElements()
   const [loading, setLoading] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+
+  // ✅ Añadido: Calcular total con fianza
+  const totalAmount = amount + securityDeposit
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -137,12 +142,13 @@ function PaymentFormWithElements({
 
             <div className="flex items-center justify-center text-sm text-gray-500">Pago seguro con cifrado SSL</div>
 
+            {/* ✅ Modificado: Mostrar total con fianza */}
             <Button
               type="submit"
               disabled={!stripe || loading}
               className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
             >
-              {loading ? "Procesando..." : `Pagar €${amount}`}
+              {loading ? "Procesando..." : `Pagar €${totalAmount}`}
             </Button>
           </form>
         </CardContent>
@@ -162,6 +168,7 @@ function PaymentFormWithElements({
           endTime: bookingData.endTime,
           vehicleName: bookingData.vehicleName,
           totalPrice: amount,
+          securityDeposit: securityDeposit, // ✅ Añadido: Pasar la fianza al modal
         }}
       />
     </>
@@ -169,7 +176,13 @@ function PaymentFormWithElements({
 }
 
 // Componente principal que maneja la lógica de descuentos y payment intent
-function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentProps): ReactElement {
+function PaymentForm({
+  amount,
+  securityDeposit = 0,
+  bookingData,
+  onSuccess,
+  onError,
+}: StripePaymentProps): ReactElement {
   const [loading, setLoading] = useState(false)
   const [clientSecret, setClientSecret] = useState<string>("")
   const [paymentIntentId, setPaymentIntentId] = useState<string>("")
@@ -178,6 +191,9 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
   const [error, setError] = useState<string>("")
   const [environment, setEnvironment] = useState<string>("unknown")
   const [showSuccessModal, setShowSuccessModal] = useState(false)
+
+  // ✅ Añadido: Calcular total con fianza (no se aplica descuento a la fianza)
+  const totalWithDeposit = finalAmount + securityDeposit
 
   // Verificar si es reserva gratuita (100% descuento)
   const isFreeBooking = finalAmount <= 0
@@ -194,16 +210,28 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
       setError("")
       setClientSecret("") // Limpiar clientSecret anterior
       setLoading(true)
-      console.log("🔄 Creating payment intent for amount:", payAmount)
+
+      // ✅ Modificado: Incluir fianza en el monto total
+      const totalAmount = payAmount + securityDeposit
+      console.log(
+        "🔄 Creating payment intent for amount:",
+        totalAmount,
+        "(Alquiler:",
+        payAmount,
+        "+ Fianza:",
+        securityDeposit,
+        ")",
+      )
 
       const response = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: payAmount,
+          amount: totalAmount, // ✅ Modificado: Monto total con fianza
           bookingData: {
             ...bookingData,
             finalAmount: payAmount,
+            securityDeposit: securityDeposit, // ✅ Añadido: Incluir fianza
             discountCode: discountData?.code,
             discountAmount: discountData?.discountAmount,
             originalPrice: discountData ? amount : undefined,
@@ -211,6 +239,8 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
           metadata: {
             customerEmail: bookingData.customerEmail,
             vehicleId: bookingData.vehicleId,
+            rentalAmount: payAmount, // ✅ Añadido: Monto del alquiler
+            securityDeposit: securityDeposit, // ✅ Añadido: Monto de la fianza
           },
         }),
       })
@@ -266,6 +296,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
         body: JSON.stringify({
           ...bookingData,
           finalAmount: 0,
+          securityDeposit: securityDeposit, // ✅ Añadido: Incluir fianza
           discountCode: discountData?.code,
           discountAmount: discountData?.discountAmount,
           originalPrice: amount,
@@ -358,12 +389,34 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
                   <hr className="my-2" />
                 </>
               )}
+
+              {/* ✅ Modificado: Mostrar desglose con fianza */}
+              <div className="flex justify-between">
+                <span>Precio del alquiler:</span>
+                <span className="font-medium">€{finalAmount}</span>
+              </div>
+
+              {securityDeposit > 0 && (
+                <div className="flex justify-between text-blue-600">
+                  <span>Fianza (reembolsable):</span>
+                  <span className="font-medium">€{securityDeposit}</span>
+                </div>
+              )}
+
+              <hr className="my-2" />
+
               <div className="flex justify-between font-bold text-lg">
                 <span>Total a pagar:</span>
                 <span className={isFreeBooking ? "text-green-600" : ""}>
-                  {isFreeBooking ? "¡GRATIS!" : `€${finalAmount}`}
+                  {isFreeBooking ? "¡GRATIS!" : `€${totalWithDeposit}`}
                 </span>
               </div>
+
+              {securityDeposit > 0 && (
+                <p className="text-xs text-blue-600 mt-1">
+                  *La fianza se devolverá al finalizar la reserva, siempre que no haya daños por uso irresponsable.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -405,6 +458,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
           >
             <PaymentFormWithElements
               amount={finalAmount}
+              securityDeposit={securityDeposit} // ✅ Añadido: Pasar la fianza
               bookingData={bookingData}
               onSuccess={onSuccess}
               onError={onError}
@@ -430,6 +484,7 @@ function PaymentForm({ amount, bookingData, onSuccess, onError }: StripePaymentP
           endTime: bookingData.endTime,
           vehicleName: bookingData.vehicleName,
           totalPrice: finalAmount,
+          securityDeposit: securityDeposit, // ✅ Añadido: Pasar la fianza al modal
         }}
       />
     </>

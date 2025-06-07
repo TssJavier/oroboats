@@ -103,14 +103,17 @@ export async function POST(request: NextRequest) {
       console.log(`✅ Discount applied: €${discountAmount}`)
     }
 
-    // ✅ PREPARAR DATOS PARA TU FUNCIÓN ORIGINAL - AÑADIENDO timeSlot
+    // ✅ PREPARAR DATOS PARA TU FUNCIÓN ORIGINAL - AÑADIENDO timeSlot y securityDeposit
     const bookingData = {
       ...body,
-      timeSlot: body.timeSlot || `${body.startTime}-${body.endTime}`, // ✅ AÑADIR timeSlot
+      timeSlot: body.timeSlot || `${body.startTime}-${body.endTime}`,
       discountCode: body.discountCode || null,
       discountAmount: discountAmount,
       originalPrice: originalPrice,
       totalPrice: originalPrice - discountAmount, // Precio final con descuento
+      securityDeposit: body.securityDeposit || 0, // ✅ AÑADIDO: Asegurar que la fianza se guarda
+      depositPaymentIntentId: body.depositPaymentIntentId || null, // ✅ AÑADIDO: ID del pago de la fianza
+      inspectionStatus: "pending", // ✅ AÑADIDO: Estado inicial de la inspección
     }
 
     console.log("📅 API: Prepared booking data:", bookingData)
@@ -130,10 +133,10 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(discountCodes.id, validDiscountCode.id))
 
-        // Registrar uso
+        // Registrar uso - CORREGIDO: Asegurar que bookingId es un número
         await db.insert(discountUsage).values({
-          discountCodeId: validDiscountCode.id, // Use the correct property name as defined in your schema
-          bookingId: booking[0].id,
+          discountCodeId: validDiscountCode.id,
+          bookingId: Number(booking[0].id), // ✅ CORREGIDO: Convertir explícitamente a número
           customerEmail: body.customerEmail,
           discountAmount: discountAmount.toString(),
         })
@@ -158,7 +161,7 @@ export async function POST(request: NextRequest) {
 
     // ✅ NUEVA FUNCIONALIDAD: ENVIAR EMAILS (NO BLOQUEAR SI FALLAN)
     const emailData = {
-      bookingId: Number(booking[0].id),
+      bookingId: Number(booking[0].id), // ✅ CORREGIDO: Convertir explícitamente a número
       customerName: body.customerName,
       customerEmail: body.customerEmail,
       customerPhone: body.customerPhone,
@@ -170,7 +173,7 @@ export async function POST(request: NextRequest) {
       discountAmount: discountAmount > 0 ? discountAmount : undefined,
       originalPrice: discountAmount > 0 ? originalPrice : undefined,
       discountCode: body.discountCode || undefined,
-      securityDeposit: body.securityDeposit || 0,
+      securityDeposit: body.securityDeposit || 0, // ✅ AÑADIDO: Incluir fianza en el email
     }
 
     // Email al admin (no bloquear si falla)
@@ -192,6 +195,7 @@ export async function POST(request: NextRequest) {
         discountAmount: discountAmount,
         originalPrice: originalPrice,
         finalPrice: originalPrice - discountAmount,
+        securityDeposit: body.securityDeposit || 0, // ✅ AÑADIDO: Devolver fianza en la respuesta
       },
       { status: 201 },
     )
