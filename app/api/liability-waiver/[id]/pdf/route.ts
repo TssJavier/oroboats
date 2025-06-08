@@ -1,9 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { sql } from "drizzle-orm"
+import { jwtVerify } from "jose"
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    // 🔒 VERIFICAR AUTENTICACIÓN (solo esta parte es nueva)
+    const token = request.cookies.get("admin-token")?.value
+    if (!token) {
+      return new NextResponse("Acceso no autorizado", { status: 401 })
+    }
+
+    try {
+      await jwtVerify(token, JWT_SECRET)
+    } catch (jwtError) {
+      return new NextResponse("Token inválido", { status: 401 })
+    }
+
+    // 📄 TU CÓDIGO ORIGINAL QUE FUNCIONA
     const waiverId = Number.parseInt(params.id)
     console.log(`🔍 PDF: Generating document for waiver ID ${waiverId}`)
 
