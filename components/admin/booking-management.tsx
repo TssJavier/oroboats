@@ -22,6 +22,8 @@ import {
   Upload,
   AlertTriangle,
   CalendarDays,
+  FileText,
+  Download,
 } from "lucide-react"
 
 interface Booking {
@@ -42,6 +44,7 @@ interface Booking {
     inspectionStatus: string
     damageDescription?: string
     damageCost: string
+    liabilityWaiverId?: number // ✅ AÑADIDO: ID del documento firmado
   }
   vehicle: {
     name: string
@@ -95,6 +98,31 @@ export function BookingManagement() {
       setError("Error al cargar las reservas. Verifica la conexión a la base de datos.")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // ✅ NUEVA FUNCIÓN: Descargar documento de exención
+  const downloadWaiver = async (waiverId: number, customerName: string) => {
+    try {
+      const response = await fetch(`/api/liability-waiver/${waiverId}/pdf`)
+
+      if (!response.ok) {
+        throw new Error("Error al descargar el documento")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.style.display = "none"
+      a.href = url
+      a.download = `exencion-responsabilidad-${customerName}-${waiverId}.html`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error("Error downloading waiver:", error)
+      setError("Error al descargar el documento")
     }
   }
 
@@ -439,6 +467,13 @@ export function BookingManagement() {
                         Fianza: {booking.booking.inspectionStatus}
                       </Badge>
                     )}
+                    {/* ✅ AÑADIDO: Badge para documento firmado */}
+                    {booking.booking.liabilityWaiverId && (
+                      <Badge className="bg-purple-600 text-white">
+                        <FileText className="h-3 w-3 mr-1" />
+                        Documento firmado
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -496,6 +531,21 @@ export function BookingManagement() {
                   <div className="space-y-2">
                     <h4 className="font-semibold text-gray-700">Acciones</h4>
                     <div className="flex flex-col gap-2">
+                      {/* ✅ AÑADIDO: Botón para descargar documento */}
+                      {booking.booking.liabilityWaiverId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            downloadWaiver(booking.booking.liabilityWaiverId!, booking.booking.customerName)
+                          }
+                          className="border-purple-300 text-purple-600 hover:bg-purple-50"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Descargar Exención
+                        </Button>
+                      )}
+
                       {/* Lógica de estados automática */}
                       {booking.booking.status === "pending" && (
                         <Button

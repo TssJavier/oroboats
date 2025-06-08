@@ -35,6 +35,20 @@ export const vehicles = pgTable("vehicles", {
   updatedAt: timestamp("updated_at").defaultNow(),
 })
 
+// ✅ NUEVA TABLA: Exenciones de responsabilidad
+export const liabilityWaivers = pgTable("liability_waivers", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id").references(() => bookings.id),
+  customerName: varchar("customer_name", { length: 255 }).notNull(),
+  customerEmail: varchar("customer_email", { length: 255 }).notNull(),
+  signatureDate: timestamp("signature_date").defaultNow(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  waiverContent: text("waiver_content").notNull(),
+  signedAt: timestamp("signed_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+})
+
 // ✅ TABLA DE CÓDIGOS DE DESCUENTO
 export const discountCodes = pgTable("discount_codes", {
   id: serial("id").primaryKey(),
@@ -88,6 +102,7 @@ export const bookings = pgTable("bookings", {
   inspectionStatus: varchar("inspection_status", { length: 50 }).default("pending"),
   damageDescription: text("damage_description"),
   damageCost: decimal("damage_cost", { precision: 10, scale: 2 }).default("0"),
+  liabilityWaiverId: integer("liability_waiver_id").references(() => liabilityWaivers.id), // ✅ AÑADIDO: Referencia al documento firmado
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })
@@ -175,6 +190,8 @@ export type Vehicle = typeof vehicles.$inferSelect
 export type NewVehicle = typeof vehicles.$inferInsert
 export type Booking = typeof bookings.$inferSelect
 export type NewBooking = typeof bookings.$inferInsert
+export type LiabilityWaiver = typeof liabilityWaivers.$inferSelect // ✅ AÑADIDO
+export type NewLiabilityWaiver = typeof liabilityWaivers.$inferInsert // ✅ AÑADIDO
 export type DiscountCode = typeof discountCodes.$inferSelect
 export type NewDiscountCode = typeof discountCodes.$inferInsert
 export type DiscountUsage = typeof discountUsage.$inferSelect
