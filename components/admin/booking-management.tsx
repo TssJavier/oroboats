@@ -347,7 +347,7 @@ export function BookingManagement() {
       <div>
         <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
-        {debug && (
+        {/*debug && (
           <div className="text-xs text-gray-500 mt-1">
             <p>
               Debug: {debug.totalBookings} reservas, {debug.withWaivers} con documentos firmados
@@ -356,7 +356,7 @@ export function BookingManagement() {
               <p>IDs de documentos: {debug.sampleWaiverIds.join(", ")}</p>
             )}
           </div>
-        )}
+        )*/}
       </div>
 
       {/* Filtros de fecha */}
