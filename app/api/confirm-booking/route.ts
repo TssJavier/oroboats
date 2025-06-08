@@ -4,7 +4,7 @@ import { createBooking } from "@/lib/db/queries"
 import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
 import { db } from "@/lib/db"
 import { discountCodes, discountUsage } from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
     console.log("🔍 Confirming booking for payment:", paymentIntentId)
 
     // Verificar el pago en Stripe
+    if (!stripe) {
+      return NextResponse.json({ error: "Stripe configuration error" }, { status: 500 })
+    }
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
     if (paymentIntent.status !== "succeeded") {
@@ -21,6 +24,7 @@ export async function POST(request: NextRequest) {
     // Extraer datos de reserva del metadata
     const bookingData = JSON.parse(paymentIntent.metadata.bookingData)
     console.log("📅 Creating booking with confirmed payment:", bookingData)
+    console.log("🔍 Liability Waiver ID in booking data:", bookingData.liabilityWaiverId)
 
     // Añadir información de pago
     const finalBookingData = {
@@ -33,6 +37,35 @@ export async function POST(request: NextRequest) {
     // Crear la reserva en la base de datos
     const booking = await createBooking(finalBookingData)
     console.log("✅ Booking created after payment:", booking[0])
+
+    // ✅ ACTUALIZAR EL LIABILITY_WAIVER_ID EN LA RESERVA
+    if (bookingData.liabilityWaiverId && booking[0]) {
+      try {
+        const bookingId = Number(booking[0].id)
+        const waiverId = Number(bookingData.liabilityWaiverId)
+
+        console.log(`🔗 Updating booking ${bookingId} with liability waiver ${waiverId}`)
+
+        await db.execute(sql`
+          UPDATE bookings 
+          SET liability_waiver_id = ${waiverId}
+          WHERE id = ${bookingId}
+        `)
+
+        // También actualizar el waiver con el booking_id
+        await db.execute(sql`
+          UPDATE liability_waivers 
+          SET booking_id = ${bookingId}
+          WHERE id = ${waiverId}
+        `)
+
+        console.log("✅ Liability waiver association updated successfully")
+      } catch (error) {
+        console.error("❌ Error updating liability waiver association:", error)
+      }
+    } else {
+      console.log("⚠️ No liability waiver ID provided or booking creation failed")
+    }
 
     // Actualizar código de descuento si se usó
     if (bookingData.discountCode && booking[0]) {
@@ -49,12 +82,16 @@ export async function POST(request: NextRequest) {
             })
             .where(eq(discountCodes.id, discountCode.id))
 
+          // ✅ CORREGIR TIPOS Y NOMBRES DE COLUMNAS
           await db.insert(discountUsage).values({
-            discountCodeId: discountCode.id,
-            bookingId: Number(booking[0].id),
-            customerEmail: bookingData.customerEmail,
-            discountAmount: String(bookingData.discountAmount || 0),
+            discountCodeId: Number(discountCode.id), // Asegurar que es number
+            bookingId: Number(booking[0].id), // Asegurar que es number
+            customerEmail: String(bookingData.customerEmail), // Asegurar que es string
+            discountAmount: String(bookingData.discountAmount || 0), // Asegurar que es string
+            usedAt: new Date(), // Añadir timestamp
           })
+
+          console.log("✅ Discount code usage recorded successfully")
         }
       } catch (error) {
         console.error("⚠️ Error updating discount code:", error)
