@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,7 @@ interface TimePickerProps {
     duration: string
     price: number
   }) => void
+  nextButtonRef?: React.RefObject<HTMLButtonElement | null>
 }
 
 interface TimeSlot {
@@ -80,7 +82,14 @@ const translations = {
   },
 }
 
-export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onTimeSelect }: TimePickerProps) {
+export function TimePicker({
+  vehicleId,
+  selectedDate,
+  vehicle,
+  selectedTime,
+  onTimeSelect,
+  nextButtonRef,
+}: TimePickerProps) {
   const { language } = useApp()
   const t = translations[language]
 
@@ -167,6 +176,23 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
       duration: selectedDuration.duration,
       price: selectedDuration.price,
     })
+
+    // ✅ Scroll automático al botón "Siguiente" después de seleccionar
+    setTimeout(() => {
+      if (nextButtonRef?.current) {
+        nextButtonRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        })
+      } else {
+        // Fallback: scroll hacia abajo si no hay referencia
+        window.scrollBy({
+          top: 300,
+          behavior: "smooth",
+        })
+      }
+    }, 100) // Pequeño delay para asegurar que el estado se actualice
   }
 
   const getSpainTime = (): Date => {
@@ -226,23 +252,6 @@ export function TimePicker({ vehicleId, selectedDate, vehicle, selectedTime, onT
 
   return (
     <div className="space-y-6">
-      {/* Debug Info - Solo en desarrollo 
-      {process.env.NODE_ENV === "development" && (
-        <Card className="bg-blue-50 border border-blue-200">
-          <CardContent className="p-4">
-            <h4 className="font-semibold text-blue-800 mb-2">Debug Info:</h4>
-            <div className="text-sm text-blue-700 space-y-1">
-              <div>
-                Vehicle ID: {vehicleId} (tipo: {typeof vehicleId})
-              </div>
-              <div>Vehicle Name: {vehicle?.name}</div>
-              <div>Selected Date: {selectedDate}</div>
-              <div>Selected Duration: {selectedDuration?.duration}</div>
-            </div>
-          </CardContent>
-        </Card>
-      )}*/}
-
       {/* Duration Selection */}
       <Card className="bg-white border border-gray-200">
         <CardContent className="p-6">

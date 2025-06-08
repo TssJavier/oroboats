@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -126,6 +126,9 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [navigationLoading, setNavigationLoading] = useState(false)
+
+  // ✅ Ref para el botón "Siguiente" para scroll automático
+  const nextButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (selectedDate && selectedTime) {
@@ -342,6 +345,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                             vehicle={vehicle}
                             selectedTime={selectedTime}
                             onTimeSelect={setSelectedTime}
+                            nextButtonRef={nextButtonRef} // ✅ Pasar la referencia para scroll automático
                           />
                         </div>
                       )}
@@ -461,6 +465,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     <div className="ml-auto">
                       {currentStep < 3 ? (
                         <Button
+                          ref={nextButtonRef} // ✅ Referencia para scroll automático
                           onClick={handleNextStep}
                           className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
                         >
