@@ -5,32 +5,24 @@ import { Button } from "@/components/ui/button"
 import { OroLoading } from "@/components/ui/oro-loading"
 import { useRouter } from "next/navigation"
 import { useApp } from "@/components/providers"
-import { ArrowRight, ChevronDown, Anchor } from "lucide-react"
+import { ChevronDown, Play } from "lucide-react"
 
 const translations = {
   es: {
-    title: "Lujo en el Mar",
-    subtitle: "Experiencias Exclusivas",
+    title: "Todo es para",
+    titleHighlight: "navegar más",
     description: "Descubre la elegancia en cada ola con nuestra flota premium de barcos y motos de agua de lujo.",
-    rentNow: "Alquila Ahora",
-    buyNow: "Comprar",
-    parties: "Fiestas VIP",
+    rentNow: "Alquilar Ahora",
     scroll: "Descubre más",
     loadingRent: "Preparando experiencias de alquiler...",
-    loadingBuy: "Explorando opciones de compra...",
-    loadingParties: "Organizando fiestas VIP...",
   },
   en: {
-    title: "Luxury at Sea",
-    subtitle: "Exclusive Experiences",
+    title: "Everything is to",
+    titleHighlight: "sail more",
     description: "Discover elegance in every wave with our premium fleet of luxury boats and jet skis.",
     rentNow: "Rent Now",
-    buyNow: "Buy Now",
-    parties: "VIP Parties",
     scroll: "Discover more",
     loadingRent: "Preparing rental experiences...",
-    loadingBuy: "Exploring purchase options...",
-    loadingParties: "Organizing VIP parties...",
   },
 }
 
@@ -39,16 +31,11 @@ export function HeroSection() {
   const t = translations[language]
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [loadingMessage, setLoadingMessage] = useState("")
 
-  const handleNavigation = (href: string, message: string) => {
-    setLoadingMessage(message)
+  const handleNavigation = () => {
     setLoading(true)
-
-    // Simular tiempo de carga para mostrar la animación
     setTimeout(() => {
-      router.push(href)
-      // El loading se ocultará cuando la nueva página se cargue
+      router.push("/boats")
       setTimeout(() => setLoading(false), 500)
     }, 1500)
   }
@@ -58,66 +45,142 @@ export function HeroSection() {
   }
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background with white overlay */}
-      <div className="absolute inset-0 bg-white"></div>
+    <section className="relative min-h-screen bg-white">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
+        {/* Mobile layout: stacked video → text → buttons → logos */}
+        <div className="flex flex-col lg:hidden items-center text-center">
+          {/* Video Circle */}
+          <div className="relative w-full max-w-xs mb-10 mt-6">
+            <div className="relative aspect-square rounded-full overflow-hidden bg-blue-100">
+              {/* Decorative elements */}
+              <div className="absolute inset-0">
+                <div className="absolute top-1/4 left-1/4 w-1/3 h-1/2 bg-gradient-to-br from-gold to-yellow-400 rounded-full transform -rotate-12 opacity-90"></div>
+                <div className="absolute top-1/3 right-1/4 w-1/4 h-1/3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full transform rotate-45 opacity-80"></div>
+                <div className="absolute bottom-1/4 left-1/3 w-1/3 h-1/4 bg-gradient-to-br from-gold/70 to-yellow-300 rounded-full transform rotate-12 opacity-85"></div>
+              </div>
 
-      {/* Animated background elements - removed for clean look */}
+              {/* Play button */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="bg-black/80 backdrop-blur-sm rounded-full p-4 hover:bg-black/90 transition-all duration-300 cursor-pointer group">
+                  <Play
+                    className="h-8 w-8 text-white ml-1 group-hover:scale-110 transition-transform duration-300"
+                    fill="currentColor"
+                  />
+                </div>
+              </div>
 
-      {/* Main content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="mb-8 animate-fade-in">
-          <Anchor className="h-16 w-16 text-gold mx-auto mb-6 animate-pulse" />
-        </div>
-
-        <h1 className="text-5xl md:text-7xl lg:text-8xl font-playfair font-bold text-black mb-4 animate-slide-up">
-          {t.title}
-        </h1>
-
-        <h2 className="text-2xl md:text-4xl lg:text-5xl font-playfair text-gold mb-8 animate-slide-up delay-200">
-          {t.subtitle}
-        </h2>
-
-        <p className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed animate-slide-up delay-400">
-          {t.description}
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center animate-slide-up delay-600 mb-25">
-          <Button
-            size="lg"
-            onClick={() => handleNavigation("/boats", t.loadingRent)}
-            className="bg-black text-white font-bold text-lg px-8 py-4 hover:bg-gold hover:text-black transition-all duration-500 transform hover:scale-105"
-          >
-            {t.rentNow}
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-
-          <Button
-            size="lg"
-            onClick={() => handleNavigation("/boats?type=sale", t.loadingBuy)}
-            className="bg-white text-black font-bold text-lg px-8 py-4 hover:bg-black hover:text-white transition-all duration-500 transform hover:scale-105 border-2 border-black"
-          >
-            {t.buyNow}
-          </Button>
-
-          <Button
-            size="lg"
-            onClick={() => handleNavigation("/fiestas", t.loadingParties)}
-            className="bg-white text-gray-600 font-bold text-lg px-8 py-4 hover:bg-gold hover:text-black transition-all duration-500 transform hover:scale-105 border-2 border-gray-300 hover:border-gold"
-          >
-            {t.parties}
-          </Button>
-        </div>
-
-        {/* Scroll indicator - mejorado */}
-        <div className="absolute bottom-18 left-1/2 transform -translate-x-1/2 mt-10">
-          <div className="flex flex-col items-center text-gray-400 cursor-pointer group">
-            <span className="text-sm mb-3 group-hover:text-gold transition-colors duration-300">{t.scroll}</span>
-            <div className="w-6 h-10 border-2 border-gray-300 rounded-full flex justify-center group-hover:border-gold transition-colors duration-300">
-              <div className="w-1 h-3 bg-gold rounded-full mt-2 animate-bounce"></div>
+              {/* Video element - uncomment when ready */}
+              {/* 
+              <video 
+                className="w-full h-full object-cover rounded-full"
+                controls
+                poster="/placeholder.svg?height=400&width=400"
+              >
+                <source src="/path-to-your-video.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+              */}
             </div>
-            <ChevronDown className="h-5 w-5 mt-2 animate-bounce text-gold" />
           </div>
+
+          {/* Text Content */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1>
+            <h2 className="text-4xl font-bold text-gold mb-6">{t.titleHighlight}</h2>
+            <p className="text-lg text-gray-600 mb-8">{t.description}</p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-center mb-16 w-full max-w-md">
+            <Button
+              size="lg"
+              onClick={handleNavigation}
+              className="bg-gold hover:bg-yellow-300 text-black font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-300 w-full max-w-xs"
+            >
+              {t.rentNow}
+            </Button>
+          </div>
+
+          {/* Partner Logos */}
+          <div className="flex justify-center items-center space-x-6 opacity-40">
+            <div className="text-gray-400 font-semibold text-sm">Yamaha</div>
+            <div className="text-gray-400 font-semibold text-sm">Sea-Doo</div>
+            <div className="text-gray-400 font-semibold text-sm">Boston</div>
+          </div>
+        </div>
+
+        {/* Desktop layout: two columns */}
+        <div className="hidden lg:grid lg:grid-cols-2 gap-20 items-center min-h-[70vh]">
+          {/* Left Column - Video/Graphic */}
+          <div className="relative">
+            <div className="relative aspect-square max-w-md">
+              {/* Circular video container */}
+              <div className="relative w-full h-full rounded-full overflow-hidden bg-blue-100">
+                {/* Decorative elements */}
+                <div className="absolute inset-0">
+                  <div className="absolute top-1/4 left-1/4 w-1/3 h-1/2 bg-gradient-to-br from-gold to-yellow-400 rounded-full transform -rotate-12 opacity-90"></div>
+                  <div className="absolute top-1/3 right-1/4 w-1/4 h-1/3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full transform rotate-45 opacity-80"></div>
+                  <div className="absolute bottom-1/4 left-1/3 w-1/3 h-1/4 bg-gradient-to-br from-gold/70 to-yellow-300 rounded-full transform rotate-12 opacity-85"></div>
+                </div>
+
+                {/* Play button */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/80 backdrop-blur-sm rounded-full p-4 hover:bg-black/90 transition-all duration-300 cursor-pointer group">
+                    <Play
+                      className="h-8 w-8 text-white ml-1 group-hover:scale-110 transition-transform duration-300"
+                      fill="currentColor"
+                    />
+                  </div>
+                </div>
+
+                {/* Video element - uncomment when ready */}
+                {/* 
+                <video 
+                  className="w-full h-full object-cover rounded-full"
+                  controls
+                  poster="/placeholder.svg?height=400&width=400"
+                >
+                  <source src="/path-to-your-video.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+                */}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Content */}
+          <div className="text-left">
+            <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1>
+            <h2 className="text-5xl lg:text-6xl font-bold text-gold mb-6">{t.titleHighlight}</h2>
+
+            <p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-lg">{t.description}</p>
+
+            {/* Buttons */}
+            <div className="flex justify-start">
+              <Button
+                size="lg"
+                onClick={handleNavigation}
+                className="bg-gold hover:bg-yellow-300 text-black font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-300 transform hover:scale-105"
+              >
+                {t.rentNow}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Partner Logos */}
+        <div className="hidden lg:flex justify-center items-center space-x-8 opacity-40 mt-20">
+          <div className="text-gray-400 font-semibold">Yamaha</div>
+          <div className="text-gray-400 font-semibold">Sea-Doo</div>
+          <div className="text-gray-400 font-semibold">Boston Whaler</div>
+          <div className="text-gray-400 font-semibold">Beneteau</div>
+        </div>
+      </div>
+
+      {/* Scroll indicator - simplified */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+        <div className="flex flex-col items-center text-gray-400 cursor-pointer group">
+          <ChevronDown className="h-6 w-6 animate-bounce text-gray-400 group-hover:text-blue-500 transition-colors duration-300" />
         </div>
       </div>
     </section>
