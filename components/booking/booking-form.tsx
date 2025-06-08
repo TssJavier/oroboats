@@ -454,34 +454,53 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                   )}
 
                   {/* Navigation Buttons */}
-                  <div className="flex justify-between pt-6 border-t border-gray-200">
-                    {currentStep > 1 && (
-                      <Button variant="outline" onClick={handlePrevStep} className="border-gray-300">
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Anterior
-                      </Button>
-                    )}
-
-                    <div className="ml-auto">
-                      {currentStep < 3 ? (
+                  <div className="pt-6 border-t border-gray-200">
+                    {currentStep > 1 && currentStep < 4 ? (
+                      // Two buttons layout - Stack on mobile
+                      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
                         <Button
-                          ref={nextButtonRef} // ✅ Referencia para scroll automático
+                          variant="outline"
+                          onClick={handlePrevStep}
+                          className="border-gray-300 w-full sm:w-auto order-2 sm:order-1"
+                        >
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Anterior
+                        </Button>
+
+                        <div className="order-1 sm:order-2">
+                          {currentStep < 3 ? (
+                            <Button
+                              ref={nextButtonRef}
+                              onClick={handleNextStep}
+                              className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+                            >
+                              Siguiente
+                              <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                            </Button>
+                          ) : currentStep === 3 ? (
+                            <Button
+                              onClick={handleBooking}
+                              className="bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg px-6 py-3 w-full sm:w-auto"
+                            >
+                              <CreditCard className="h-5 w-5 mr-2" />
+                              Proceder al Pago
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : currentStep === 1 ? (
+                      // Single button layout - First step
+                      <div className="flex justify-end">
+                        <Button
+                          ref={nextButtonRef}
                           onClick={handleNextStep}
-                          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
+                          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
                         >
                           Siguiente
                           <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
                         </Button>
-                      ) : currentStep === 3 ? (
-                        <Button
-                          onClick={handleBooking}
-                          className="bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg px-8 py-3"
-                        >
-                          <CreditCard className="h-5 w-5 mr-2" />
-                          Proceder al Pago
-                        </Button>
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
