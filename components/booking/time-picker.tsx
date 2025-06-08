@@ -25,7 +25,7 @@ interface TimePickerProps {
     duration: string
     price: number
   }) => void
-  nextButtonRef?: React.RefObject<HTMLButtonElement | null>
+  nextButtonRef?: React.RefObject<HTMLButtonElement> // ✅ Cambiado de HTMLElement a HTMLButtonElement
 }
 
 interface TimeSlot {
@@ -214,14 +214,20 @@ export function TimePicker({
     return availableSlots.filter((slot) => {
       if (!slot.available || slot.restricted) return false
 
+      // Si no es hoy, mostrar todos los slots disponibles
       if (!isSelectedDateToday) return true
 
+      // Para el día de hoy, solo bloquear slots que YA HAN EMPEZADO
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
-      const slotTimeInMinutes = slotHours * 60 + slotMinutes
+      const slotStartTimeInMinutes = slotHours * 60 + slotMinutes
       const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
-      const minimumTimeInMinutes = currentTimeInMinutes + 30
 
-      return slotTimeInMinutes >= minimumTimeInMinutes
+      // ✅ NUEVO: Solo bloquear si el slot YA EMPEZÓ (no si está por empezar)
+      // Ejemplo: Si son las 7:15 (435 min) y el slot es 7:30 (450 min), SÍ se puede reservar
+      // Solo se bloquea si son las 7:35 (455 min) y el slot es 7:30 (450 min)
+      console.log(`🕐 Slot ${slot.time}: ${slotStartTimeInMinutes} min vs Current: ${currentTimeInMinutes} min`)
+
+      return slotStartTimeInMinutes >= currentTimeInMinutes
     })
   }
 
