@@ -25,7 +25,7 @@ interface TimePickerProps {
     duration: string
     price: number
   }) => void
-  nextButtonRef?: React.RefObject<HTMLButtonElement> // ✅ Cambiado de HTMLElement a HTMLButtonElement
+  nextButtonRef: React.RefObject<HTMLButtonElement | null>
 }
 
 interface TimeSlot {
