@@ -12,8 +12,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // ✅ PROTEGER RUTAS ADMIN Y DASHBOARD
-  const protectedPaths = ["/admin", "/dashboard", "/test-descuentos"]
+  // ✅ PROTEGER RUTAS ADMIN, DASHBOARD Y APIs SENSIBLES
+  const protectedPaths = [
+    "/admin",
+    "/dashboard",
+    "/test-descuentos",
+    "/api/liability-waiver", // 🔒 PROTEGER DOCUMENTOS
+    "/api/bookings", // 🔒 PROTEGER RESERVAS
+    "/api/discount-codes", // 🔒 PROTEGER CÓDIGOS DESCUENTO
+    "/api/deposits", // 🔒 PROTEGER FIANZAS
+    "/api/analytics", // 🔒 PROTEGER ANALYTICS
+  ]
+
   const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
 
   if (isProtectedPath) {
@@ -39,5 +49,15 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*", "/auth/login", "/test-descuentos"],
+  matcher: [
+    "/admin/:path*",
+    "/dashboard/:path*",
+    "/auth/login",
+    "/test-descuentos",
+    "/api/liability-waiver/:path*", // 🔒 DOCUMENTOS
+    "/api/bookings/:path*", // 🔒 RESERVAS
+    "/api/discount-codes/:path*", // 🔒 CÓDIGOS
+    "/api/deposits/:path*", // 🔒 FIANZAS
+    "/api/analytics/:path*", // 🔒 ANALYTICS
+  ],
 }
