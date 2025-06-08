@@ -119,10 +119,14 @@ export async function GET(request: NextRequest, context: RouteParams) {
     console.log(`📋 Reservas existentes: ${existingBookings.length}`)
 
     // 7. Generar slots usando la nueva lógica CON LA CATEGORÍA
+    const normalizedBookings = existingBookings.map(b => ({
+      ...b,
+      status: b.status === null ? undefined : b.status,
+    }))
     const slots = generateSlotsForVehicle(
       vehicleInfo.type,
       businessSchedule,
-      existingBookings,
+      normalizedBookings,
       duration || "regular",
       vehicleInfo.category,
     )

@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Obtener reservas con query más específica
+      // Obtener reservas con query más específica PARA LA FECHA CORRECTA
       console.log(`📅 Fetching bookings for vehicle ${vehicleId} on ${date}...`)
       const bookingsQuery = sql`
         SELECT 
@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
           customer_name,
           time_slot,
           status,
-          created_at
+          created_at,
+          booking_date
         FROM bookings 
         WHERE vehicle_id = ${vehicleId} 
         AND booking_date = ${date}
@@ -111,38 +112,26 @@ export async function POST(request: NextRequest) {
         new Promise((_, reject) => setTimeout(() => reject(new Error("Bookings query timeout")), 10000)),
       ])) as any[]
 
-      console.log("📊 REAL bookings found:", existingBookings.length)
+      console.log("📊 REAL bookings found for date", date, ":", existingBookings.length)
       existingBookings.forEach((booking, index) => {
-        console.log(`  ${index + 1}. ${booking.customer_name} - ${booking.time_slot} (${booking.status})`)
+        console.log(
+          `  ${index + 1}. ${booking.customer_name} - ${booking.time_slot} (${booking.status}) - Date: ${booking.booking_date}`,
+        )
       })
     } catch (dbError) {
       console.log("❌ Database connection FAILED")
       console.log("Error type:", dbError?.constructor?.name)
       console.log("Error message:", dbError instanceof Error ? dbError.message : String(dbError))
 
-      // En lugar de fallar, usar datos conocidos basados en el SQL que funcionó
-      console.log("🔄 Using known bookings from successful SQL query...")
-
-      // Usar las reservas que sabemos que existen del SQL que funcionó
-      existingBookings = [
-        { customer_name: "a", time_slot: "19:00-19:30", status: "confirmed" },
-        { customer_name: "g", time_slot: "20:00-20:30", status: "confirmed" },
-        { customer_name: "javier", time_slot: "17:30-18:00", status: "completed" },
-        { customer_name: "f", time_slot: "16:30-17:00", status: "confirmed" },
-        { customer_name: "d", time_slot: "11:00-11:30", status: "confirmed" },
-      ]
-
-      vehicle = {
-        id: vehicleId,
-        name: "moto sin licencia",
-        available: true,
-        pricing: [
-          { label: "30 minutos", duration: "30min", price: 600 },
-          { label: "1 hora", duration: "1hour", price: 700 },
-        ],
-      }
-
-      console.log("✅ Using fallback data with REAL bookings")
+      // ❌ NO USAR DATOS DE FALLBACK - Devolver error real
+      return NextResponse.json(
+        {
+          error: "Database connection failed",
+          details: dbError instanceof Error ? dbError.message : String(dbError),
+          suggestion: "Check DATABASE_URL configuration and database availability",
+        },
+        { status: 500 },
+      )
     }
 
     if (!vehicle.available) {
@@ -151,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar slots
-    console.log("⚙️ Generating slots with REAL booking conflicts...")
+    console.log("⚙️ Generating slots with REAL booking conflicts for date:", date)
     const slots = generateSlots(vehicle.pricing, existingBookings, date)
 
     console.log("✅ Generated slots:", slots.length)
@@ -161,8 +150,11 @@ export async function POST(request: NextRequest) {
       debug: {
         vehicleName: vehicle.name,
         existingBookings: existingBookings.length,
-        bookingsFound: existingBookings.map((b) => `${b.customer_name}: ${b.time_slot} (${b.status})`),
+        bookingsFound: existingBookings.map(
+          (b) => `${b.customer_name}: ${b.time_slot} (${b.status}) - ${b.booking_date}`,
+        ),
         date: date,
+        databaseConnected: true,
       },
     })
   } catch (error) {
@@ -178,7 +170,7 @@ export async function POST(request: NextRequest) {
 }
 
 function generateSlots(pricing: any[], existingBookings: any[], date: string) {
-  console.log("🔧 Generating slots with REAL conflicts...")
+  console.log("🔧 Generating slots with REAL conflicts for date:", date)
 
   const slots = []
   const workStart = 10 * 60 // 10:00 AM
@@ -199,12 +191,15 @@ function generateSlots(pricing: any[], existingBookings: any[], date: string) {
         end: endMinutes,
         customer: booking.customer_name,
         status: booking.status,
+        bookingDate: booking.booking_date,
       })
-      console.log(`🚫 OCCUPIED: ${startTime.trim()}-${endTime.trim()} by ${booking.customer_name} (${booking.status})`)
+      console.log(
+        `🚫 OCCUPIED: ${startTime.trim()}-${endTime.trim()} by ${booking.customer_name} (${booking.status}) on ${booking.booking_date}`,
+      )
     }
   }
 
-  console.log("🚫 Total REAL occupied ranges:", occupiedRanges.length)
+  console.log("🚫 Total REAL occupied ranges for date", date, ":", occupiedRanges.length)
 
   // Generar slots para cada opción de pricing
   for (const option of pricing) {
@@ -224,7 +219,7 @@ function generateSlots(pricing: any[], existingBookings: any[], date: string) {
 
       if (conflictingRange) {
         console.log(
-          `❌ REAL CONFLICT: ${minutesToTime(start)}-${minutesToTime(end)} conflicts with ${conflictingRange.customer}'s booking ${minutesToTime(conflictingRange.start)}-${minutesToTime(conflictingRange.end)}`,
+          `❌ REAL CONFLICT: ${minutesToTime(start)}-${minutesToTime(end)} conflicts with ${conflictingRange.customer}'s booking ${minutesToTime(conflictingRange.start)}-${minutesToTime(conflictingRange.end)} on ${conflictingRange.bookingDate}`,
         )
         continue
       }
@@ -250,7 +245,7 @@ function generateSlots(pricing: any[], existingBookings: any[], date: string) {
   // Ordenar por hora
   slots.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
 
-  console.log("✅ FINAL AVAILABLE SLOTS (after REAL conflicts):")
+  console.log("✅ FINAL AVAILABLE SLOTS for date", date, "(after REAL conflicts):")
   slots.forEach((slot, index) => {
     console.log(`  ${index + 1}. ${slot.startTime}-${slot.endTime} (${slot.label}) - €${slot.price}`)
   })

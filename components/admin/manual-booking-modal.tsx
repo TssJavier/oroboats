@@ -52,6 +52,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Cargar slots disponibles cuando cambie la fecha
   useEffect(() => {
@@ -67,6 +68,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     if (!vehicle || !formData.bookingDate) return
 
     setLoadingSlots(true)
+    setError(null)
     try {
       console.log("🕐 Fetching available slots for vehicle:", vehicle.id, "date:", formData.bookingDate)
 
@@ -92,6 +94,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     } catch (error) {
       console.error("❌ Error fetching slots:", error)
       toast.error("Error al cargar los horarios disponibles")
+      setError("No se pudieron cargar los horarios. Por favor, intenta de nuevo.")
       setAvailableSlots([])
     } finally {
       setLoadingSlots(false)
@@ -147,8 +150,25 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     }
 
     setLoading(true)
+    setError(null)
 
     try {
+      // Determinar la duración basada en el tiempo seleccionado
+      let duration = "30min"
+      if (selectedSlot.endTime && selectedSlot.startTime) {
+        const startParts = selectedSlot.startTime.split(":").map(Number)
+        const endParts = selectedSlot.endTime.split(":").map(Number)
+
+        const startMinutes = startParts[0] * 60 + startParts[1]
+        const endMinutes = endParts[0] * 60 + endParts[1]
+        const durationMinutes = endMinutes - startMinutes
+
+        if (durationMinutes === 60) duration = "1hour"
+        else if (durationMinutes === 120) duration = "2hour"
+        else if (durationMinutes === 240) duration = "halfday"
+        else if (durationMinutes >= 480) duration = "fullday"
+      }
+
       const response = await fetch("/api/bookings/manual", {
         method: "POST",
         headers: {
@@ -164,19 +184,19 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
           timeSlot: `${selectedSlot.startTime}-${selectedSlot.endTime}`,
           startTime: selectedSlot.startTime,
           endTime: selectedSlot.endTime,
-          duration: selectedSlot.duration,
+          duration: duration, // Usar la duración calculada
           totalPrice: selectedSlot.price,
           notes: formData.notes,
           isManualBooking: true,
         }),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Error al crear la reserva")
+        throw new Error(result.error || result.details || "Error al crear la reserva")
       }
 
-      const result = await response.json()
       console.log("✅ Manual booking created:", result)
 
       toast.success("Reserva manual creada correctamente")
@@ -196,6 +216,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
       onClose()
     } catch (error) {
       console.error("❌ Error creating manual booking:", error)
+      setError(error instanceof Error ? error.message : "Error al crear la reserva")
       toast.error(error instanceof Error ? error.message : "Error al crear la reserva")
     } finally {
       setLoading(false)
@@ -327,6 +348,19 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-gold" />
                   <span className="ml-2 text-gray-600">Cargando horarios disponibles...</span>
+                </div>
+              ) : error ? (
+                <div className="text-center py-6 bg-red-50 rounded-lg border border-red-200">
+                  <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                  <p className="text-red-700">{error}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={fetchAvailableSlots}
+                  >
+                    Reintentar
+                  </Button>
                 </div>
               ) : availableSlots.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-lg">
