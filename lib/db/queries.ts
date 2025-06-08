@@ -1,6 +1,6 @@
 import { db } from "./index"
 import { vehicles, bookings, settings } from "./schema"
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm"
+import { eq, and, gte, lte, sql } from "drizzle-orm"
 import type { NewVehicle } from "./schema"
 
 // ===== VEHICLES =====
@@ -122,16 +122,57 @@ export async function deleteVehicle(id: number) {
 export async function getBookings() {
   try {
     console.log("🔍 DB: Fetching bookings...")
-    const result = await db
-      .select({
-        booking: bookings,
-        vehicle: vehicles,
-      })
-      .from(bookings)
-      .leftJoin(vehicles, eq(bookings.vehicleId, vehicles.id))
-      .orderBy(desc(bookings.createdAt))
-    console.log(`✅ DB: Found ${result.length} bookings`)
-    return result
+    // ✅ MODIFICADO: Usar SQL directo para asegurar que obtenemos todos los campos
+    const result = await db.execute(sql`
+      SELECT 
+        b.*,
+        v.name as vehicle_name,
+        v.type as vehicle_type
+      FROM bookings b
+      LEFT JOIN vehicles v ON b.vehicle_id = v.id
+      ORDER BY b.created_at DESC
+    `)
+
+    // Transformar el resultado al formato esperado por el frontend
+    const transformedResult = (result as any[]).map((row: any) => ({
+      booking: {
+        id: row.id,
+        vehicleId: row.vehicle_id,
+        customerName: row.customer_name,
+        customerEmail: row.customer_email,
+        customerPhone: row.customer_phone,
+        bookingDate: row.booking_date,
+        timeSlot: row.time_slot,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        duration: row.duration,
+        totalPrice: row.total_price,
+        status: row.status,
+        paymentStatus: row.payment_status,
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        securityDeposit: row.security_deposit || "0",
+        inspectionStatus: row.inspection_status || "pending",
+        damageDescription: row.damage_description,
+        damageCost: row.damage_cost || "0",
+        liabilityWaiverId: row.liability_waiver_id, // ✅ AÑADIDO: Campo crucial
+        isTestBooking: row.is_test_booking === true, // ✅ AÑADIDO: Campo crucial
+      },
+      vehicle: row.vehicle_name
+        ? {
+            name: row.vehicle_name,
+            type: row.vehicle_type,
+          }
+        : null,
+    }))
+
+    console.log(`✅ DB: Found ${transformedResult.length} bookings`)
+    // Debug para ver si hay documentos firmados
+    const withWaivers = transformedResult.filter((b) => b.booking.liabilityWaiverId).length
+    console.log(`✅ DB: ${withWaivers} bookings have signed liability waivers`)
+
+    return transformedResult
   } catch (error) {
     console.error("❌ DB Error fetching bookings:", error)
     throw error
@@ -195,7 +236,7 @@ export async function createBooking(bookingData: any) {
     `)
 
     console.log("✅ DB: Booking created successfully:", result)
-    return [result[0]] // Mantener formato compatible
+    return [result[0]] // ✅ CORREGIDO: Acceder directamente al primer elemento del array
   } catch (error) {
     console.error("❌ DB Error creating booking:", error)
     console.error("❌ Original data:", bookingData)

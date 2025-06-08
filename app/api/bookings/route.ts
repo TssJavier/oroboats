@@ -7,18 +7,27 @@ import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("📅 API: Fetching bookings...")
+    console.log("🔍 API: Fetching bookings...")
     const bookings = await getBookings()
-    console.log(`✅ API: Found ${bookings.length} bookings`)
+
+    // ✅ AÑADIDO: Debug detallado para verificar los datos
+    console.log("🔍 API: Sample booking data:", JSON.stringify(bookings[0], null, 2))
+
+    const withWaivers = bookings.filter((b) => b.booking.liabilityWaiverId).length
+    console.log(`✅ API: Returning ${bookings.length} bookings, ${withWaivers} with liability waivers`)
+
+    // ✅ AÑADIDO: Log específico de los IDs de documentos
+    bookings.forEach((booking) => {
+      if (booking.booking.liabilityWaiverId) {
+        console.log(`📄 Booking ${booking.booking.id} has waiver ID: ${booking.booking.liabilityWaiverId}`)
+      }
+    })
 
     return NextResponse.json(bookings)
   } catch (error) {
     console.error("❌ API Error fetching bookings:", error)
     return NextResponse.json(
-      {
-        error: "Failed to fetch bookings",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to fetch bookings", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     )
   }

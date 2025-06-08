@@ -1,5 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import stripe, { stripeEnvironment } from "@/lib/stripe-config"
+import { db } from "@/lib/db"
+import { bookings } from "@/lib/db/schema"
+import { eq } from "drizzle-orm"
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,10 +52,33 @@ export async function POST(request: NextRequest) {
         ...metadata,
         environment: stripeEnvironment.environment,
         bookingData: JSON.stringify(body.bookingData),
+        isTestMode: stripeEnvironment.isDevelopment ? "true" : "false", // ✅ AÑADIDO
       },
     })
 
     console.log(`✅ Payment Intent created (${stripeEnvironment.environment}):`, paymentIntent.id)
+
+    // ✅ NUEVA FUNCIONALIDAD: Actualizar reserva con paymentId y marcar si es de prueba
+    if (body.bookingData?.bookingId) {
+      try {
+        await db
+          .update(bookings)
+          .set({
+            paymentId: paymentIntent.id,
+            isTestBooking: stripeEnvironment.isDevelopment, // Marcar como prueba si es desarrollo
+          })
+          .where(eq(bookings.id, body.bookingData.bookingId))
+
+        console.log(`📝 Booking updated with payment ID and test flag:`, {
+          bookingId: body.bookingData.bookingId,
+          paymentId: paymentIntent.id,
+          isTest: stripeEnvironment.isDevelopment,
+        })
+      } catch (dbError) {
+        console.error("⚠️ Error updating booking:", dbError)
+        // No fallar el payment intent por un error de DB
+      }
+    }
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,

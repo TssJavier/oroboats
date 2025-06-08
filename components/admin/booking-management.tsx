@@ -23,7 +23,8 @@ import {
   AlertTriangle,
   CalendarDays,
   FileText,
-  Download,
+  Beaker,
+  ExternalLink,
 } from "lucide-react"
 
 interface Booking {
@@ -44,7 +45,8 @@ interface Booking {
     inspectionStatus: string
     damageDescription?: string
     damageCost: string
-    liabilityWaiverId?: number // ✅ AÑADIDO: ID del documento firmado
+    liabilityWaiverId?: number
+    isTestBooking?: boolean
   }
   vehicle: {
     name: string
@@ -52,7 +54,7 @@ interface Booking {
   } | null
 }
 
-type DateFilter = "all" | "today" | "tomorrow"
+type DateFilter = "all" | "today" | "tomorrow" | "test"
 
 export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -65,6 +67,7 @@ export function BookingManagement() {
   const [damageCost, setDamageCost] = useState("")
   const [damageImages, setDamageImages] = useState<File[]>([])
   const [dateFilter, setDateFilter] = useState<DateFilter>("all")
+  const [debug, setDebug] = useState<any>(null)
 
   useEffect(() => {
     fetchBookings()
@@ -80,12 +83,33 @@ export function BookingManagement() {
       }
 
       const data = await response.json()
+      console.log("🔍 Frontend: Bookings data received:", data)
 
       if (Array.isArray(data)) {
         // Ordenar por fecha de creación, más recientes primero
         const sortedBookings = data.sort(
           (a, b) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
         )
+
+        // Debug detallado para verificar liabilityWaiverId
+        const withWaivers = sortedBookings.filter((b) => {
+          const hasWaiver = b.booking.liabilityWaiverId && b.booking.liabilityWaiverId !== null
+          console.log(
+            `🔍 Booking ${b.booking.id} (${b.booking.customerName}): liabilityWaiverId = ${b.booking.liabilityWaiverId}, hasWaiver = ${hasWaiver}`,
+          )
+          return hasWaiver
+        }).length
+
+        console.log(`✅ Frontend: Found ${withWaivers} bookings with signed liability waivers`)
+        setDebug({
+          totalBookings: sortedBookings.length,
+          withWaivers,
+          sampleWaiverIds: sortedBookings
+            .filter((b) => b.booking.liabilityWaiverId)
+            .map((b) => b.booking.liabilityWaiverId)
+            .slice(0, 5),
+        })
+
         setBookings(sortedBookings)
       } else {
         console.error("API returned non-array data:", data)
@@ -101,33 +125,26 @@ export function BookingManagement() {
     }
   }
 
-  // ✅ NUEVA FUNCIÓN: Descargar documento de exención
-  const downloadWaiver = async (waiverId: number, customerName: string) => {
+  // ✅ FUNCIÓN CORREGIDA: Abrir documento como HTML en nueva pestaña
+  const viewWaiver = async (waiverId: number, customerName: string) => {
     try {
-      const response = await fetch(`/api/liability-waiver/${waiverId}/pdf`)
+      console.log(`🔍 Opening waiver ${waiverId} for ${customerName}...`)
 
-      if (!response.ok) {
-        throw new Error("Error al descargar el documento")
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.style.display = "none"
-      a.href = url
-      a.download = `exencion-responsabilidad-${customerName}-${waiverId}.html`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      // Abrir en nueva pestaña como HTML
+      const url = `/api/liability-waiver/${waiverId}/pdf`
+      window.open(url, "_blank")
     } catch (error) {
-      console.error("Error downloading waiver:", error)
-      setError("Error al descargar el documento")
+      console.error("Error opening waiver:", error)
+      setError("Error al abrir el documento")
     }
   }
 
-  // Función para filtrar reservas por fecha
+  // Función para filtrar reservas por fecha o tipo
   const getFilteredBookings = () => {
+    if (dateFilter === "test") {
+      return bookings.filter((booking) => booking.booking.isTestBooking === true)
+    }
+
     if (dateFilter === "all") return bookings
 
     const today = new Date()
@@ -322,11 +339,24 @@ export function BookingManagement() {
     )
   }
 
+  const testBookingsCount = bookings.filter((b) => b.booking.isTestBooking === true).length
+  const withWaiversCount = bookings.filter((b) => b.booking.liabilityWaiverId).length
+
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
+        {debug && (
+          <div className="text-xs text-gray-500 mt-1">
+            <p>
+              Debug: {debug.totalBookings} reservas, {debug.withWaivers} con documentos firmados
+            </p>
+            {debug.sampleWaiverIds && debug.sampleWaiverIds.length > 0 && (
+              <p>IDs de documentos: {debug.sampleWaiverIds.join(", ")}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filtros de fecha */}
@@ -384,12 +414,30 @@ export function BookingManagement() {
               }
               )
             </Button>
+            <Button
+              variant={dateFilter === "test" ? "default" : "outline"}
+              onClick={() => setDateFilter("test")}
+              className={dateFilter === "test" ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
+            >
+              <Beaker className="h-4 w-4 mr-2" />
+              Pruebas ({testBookingsCount})
+            </Button>
           </div>
           {dateFilter !== "all" && (
             <div className="mt-3 text-sm text-gray-600">
-              Mostrando {filteredBookings.length} reserva(s) para {dateFilter === "today" ? "hoy" : "mañana"}
+              Mostrando {filteredBookings.length} reserva(s)
+              {dateFilter === "today"
+                ? " para hoy"
+                : dateFilter === "tomorrow"
+                  ? " para mañana"
+                  : dateFilter === "test"
+                    ? " de prueba"
+                    : ""}
             </div>
           )}
+          <div className="mt-2 text-xs text-gray-500">
+            {withWaiversCount} reserva(s) con documento de exención firmado
+          </div>
         </CardContent>
       </Card>
 
@@ -443,199 +491,220 @@ export function BookingManagement() {
 
       {Array.isArray(filteredBookings) && filteredBookings.length > 0 ? (
         <div className="space-y-6">
-          {filteredBookings.map((booking) => (
-            <Card key={booking.booking.id} className="bg-white border border-gray-200 hover:shadow-lg transition-all">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-xl font-bold text-black flex items-center">
-                      <User className="h-5 w-5 text-gold mr-2" />
-                      {booking.booking.customerName}
-                    </CardTitle>
-                    <CardDescription className="flex items-center mt-1">
-                      <Ship className="h-4 w-4 mr-1" />
-                      {booking.vehicle?.name || "Producto eliminado"}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <Badge className={getStatusColor(booking.booking.status)}>{booking.booking.status}</Badge>
-                    <Badge className={getPaymentStatusColor(booking.booking.paymentStatus)}>
-                      {booking.booking.paymentStatus}
-                    </Badge>
-                    {Number(booking.booking.securityDeposit) > 0 && (
-                      <Badge className={getInspectionStatusColor(booking.booking.inspectionStatus)}>
-                        Fianza: {booking.booking.inspectionStatus}
-                      </Badge>
-                    )}
-                    {/* ✅ AÑADIDO: Badge para documento firmado */}
-                    {booking.booking.liabilityWaiverId && (
-                      <Badge className="bg-purple-600 text-white">
-                        <FileText className="h-3 w-3 mr-1" />
-                        Documento firmado
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
+          {filteredBookings.map((booking) => {
+            // Debug específico para cada reserva
+            const hasWaiver = booking.booking.liabilityWaiverId && booking.booking.liabilityWaiverId !== null
+            console.log(
+              `🔍 Rendering booking ${booking.booking.id}: liabilityWaiverId = ${booking.booking.liabilityWaiverId}, hasWaiver = ${hasWaiver}`,
+            )
 
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-gray-700 flex items-center">
-                      <User className="h-4 w-4 mr-1" />
-                      Contacto
-                    </h4>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex items-center text-gray-600">
-                        <Mail className="h-3 w-3 mr-2" />
-                        {booking.booking.customerEmail}
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <Phone className="h-3 w-3 mr-2" />
-                        {booking.booking.customerPhone}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-gray-700 flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Fecha y Hora
-                    </h4>
-                    <div className="space-y-1 text-sm">
-                      <div className="text-gray-600">
-                        {new Date(booking.booking.bookingDate).toLocaleDateString("es-ES")}
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <Clock className="h-3 w-3 mr-2" />
-                        {booking.booking.timeSlot}
-                      </div>
-                      <div className="text-gray-600">Duración: {booking.booking.duration}</div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-gray-700 flex items-center">
-                      <Euro className="h-4 w-4 mr-1" />
-                      Precio
-                    </h4>
-                    <div className="text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
-                    {Number(booking.booking.securityDeposit) > 0 && (
-                      <div className="text-sm text-gray-600">
-                        <Shield className="h-3 w-3 inline mr-1" />
-                        Fianza: €{booking.booking.securityDeposit}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-gray-700">Acciones</h4>
-                    <div className="flex flex-col gap-2">
-                      {/* ✅ AÑADIDO: Botón para descargar documento */}
-                      {booking.booking.liabilityWaiverId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            downloadWaiver(booking.booking.liabilityWaiverId!, booking.booking.customerName)
-                          }
-                          className="border-purple-300 text-purple-600 hover:bg-purple-50"
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          Descargar Exención
-                        </Button>
-                      )}
-
-                      {/* Lógica de estados automática */}
-                      {booking.booking.status === "pending" && (
-                        <Button
-                          size="sm"
-                          onClick={() => updateBookingStatus(booking.booking.id, "confirmed")}
-                          className="bg-green-600 text-white hover:bg-green-700"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Auto-Confirmar
-                        </Button>
-                      )}
-
-                      {/* Gestión de fianzas */}
-                      {booking.booking.status === "confirmed" &&
-                        Number(booking.booking.securityDeposit) > 0 &&
-                        booking.booking.inspectionStatus === "pending" && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDepositAction(booking, "approve")}
-                              className="bg-green-600 text-white hover:bg-green-700"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Completar Fianza
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleDepositAction(booking, "reject")}
-                              className="bg-red-600 text-white hover:bg-red-700"
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Rechazar Fianza
-                            </Button>
-                          </>
+            return (
+              <Card
+                key={booking.booking.id}
+                className={`bg-white border border-gray-200 hover:shadow-lg transition-all ${booking.booking.isTestBooking ? "border-l-4 border-l-purple-500" : ""}`}
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-xl font-bold text-black flex items-center">
+                        <User className="h-5 w-5 text-gold mr-2" />
+                        {booking.booking.customerName}
+                        {booking.booking.isTestBooking && (
+                          <Badge className="ml-2 bg-purple-600 text-white">
+                            <Beaker className="h-3 w-3 mr-1" />
+                            Prueba
+                          </Badge>
                         )}
+                      </CardTitle>
+                      <CardDescription className="flex items-center mt-1">
+                        <Ship className="h-4 w-4 mr-1" />
+                        {booking.vehicle?.name || "Producto eliminado"}
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge className={getStatusColor(booking.booking.status)}>{booking.booking.status}</Badge>
+                      <Badge className={getPaymentStatusColor(booking.booking.paymentStatus)}>
+                        {booking.booking.paymentStatus}
+                      </Badge>
+                      {Number(booking.booking.securityDeposit) > 0 && (
+                        <Badge className={getInspectionStatusColor(booking.booking.inspectionStatus)}>
+                          Fianza: {booking.booking.inspectionStatus}
+                        </Badge>
+                      )}
+                      {/* Badge para documento firmado */}
+                      {hasWaiver && (
+                        <Badge className="bg-purple-600 text-white">
+                          <FileText className="h-3 w-3 mr-1" />
+                          Documento firmado
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
 
-                      {/* Completar reserva normal */}
-                      {booking.booking.status === "confirmed" &&
-                        (Number(booking.booking.securityDeposit) === 0 ||
-                          booking.booking.inspectionStatus === "approved") && (
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-gray-700 flex items-center">
+                        <User className="h-4 w-4 mr-1" />
+                        Contacto
+                      </h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex items-center text-gray-600">
+                          <Mail className="h-3 w-3 mr-2" />
+                          {booking.booking.customerEmail}
+                        </div>
+                        <div className="flex items-center text-gray-600">
+                          <Phone className="h-3 w-3 mr-2" />
+                          {booking.booking.customerPhone}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-gray-700 flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        Fecha y Hora
+                      </h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="text-gray-600">
+                          {new Date(booking.booking.bookingDate).toLocaleDateString("es-ES")}
+                        </div>
+                        <div className="flex items-center text-gray-600">
+                          <Clock className="h-3 w-3 mr-2" />
+                          {booking.booking.timeSlot}
+                        </div>
+                        <div className="text-gray-600">Duración: {booking.booking.duration}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-gray-700 flex items-center">
+                        <Euro className="h-4 w-4 mr-1" />
+                        Precio
+                      </h4>
+                      <div className="text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
+                      {Number(booking.booking.securityDeposit) > 0 && (
+                        <div className="text-sm text-gray-600">
+                          <Shield className="h-3 w-3 inline mr-1" />
+                          Fianza: €{booking.booking.securityDeposit}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-gray-700">Acciones</h4>
+                      <div className="flex flex-col gap-2">
+                        {/* ✅ BOTÓN CORREGIDO: Ver documento como HTML */}
+                        {hasWaiver && (
                           <Button
                             size="sm"
-                            onClick={() => updateBookingStatus(booking.booking.id, "completed")}
-                            className="bg-blue-600 text-white hover:bg-blue-700"
+                            onClick={() => viewWaiver(booking.booking.liabilityWaiverId!, booking.booking.customerName)}
+                            className="bg-purple-600 text-white hover:bg-purple-700"
                           >
-                            Completar Reserva
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Ver Documento (ID: {booking.booking.liabilityWaiverId})
                           </Button>
                         )}
 
-                      {booking.booking.status !== "cancelled" && booking.booking.status !== "completed" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateBookingStatus(booking.booking.id, "cancelled")}
-                          className="border-red-300 text-red-600 hover:bg-red-50"
-                        >
-                          Cancelar
-                        </Button>
-                      )}
+                        {/* Debug visual para verificar */}
+                        {!hasWaiver && (
+                          <div className="text-xs text-gray-400 p-2 bg-gray-50 rounded">
+                            Sin documento (ID: {booking.booking.liabilityWaiverId || "null"})
+                          </div>
+                        )}
+
+                        {/* Lógica de estados automática */}
+                        {booking.booking.status === "pending" && (
+                          <Button
+                            size="sm"
+                            onClick={() => updateBookingStatus(booking.booking.id, "confirmed")}
+                            className="bg-green-600 text-white hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Auto-Confirmar
+                          </Button>
+                        )}
+
+                        {/* Gestión de fianzas */}
+                        {booking.booking.status === "confirmed" &&
+                          Number(booking.booking.securityDeposit) > 0 &&
+                          booking.booking.inspectionStatus === "pending" && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDepositAction(booking, "approve")}
+                                className="bg-green-600 text-white hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Completar Fianza
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleDepositAction(booking, "reject")}
+                                className="bg-red-600 text-white hover:bg-red-700"
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Rechazar Fianza
+                              </Button>
+                            </>
+                          )}
+
+                        {/* Completar reserva normal */}
+                        {booking.booking.status === "confirmed" &&
+                          (Number(booking.booking.securityDeposit) === 0 ||
+                            booking.booking.inspectionStatus === "approved") && (
+                            <Button
+                              size="sm"
+                              onClick={() => updateBookingStatus(booking.booking.id, "completed")}
+                              className="bg-blue-600 text-white hover:blue-700"
+                            >
+                              Completar Reserva
+                            </Button>
+                          )}
+
+                        {booking.booking.status !== "cancelled" && booking.booking.status !== "completed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateBookingStatus(booking.booking.id, "cancelled")}
+                            className="border-red-300 text-red-600 hover:bg-red-50"
+                          >
+                            Cancelar
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Información de daños si existe */}
-                {booking.booking.damageDescription && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <h5 className="font-semibold text-red-800 mb-1 flex items-center">
-                      <AlertTriangle className="h-4 w-4 mr-1" />
-                      Daños Registrados:
-                    </h5>
-                    <p className="text-red-700 text-sm mb-1">{booking.booking.damageDescription}</p>
-                    {Number(booking.booking.damageCost) > 0 && (
-                      <p className="text-red-700 text-sm font-semibold">Coste: €{booking.booking.damageCost}</p>
-                    )}
+                  {/* Información de daños si existe */}
+                  {booking.booking.damageDescription && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <h5 className="font-semibold text-red-800 mb-1 flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        Daños Registrados:
+                      </h5>
+                      <p className="text-red-700 text-sm mb-1">{booking.booking.damageDescription}</p>
+                      {Number(booking.booking.damageCost) > 0 && (
+                        <p className="text-red-700 text-sm font-semibold">Coste: €{booking.booking.damageCost}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {booking.booking.notes && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <h5 className="font-semibold text-gray-700 mb-1">Notas:</h5>
+                      <p className="text-gray-600 text-sm">{booking.booking.notes}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-4 text-xs text-gray-500">
+                    Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
                   </div>
-                )}
-
-                {booking.booking.notes && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <h5 className="font-semibold text-gray-700 mb-1">Notas:</h5>
-                    <p className="text-gray-600 text-sm">{booking.booking.notes}</p>
-                  </div>
-                )}
-
-                <div className="mt-4 text-xs text-gray-500">
-                  Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <Card className="bg-white border border-gray-200">
@@ -644,7 +713,9 @@ export function BookingManagement() {
             <h3 className="text-xl font-semibold text-gray-600 mb-2">
               {dateFilter === "all"
                 ? "No hay reservas"
-                : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
+                : dateFilter === "test"
+                  ? "No hay reservas de prueba"
+                  : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
             </h3>
             <p className="text-gray-500">
               {dateFilter === "all"
