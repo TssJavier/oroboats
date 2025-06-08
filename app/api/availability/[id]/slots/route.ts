@@ -14,7 +14,10 @@ export async function GET(request: NextRequest, context: RouteParams) {
     console.log("   - context.params:", context.params)
     console.log("   - URL:", request.url)
 
-    const { id: idParam } = context.params
+    // Corregir el error de Next.js usando await para params
+    const params = await Promise.resolve(context.params)
+    const { id: idParam } = params
+
     console.log("   - id extraído:", idParam, typeof idParam)
 
     const id = Number.parseInt(idParam)
@@ -119,19 +122,24 @@ export async function GET(request: NextRequest, context: RouteParams) {
     console.log(`📋 Reservas existentes: ${existingBookings.length}`)
 
     // 7. Generar slots usando la nueva lógica CON LA CATEGORÍA
-    const normalizedBookings = existingBookings.map(b => ({
+    const normalizedBookings = existingBookings.map((b) => ({
       ...b,
       status: b.status === null ? undefined : b.status,
     }))
+
+    // Pasar la fecha seleccionada a la función para verificación correcta de slots pasados
     const slots = generateSlotsForVehicle(
       vehicleInfo.type,
       businessSchedule,
       normalizedBookings,
       duration || "regular",
       vehicleInfo.category,
+      date, // Pasar la fecha seleccionada
     )
 
     console.log(`⏰ Generados ${slots.length} slots para ${vehicleInfo.type} (${vehicleInfo.category})`)
+    console.log(`   - Disponibles: ${slots.filter((s) => s.available).length}`)
+    console.log(`   - No disponibles: ${slots.filter((s) => !s.available).length}`)
 
     const response = {
       slots,

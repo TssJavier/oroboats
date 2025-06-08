@@ -19,278 +19,295 @@ export interface ExistingBooking {
 }
 
 // Función auxiliar para convertir hora (HH:MM) a minutos
-function timeToMinutes(timeString: string): number {
+export function timeToMinutes(timeString: string): number {
   if (!timeString || typeof timeString !== "string") return 0
+
   const [hours, minutes] = timeString.split(":").map(Number)
   return hours * 60 + minutes
 }
 
 // Función auxiliar para convertir minutos a hora (HH:MM)
-function minutesToTime(minutes: number): string {
+export function minutesToTime(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
 }
 
-// Función principal para generar slots
+// Función mejorada para verificar si un slot ya pasó
+export function isPastSlot(slotStart: number, selectedDate: string): boolean {
+  const now = new Date()
+  const today = now.toISOString().split("T")[0]
+
+  // IMPORTANTE: Si la fecha seleccionada es futura, NUNCA está en el pasado
+  if (selectedDate > today) {
+    console.log(`📅 Fecha ${selectedDate} es futura (hoy: ${today}), slot disponible`)
+    return false
+  }
+
+  // Si la fecha seleccionada es pasada, SIEMPRE está en el pasado
+  if (selectedDate < today) {
+    console.log(`📅 Fecha ${selectedDate} es pasada (hoy: ${today}), slot no disponible`)
+    return true
+  }
+
+  // Solo para HOY, verificar la hora actual
+  const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes()
+  const isPast = slotStart <= currentTimeInMinutes
+
+  console.log(
+    `⏰ Verificando slot ${minutesToTime(slotStart)} para HOY: ${isPast ? "YA PASÓ" : "DISPONIBLE"} (ahora: ${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")})`,
+  )
+
+  return isPast
+}
+
+// Función mejorada para detectar conflictos con reservas existentes
+export function hasConflict(
+  checkStartTime: string,
+  checkEndTime: string,
+  existingBookings: ExistingBooking[],
+): boolean {
+  const checkStart = timeToMinutes(checkStartTime)
+  const checkEnd = timeToMinutes(checkEndTime)
+
+  console.log(`🔍 Verificando conflicto para slot ${checkStartTime}-${checkEndTime}`)
+
+  return existingBookings.some((booking) => {
+    // Extraer tiempo de inicio y fin del booking
+    let bookingStart: string
+    let bookingEnd: string
+
+    // Priorizar time_slot de la BD
+    const timeSlot = booking.time_slot || booking.timeSlot
+    if (timeSlot && timeSlot.includes("-")) {
+      ;[bookingStart, bookingEnd] = timeSlot.split("-").map((t) => t.trim())
+    } else if (booking.startTime && booking.endTime) {
+      bookingStart = booking.startTime
+      bookingEnd = booking.endTime
+    } else {
+      console.log("⚠️ Booking sin formato válido:", booking)
+      return false
+    }
+
+    // Convertir a minutos para comparación precisa
+    const bookingStartMin = timeToMinutes(bookingStart)
+    const bookingEndMin = timeToMinutes(bookingEnd)
+
+    // Detectar solapamiento: hay conflicto si los rangos se solapan
+    const overlaps = checkStart < bookingEndMin && checkEnd > bookingStartMin
+
+    if (overlaps) {
+      const customerName = booking.customer_name || booking.customerName || "Cliente"
+      console.log(
+        `❌ CONFLICTO DETECTADO: ${checkStartTime}-${checkEndTime} solapa con ${bookingStart}-${bookingEnd} (${customerName})`,
+      )
+    } else {
+      console.log(`✅ Sin conflicto: ${checkStartTime}-${checkEndTime} vs ${bookingStart}-${bookingEnd}`)
+    }
+
+    return overlaps
+  })
+}
+
+// Función mejorada para generar slots
 export function generateSlotsForVehicle(
   vehicleType: string,
   businessSchedule: { startTime: string; endTime: string },
-  existingBookings: ExistingBooking[],
+  existingBookings: any[],
   durationType = "regular",
   vehicleCategory = "default",
+  selectedDate?: string, // Nuevo parámetro para fecha seleccionada
 ) {
   console.log("⚙️ Generando slots con parámetros:")
   console.log(`   - Tipo: ${vehicleType}`)
   console.log(`   - Categoría: ${vehicleCategory}`)
   console.log(`   - Horario: ${businessSchedule.startTime} - ${businessSchedule.endTime}`)
   console.log(`   - Duración: ${durationType}`)
+  console.log(`   - Fecha seleccionada: ${selectedDate || "No especificada"}`)
   console.log(`   - Reservas existentes: ${existingBookings.length}`)
 
-  // Convertir horarios a minutos
+  // Mostrar detalles de reservas existentes
+  console.log("📋 Detalles de reservas existentes:")
+  existingBookings.forEach((booking, index) => {
+    const timeSlot = booking.time_slot || booking.timeSlot || "Sin horario"
+    const customer = booking.customer_name || booking.customerName || "Sin nombre"
+    console.log(`   ${index + 1}. ${customer}: ${timeSlot} (${booking.status})`)
+  })
+
+  // Convertir horarios a minutos para facilitar cálculos
   const startMinutes = timeToMinutes(businessSchedule.startTime)
   const endMinutes = timeToMinutes(businessSchedule.endTime)
 
-  // Procesar reservas existentes
-  const occupiedRanges = existingBookings
-    .map((booking) => {
-      const timeSlot = booking.time_slot || booking.timeSlot || ""
-      const [startTime, endTime] = timeSlot.split("-")
+  // Determinar intervalos basados en duración
+  let intervalMinutes = 30 // Por defecto 30 minutos
 
-      if (!startTime || !endTime) {
-        console.log(`⚠️ Reserva con formato inválido:`, booking)
-        return null
-      }
-
-      return {
-        start: timeToMinutes(startTime.trim()),
-        end: timeToMinutes(endTime.trim()),
-        customer: booking.customer_name || booking.customerName || "Cliente",
-        id: booking.id,
-        timeSlot: timeSlot,
-      }
-    })
-    .filter(Boolean) // Filtrar nulls
-
-  console.log("🚫 Reservas ocupadas:")
-  occupiedRanges.forEach((range) => {
-    if (range) {
-      // Verificar que range no sea null
-      console.log(`   - ${minutesToTime(range.start)}-${minutesToTime(range.end)} (${range.customer})`)
-    }
-  })
-
-  const hasConflict = (checkStart: string, checkEnd: string): boolean => {
-    return existingBookings.some((booking) => {
-      // Extraer tiempo de inicio y fin del booking
-      let bookingStart: string
-      let bookingEnd: string
-
-      // Priorizar time_slot de la BD
-      const timeSlot = booking.time_slot || booking.timeSlot
-      if (timeSlot && timeSlot.includes("-")) {
-        ;[bookingStart, bookingEnd] = timeSlot.split("-").map((t) => t.trim())
-      } else if (booking.startTime && booking.endTime) {
-        bookingStart = booking.startTime
-        bookingEnd = booking.endTime
-      } else {
-        console.log("⚠️ Booking sin formato válido:", booking)
-        return false
-      }
-
-      // Convertir a minutos para comparación precisa
-      const checkStartMin = timeToMinutes(checkStart)
-      const checkEndMin = timeToMinutes(checkEnd)
-      const bookingStartMin = timeToMinutes(bookingStart)
-      const bookingEndMin = timeToMinutes(bookingEnd)
-
-      // Detectar solapamiento: hay conflicto si los rangos se solapan
-      const overlaps = checkStartMin < bookingEndMin && checkEndMin > bookingStartMin
-
-      if (overlaps) {
-        const customerName = booking.customer_name || booking.customerName || "Cliente"
-        console.log(
-          `❌ Conflicto detectado: ${checkStart}-${checkEnd} solapa con ${bookingStart}-${bookingEnd} (${customerName})`,
-        )
-      }
-
-      return overlaps
-    })
+  // Mapeo de duraciones a minutos
+  const durationMap: Record<string, number> = {
+    "30min": 30,
+    "1hour": 60,
+    "2hour": 120,
+    "3hour": 180,
+    "4hour": 240,
+    halfday: 300, // 5 horas
+    fullday: 660, // 11 horas (10:00-21:00)
+    // Versiones en español
+    "30 minutos": 30,
+    "1 hora": 60,
+    "2 horas": 120,
+    "3 horas": 180,
+    "4 horas": 240,
+    "medio día": 300,
+    "día completo": 660,
   }
 
-  // Función para verificar si un slot ya pasó (solo para hoy)
-  const isPastSlot = (slotStart: number, selectedDate: string): boolean => {
-    const now = new Date()
-    const today = new Date().toISOString().split("T")[0]
+  // Usar el mapeo para determinar la duración
+  intervalMinutes = durationMap[durationType] || 30
 
-    if (selectedDate !== today) return false
+  console.log(`⏱️ Intervalo seleccionado: ${intervalMinutes} minutos`)
 
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes()
-    return slotStart < currentTimeInMinutes
-  }
+  // Obtener la fecha actual para comparaciones
+  const today = new Date().toISOString().split("T")[0]
+  // Usar la fecha seleccionada o la fecha de la primera reserva o hoy
+  const bookingDate = selectedDate || existingBookings[0]?.bookingDate || today
 
+  console.log(`📅 Fecha para verificación de slots pasados: ${bookingDate} (hoy: ${today})`)
+
+  // Generar todos los slots posibles
   const slots = []
-  const selectedDate =
-    existingBookings[0]?.booking_date || existingBookings[0]?.bookingDate || new Date().toISOString().split("T")[0]
 
-  // ✅ CORREGIDO: Usar los valores exactos de la base de datos
-  if (durationType === "30min" || durationType === "30 minutos" || durationType === "regular") {
-    // Slots de 30 minutos: 10:00-10:30, 10:30-11:00, etc.
-    console.log("🕐 Generando slots de 30 minutos...")
+  // Para slots regulares (30min, 1h, etc.)
+  if (!["halfday", "fullday", "medio día", "día completo"].includes(durationType)) {
+    console.log(`🕐 Generando slots regulares de ${intervalMinutes} minutos...`)
 
-    for (let time = startMinutes; time < endMinutes; time += 30) {
+    for (let time = startMinutes; time <= endMinutes - intervalMinutes; time += 30) {
       const slotStart = time
-      const slotEnd = time + 30
-      const timeString = minutesToTime(slotStart)
+      const slotEnd = time + intervalMinutes
+
+      const startTimeString = minutesToTime(slotStart)
       const endTimeString = minutesToTime(slotEnd)
 
-      if (slotEnd > endMinutes) break // No exceder horario de cierre
+      // Verificar si el slot actual está ocupado usando la función hasConflict
+      const isOccupied = hasConflict(startTimeString, endTimeString, existingBookings)
 
-      const isOccupied = hasConflict(timeString, endTimeString)
-      const isPast = isPastSlot(slotStart, selectedDate)
+      // Verificar si el slot ya ha pasado usando la función mejorada
+      const isPast = isPastSlot(slotStart, bookingDate)
 
-      slots.push({
-        time: minutesToTime(slotStart),
+      // Añadir el slot a la lista
+      const slot = {
+        time: startTimeString,
         available: !isOccupied && !isPast,
         type: "regular",
         restricted: false,
         restrictionReason: undefined,
-        endTime: minutesToTime(slotEnd),
-        label: `${minutesToTime(slotStart)} - ${minutesToTime(slotEnd)}`,
-      })
+        endTime: endTimeString,
+        label: `${startTimeString} - ${endTimeString}`,
+      }
+
+      console.log(
+        `Slot ${slot.label}: ${slot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${isOccupied}, pasado: ${isPast})`,
+      )
+
+      slots.push(slot)
     }
   }
 
-  // ✅ CORREGIDO: Usar "1hour" que es lo que viene de la BD
-  if (durationType === "1hour" || durationType === "1 hora" || durationType === "1h" || durationType === "hour") {
-    // Slots de 1 hora: 10:00-11:00, 10:30-11:30, 11:00-12:00, etc.
-    console.log("🕐 Generando slots de 1 hora...")
+  // Para slots de medio día y día completo
+  if (["halfday", "fullday", "medio día", "día completo"].includes(durationType)) {
+    console.log(`🕐 Generando slots de medio día/día completo...`)
 
-    for (let time = startMinutes; time < endMinutes; time += 30) {
-      const slotStart = time
-      const slotEnd = time + 60
-      const timeString = minutesToTime(slotStart)
-      const endTimeString = minutesToTime(slotEnd)
+    // Lógica para medio día (mañana: 10:00-15:00)
+    if (["halfday", "fullday", "medio día", "día completo"].includes(durationType)) {
+      const morningStart = startMinutes // 10:00
+      const morningEnd = timeToMinutes("15:00") // 15:00
+      const morningStartString = minutesToTime(morningStart)
+      const morningEndString = minutesToTime(morningEnd)
 
-      if (slotEnd > endMinutes) break // No exceder horario de cierre
+      const morningOccupied = hasConflict(morningStartString, morningEndString, existingBookings)
+      const morningPast = isPastSlot(morningStart, bookingDate)
 
-      const isOccupied = hasConflict(timeString, endTimeString)
-      const isPast = isPastSlot(slotStart, selectedDate)
-
-      slots.push({
-        time: minutesToTime(slotStart),
-        available: !isOccupied && !isPast,
-        type: "regular",
+      const morningSlot = {
+        time: morningStartString,
+        available: !morningOccupied && !morningPast,
+        type: "morning-half",
         restricted: false,
         restrictionReason: undefined,
-        endTime: minutesToTime(slotEnd),
-        label: `${minutesToTime(slotStart)} - ${minutesToTime(slotEnd)}`,
-      })
+        endTime: morningEndString,
+        label: `Mañana (${morningStartString} - ${morningEndString})`,
+      }
+
+      console.log(
+        `Slot ${morningSlot.label}: ${morningSlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${morningOccupied}, pasado: ${morningPast})`,
+      )
+
+      slots.push(morningSlot)
     }
-  }
 
-  // ✅ CORREGIDO: Usar "2hour" que es lo que viene de la BD
-  if (durationType === "2hour" || durationType === "2 horas" || durationType === "2h") {
-    // Slots de 2 horas: 10:00-12:00, 10:30-12:30, etc.
-    console.log("🕐 Generando slots de 2 horas...")
+    // Lógica para medio día (tarde: 15:00-21:00)
+    if (["halfday", "fullday", "medio día", "día completo"].includes(durationType)) {
+      const afternoonStart = timeToMinutes("15:00") // 15:00
+      const afternoonEnd = endMinutes // 21:00
+      const afternoonStartString = minutesToTime(afternoonStart)
+      const afternoonEndString = minutesToTime(afternoonEnd)
 
-    for (let time = startMinutes; time < endMinutes; time += 30) {
-      const slotStart = time
-      const slotEnd = time + 120
-      const timeString = minutesToTime(slotStart)
-      const endTimeString = minutesToTime(slotEnd)
+      const afternoonOccupied = hasConflict(afternoonStartString, afternoonEndString, existingBookings)
+      const afternoonPast = isPastSlot(afternoonStart, bookingDate)
 
-      if (slotEnd > endMinutes) break
-
-      const isOccupied = hasConflict(timeString, endTimeString)
-      const isPast = isPastSlot(slotStart, selectedDate)
-
-      slots.push({
-        time: minutesToTime(slotStart),
-        available: !isOccupied && !isPast,
-        type: "regular",
+      const afternoonSlot = {
+        time: afternoonStartString,
+        available: !afternoonOccupied && !afternoonPast,
+        type: "afternoon-half",
         restricted: false,
         restrictionReason: undefined,
-        endTime: minutesToTime(slotEnd),
-        label: `${minutesToTime(slotStart)} - ${minutesToTime(slotEnd)}`,
-      })
+        endTime: afternoonEndString,
+        label: `Tarde (${afternoonStartString} - ${afternoonEndString})`,
+      }
+
+      console.log(
+        `Slot ${afternoonSlot.label}: ${afternoonSlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${afternoonOccupied}, pasado: ${afternoonPast})`,
+      )
+
+      slots.push(afternoonSlot)
+    }
+
+    // Lógica para día completo (10:00-21:00)
+    if (["fullday", "día completo"].includes(durationType)) {
+      const fullDayStart = startMinutes // 10:00
+      const fullDayEnd = endMinutes // 21:00
+      const fullDayStartString = minutesToTime(fullDayStart)
+      const fullDayEndString = minutesToTime(fullDayEnd)
+
+      const fullDayOccupied = hasConflict(fullDayStartString, fullDayEndString, existingBookings)
+      const fullDayPast = isPastSlot(fullDayStart, bookingDate)
+
+      const fullDaySlot = {
+        time: fullDayStartString,
+        available: !fullDayOccupied && !fullDayPast,
+        type: "fullday",
+        restricted: false,
+        restrictionReason: undefined,
+        endTime: fullDayEndString,
+        label: `Día completo (${fullDayStartString} - ${fullDayEndString})`,
+      }
+
+      console.log(
+        `Slot ${fullDaySlot.label}: ${fullDaySlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${fullDayOccupied}, pasado: ${fullDayPast})`,
+      )
+
+      slots.push(fullDaySlot)
     }
   }
 
-  // ✅ CORREGIDO: Usar "halfday" que es lo que viene de la BD
-  if (durationType === "halfday" || durationType === "medio día" || durationType === "half-day") {
-    console.log("🕐 Generando slots de medio día...")
-
-    // Mañana: 10:00-15:00
-    const morningStart = startMinutes
-    const morningEnd = timeToMinutes("15:00")
-    const morningOccupied = hasConflict(minutesToTime(morningStart), minutesToTime(morningEnd))
-    const morningPast = isPastSlot(morningStart, selectedDate)
-
-    slots.push({
-      time: minutesToTime(morningStart),
-      available: !morningOccupied && !morningPast,
-      type: "morning-half",
-      restricted: false,
-      restrictionReason: undefined,
-      endTime: minutesToTime(morningEnd),
-      label: `Mañana (${minutesToTime(morningStart)} - ${minutesToTime(morningEnd)})`,
-    })
-
-    // Tarde: 15:00-21:00
-    const afternoonStart = timeToMinutes("15:00")
-    const afternoonEnd = endMinutes
-    const afternoonOccupied = hasConflict(minutesToTime(afternoonStart), minutesToTime(afternoonEnd))
-    const afternoonPast = isPastSlot(afternoonStart, selectedDate)
-
-    slots.push({
-      time: minutesToTime(afternoonStart),
-      available: !afternoonOccupied && !afternoonPast,
-      type: "afternoon-half",
-      restricted: false,
-      restrictionReason: undefined,
-      endTime: minutesToTime(afternoonEnd),
-      label: `Tarde (${minutesToTime(afternoonStart)} - ${minutesToTime(afternoonEnd)})`,
-    })
-  }
-
-  // ✅ CORREGIDO: Usar "fullday" que es lo que viene de la BD
-  if (durationType === "fullday" || durationType === "día completo" || durationType === "full-day") {
-    console.log("🕐 Generando slot de día completo...")
-
-    const fullDayStart = startMinutes
-    const fullDayEnd = endMinutes
-    const fullDayOccupied = hasConflict(minutesToTime(fullDayStart), minutesToTime(fullDayEnd))
-    const fullDayPast = isPastSlot(fullDayStart, selectedDate)
-
-    slots.push({
-      time: minutesToTime(fullDayStart),
-      available: !fullDayOccupied && !fullDayPast,
-      type: "fullday",
-      restricted: false,
-      restrictionReason: undefined,
-      endTime: minutesToTime(fullDayEnd),
-      label: `Día completo (${minutesToTime(fullDayStart)} - ${minutesToTime(fullDayEnd)})`,
-    })
-  }
-
-  // Mostrar resumen
-  const availableSlots = slots.filter((s) => s.available)
-  const unavailableSlots = slots.filter((s) => !s.available)
-
+  // Mostrar resumen de slots generados
   console.log(`✅ Slots generados: ${slots.length}`)
-  console.log(`   - Disponibles: ${availableSlots.length}`)
-  console.log(`   - No disponibles: ${unavailableSlots.length}`)
+  console.log(`   - Disponibles: ${slots.filter((s) => s.available).length}`)
+  console.log(`   - No disponibles: ${slots.filter((s) => !s.available).length}`)
 
-  console.log("✅ Slots disponibles:")
-  availableSlots.forEach((slot) => {
-    console.log(`   - ${slot.label}`)
-  })
+  // Mostrar slots disponibles e indisponibles
+  console.log(`✅ Slots disponibles:`)
+  slots.filter((s) => s.available).forEach((s) => console.log(`   - ${s.label}`))
 
-  console.log("❌ Slots no disponibles:")
-  unavailableSlots.forEach((slot) => {
-    console.log(`   - ${slot.label}`)
-  })
+  console.log(`❌ Slots no disponibles:`)
+  slots.filter((s) => !s.available).forEach((s) => console.log(`   - ${s.label}`))
 
   return slots
 }
