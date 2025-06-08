@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { jwtVerify } from "jose"
+import { sql } from "drizzle-orm"
+import { db } from "@/lib/db"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 
@@ -28,59 +30,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Vehicle ID and date required" }, { status: 400 })
     }
 
-    // CONEXIÓN MEJORADA Y MÁS ROBUSTA
+    // USAR LA MISMA CONFIGURACIÓN QUE FUNCIONA EN OTRAS APIS
     let vehicle = null
     let existingBookings = []
 
     try {
-      console.log("🔌 Attempting ROBUST database connection...")
+      console.log("🔌 Using same DB config as working APIs...")
 
-      if (!process.env.DATABASE_URL) {
-        throw new Error("DATABASE_URL not configured")
-      }
-
-      console.log("📊 DATABASE_URL configured, length:", process.env.DATABASE_URL.length)
-
-      // Importar neon con manejo de errores mejorado
-      const { neon } = await import("@neondatabase/serverless")
-
-      // Crear cliente con configuración más robusta
-      const sql = neon(process.env.DATABASE_URL, {
-        fullResults: false,
-      })
-
-      // Test de conexión más simple
-      console.log("🧪 Testing basic connection...")
-      await sql`SELECT 1`
-      console.log("✅ Basic connection successful")
-
-      // Obtener vehículo con timeout
+      // Obtener vehículo usando la misma sintaxis que funciona
       console.log(`🚗 Fetching vehicle ${vehicleId}...`)
-      const vehicleQuery = sql`
+
+      const vehicleQuery = await db.execute(sql`
         SELECT id, name, pricing, available
         FROM vehicles 
         WHERE id = ${vehicleId}
         LIMIT 1
-      `
+      `)
 
-      const vehicles = (await Promise.race([
-        vehicleQuery,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Vehicle query timeout")), 10000)),
-      ])) as any[]
-
-      if (!vehicles || vehicles.length === 0) {
+      if (!vehicleQuery || vehicleQuery.length === 0) {
         console.log("❌ Vehicle not found")
         return NextResponse.json({ error: "Vehicle not found" }, { status: 404 })
       }
 
-      vehicle = vehicles[0]
+      vehicle = vehicleQuery[0]
       console.log("✅ Vehicle found:", vehicle.name)
 
       // Parsear pricing
       if (typeof vehicle.pricing === "string") {
         try {
-          vehicle.pricing = JSON.parse(vehicle.pricing)
-          console.log("✅ Pricing parsed, options:", vehicle.pricing.length)
+          vehicle.pricing = JSON.parse(vehicle.pricing) as any[]
+          console.log("✅ Pricing parsed, options:", (vehicle.pricing as any[]).length)
         } catch (e) {
           console.log("⚠️ Error parsing pricing, using defaults")
           vehicle.pricing = [
@@ -90,9 +69,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Obtener reservas con query más específica PARA LA FECHA CORRECTA
+      // Obtener reservas para la fecha específica usando la misma sintaxis
       console.log(`📅 Fetching bookings for vehicle ${vehicleId} on ${date}...`)
-      const bookingsQuery = sql`
+
+      const bookingsQuery = await db.execute(sql`
         SELECT 
           id,
           customer_name,
@@ -105,12 +85,9 @@ export async function POST(request: NextRequest) {
         AND booking_date = ${date}
         AND status IN ('confirmed', 'completed', 'pending')
         ORDER BY time_slot ASC
-      `
+      `)
 
-      existingBookings = (await Promise.race([
-        bookingsQuery,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Bookings query timeout")), 10000)),
-      ])) as any[]
+      existingBookings = bookingsQuery || []
 
       console.log("📊 REAL bookings found for date", date, ":", existingBookings.length)
       existingBookings.forEach((booking, index) => {
@@ -118,17 +95,19 @@ export async function POST(request: NextRequest) {
           `  ${index + 1}. ${booking.customer_name} - ${booking.time_slot} (${booking.status}) - Date: ${booking.booking_date}`,
         )
       })
+
+      console.log("✅ Database connection successful - using REAL data")
     } catch (dbError) {
-      console.log("❌ Database connection FAILED")
+      console.log("❌ Database query FAILED")
       console.log("Error type:", dbError?.constructor?.name)
       console.log("Error message:", dbError instanceof Error ? dbError.message : String(dbError))
 
-      // ❌ NO USAR DATOS DE FALLBACK - Devolver error real
+      // NO USAR FALLBACK - devolver error para forzar la corrección
       return NextResponse.json(
         {
           error: "Database connection failed",
           details: dbError instanceof Error ? dbError.message : String(dbError),
-          suggestion: "Check DATABASE_URL configuration and database availability",
+          suggestion: "Check database configuration",
         },
         { status: 500 },
       )
@@ -139,9 +118,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ availableSlots: [] })
     }
 
-    // Generar slots
+    // Generar slots con datos REALES
     console.log("⚙️ Generating slots with REAL booking conflicts for date:", date)
-    const slots = generateSlots(vehicle.pricing, existingBookings, date)
+    const slots = generateSlots(vehicle.pricing as any[], existingBookings, date)
 
     console.log("✅ Generated slots:", slots.length)
 
