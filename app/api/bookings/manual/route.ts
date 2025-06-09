@@ -7,6 +7,8 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secret
 
 export async function POST(request: NextRequest) {
   try {
+    console.log("🛡️ Manual booking API started")
+
     // Verificar autenticación de admin
     const token = request.cookies.get("admin-token")?.value
 
@@ -36,103 +38,198 @@ export async function POST(request: NextRequest) {
       totalPrice,
       notes,
       isManualBooking = true,
+      salesPerson,
+      vehicleName,
+      vehicleType,
     } = body
 
-    // Validaciones
+    // Validaciones básicas
     if (!vehicleId || !customerName || !customerPhone || !bookingDate || !timeSlot || !totalPrice) {
       return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 })
     }
 
-    // Verificar que el vehículo existe
-    const vehicleCheck = await db.execute(sql`
-      SELECT id, name FROM vehicles WHERE id = ${vehicleId}
+    if (!salesPerson) {
+      return NextResponse.json({ error: "Debe seleccionar un comercial" }, { status: 400 })
+    }
+
+    if (!startTime || !endTime) {
+      return NextResponse.json({ error: "Faltan horarios de inicio y fin" }, { status: 400 })
+    }
+
+    // Verificar que el vehículo existe y obtener su información
+    console.log(`🔍 Checking vehicle ${vehicleId}...`)
+
+    const vehicleResult = await db.execute(sql`
+      SELECT id, name, type, stock FROM vehicles WHERE id = ${vehicleId}
     `)
 
-    if (!vehicleCheck || vehicleCheck.length === 0) {
+    if (!vehicleResult || vehicleResult.length === 0) {
       return NextResponse.json({ error: "Vehículo no encontrado" }, { status: 404 })
     }
 
-    // Verificar disponibilidad del horario
-    const conflictCheck = await db.execute(sql`
-      SELECT id FROM bookings 
+    const vehicle = vehicleResult[0]
+    const vehicleStock = typeof vehicle.stock === "number" ? vehicle.stock : 1
+
+    console.log(`📊 Vehicle ${vehicleId} (${vehicle.name}) has stock: ${vehicleStock}`)
+
+    // ✅ VERIFICAR DISPONIBILIDAD CON STOCK
+    console.log(`🔍 Checking availability for slot: ${timeSlot} on ${bookingDate}`)
+
+    const existingBookingsResult = await db.execute(sql`
+      SELECT COUNT(*) as count FROM bookings 
       WHERE vehicle_id = ${vehicleId} 
       AND booking_date = ${bookingDate}
-      AND (
-        (start_time <= ${startTime} AND end_time > ${startTime}) OR
-        (start_time < ${endTime} AND end_time >= ${endTime}) OR
-        (start_time >= ${startTime} AND end_time <= ${endTime})
-      )
-      AND status != 'cancelled'
+      AND time_slot = ${timeSlot}
+      AND status IN ('confirmed', 'completed', 'pending')
     `)
 
-    if (conflictCheck && conflictCheck.length > 0) {
-      return NextResponse.json({ error: "Ya existe una reserva en ese horario" }, { status: 409 })
-    }
+    const bookingsCount = Number(existingBookingsResult[0]?.count || 0)
 
-    // Calcular duración en minutos
-    const start = new Date(`2000-01-01T${startTime}`)
-    const end = new Date(`2000-01-01T${endTime}`)
-    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60)
+    console.log(`📊 Existing bookings for this slot: ${bookingsCount}/${vehicleStock}`)
 
-    // Crear la reserva manual
-    const result = await db.execute(sql`
-      INSERT INTO bookings (
-        vehicle_id,
-        customer_name,
-        customer_email,
-        customer_phone,
-        booking_date,
-        time_slot,
-        start_time,
-        end_time,
-        duration,
-        duration_minutes,
-        total_price,
-        original_price,
-        status,
-        payment_status,
-        notes,
-        is_manual_booking,
-        created_at,
-        updated_at
-      ) VALUES (
-        ${vehicleId},
-        ${customerName},
-        ${customerEmail},
-        ${customerPhone},
-        ${bookingDate},
-        ${timeSlot},
-        ${startTime},
-        ${endTime},
-        ${duration || "30min"},
-        ${durationMinutes},
-        ${totalPrice},
-        ${totalPrice},
-        'confirmed',
-        'manual',
-        ${notes || ""},
-        ${isManualBooking},
-        NOW(),
-        NOW()
+    // Si ya hay tantas reservas como stock disponible, rechazamos
+    if (bookingsCount >= vehicleStock) {
+      return NextResponse.json(
+        {
+          error: "No hay suficiente stock disponible para este horario",
+          details: `Stock disponible: ${vehicleStock}, Reservas existentes: ${bookingsCount}`,
+        },
+        { status: 409 },
       )
-      RETURNING id
-    `)
-
-    const bookingId = result[0]?.id
-
-    if (!bookingId) {
-      throw new Error("Error al crear la reserva")
     }
 
-    console.log("✅ Manual booking created with ID:", bookingId)
+    // ✅ CALCULAR DURACIÓN CORRECTAMENTE
+    let durationMinutes = 30 // Valor por defecto
+    let finalDuration = duration || "30min"
 
-    return NextResponse.json({
-      success: true,
-      bookingId,
-      message: "Reserva manual creada correctamente",
-    })
+    try {
+      const startParts = startTime.split(":").map(Number)
+      const endParts = endTime.split(":").map(Number)
+
+      const startMinutes = startParts[0] * 60 + startParts[1]
+      const endMinutes = endParts[0] * 60 + endParts[1]
+
+      durationMinutes = endMinutes - startMinutes
+
+      // Asignar duración basada en minutos calculados
+      if (durationMinutes <= 30) {
+        finalDuration = "30min"
+      } else if (durationMinutes <= 60) {
+        finalDuration = "1hour"
+      } else if (durationMinutes <= 120) {
+        finalDuration = "2hour"
+      } else if (durationMinutes <= 240) {
+        finalDuration = "halfday"
+      } else {
+        finalDuration = "fullday"
+      }
+
+      console.log(`⏱️ Calculated duration: ${durationMinutes} minutes = ${finalDuration}`)
+    } catch (error) {
+      console.log("⚠️ Error calculating duration, using provided value:", duration)
+      finalDuration = duration || "30min"
+    }
+
+    // ✅ CREAR LA RESERVA MANUAL
+    console.log("💾 Creating booking in database...")
+
+    try {
+      const insertResult = await db.execute(sql`
+        INSERT INTO bookings (
+          vehicle_id,
+          customer_name,
+          customer_email,
+          customer_phone,
+          booking_date,
+          time_slot,
+          start_time,
+          end_time,
+          duration,
+          duration_minutes,
+          total_price,
+          original_price,
+          status,
+          payment_status,
+          notes,
+          is_manual_booking,
+          sales_person,
+          vehicle_name,
+          vehicle_type,
+          created_at,
+          updated_at
+        ) VALUES (
+          ${vehicleId},
+          ${customerName},
+          ${customerEmail || `${customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`},
+          ${customerPhone},
+          ${bookingDate},
+          ${timeSlot},
+          ${startTime},
+          ${endTime},
+          ${finalDuration},
+          ${durationMinutes},
+          ${totalPrice},
+          ${totalPrice},
+          'confirmed',
+          'manual',
+          ${notes || ""},
+          ${isManualBooking},
+          ${salesPerson},
+          ${vehicleName || vehicle.name},
+          ${vehicleType || vehicle.type},
+          NOW(),
+          NOW()
+        )
+        RETURNING id
+      `)
+
+      const bookingId = insertResult[0]?.id
+
+      if (!bookingId) {
+        throw new Error("No se pudo obtener el ID de la reserva creada")
+      }
+
+      console.log("✅ Manual booking created successfully!")
+      console.log(`   - Booking ID: ${bookingId}`)
+      console.log(`   - Customer: ${customerName}`)
+      console.log(`   - Vehicle: ${vehicleName || vehicle.name} (${vehicleType || vehicle.type})`)
+      console.log(`   - Sales Person: ${salesPerson}`)
+      console.log(`   - Date: ${bookingDate}`)
+      console.log(`   - Time: ${timeSlot}`)
+      console.log(`   - Duration: ${finalDuration} (${durationMinutes} min)`)
+      console.log(`   - Price: €${totalPrice}`)
+      console.log(`   - Remaining stock: ${vehicleStock - bookingsCount - 1}`)
+
+      return NextResponse.json({
+        success: true,
+        bookingId,
+        message: "Reserva manual creada correctamente",
+        details: {
+          customerName,
+          vehicleName: vehicleName || vehicle.name,
+          vehicleType: vehicleType || vehicle.type,
+          salesPerson,
+          bookingDate,
+          timeSlot,
+          duration: finalDuration,
+          durationMinutes,
+          totalPrice,
+          availableStock: vehicleStock - bookingsCount - 1,
+          totalStock: vehicleStock,
+        },
+      })
+    } catch (dbError) {
+      console.error("❌ Database error creating booking:", dbError)
+      return NextResponse.json(
+        {
+          error: "Error al crear la reserva en la base de datos",
+          details: dbError instanceof Error ? dbError.message : "Error de base de datos desconocido",
+        },
+        { status: 500 },
+      )
+    }
   } catch (error) {
-    console.error("❌ Error creating manual booking:", error)
+    console.error("❌ Server error in manual booking:", error)
     return NextResponse.json(
       {
         error: "Error interno del servidor",

@@ -25,6 +25,8 @@ import {
   FileText,
   Beaker,
   ExternalLink,
+  UserCheck,
+  Settings,
 } from "lucide-react"
 
 interface Booking {
@@ -47,6 +49,10 @@ interface Booking {
     damageCost: string
     liabilityWaiverId?: number
     isTestBooking?: boolean
+    isManualBooking?: boolean
+    salesPerson?: string
+    vehicleName?: string
+    vehicleType?: string
   }
   vehicle: {
     name: string
@@ -54,7 +60,7 @@ interface Booking {
   } | null
 }
 
-type DateFilter = "all" | "today" | "tomorrow" | "test"
+type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual"
 
 export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -139,10 +145,27 @@ export function BookingManagement() {
     }
   }
 
+  // ✅ NUEVA FUNCIÓN: Obtener nombre del comercial
+  const getSalesPersonName = (id?: string) => {
+    if (!id) return null
+
+    const salesPerson = {
+      manuel: "Manuel",
+      fermin: "Fermín",
+      javier: "Javier",
+    }[id]
+
+    return salesPerson || id
+  }
+
   // Función para filtrar reservas por fecha o tipo
   const getFilteredBookings = () => {
     if (dateFilter === "test") {
       return bookings.filter((booking) => booking.booking.isTestBooking === true)
+    }
+
+    if (dateFilter === "manual") {
+      return bookings.filter((booking) => booking.booking.isManualBooking === true)
     }
 
     if (dateFilter === "all") return bookings
@@ -275,6 +298,8 @@ export function BookingManagement() {
         return "bg-red-600 text-white"
       case "free_booking":
         return "bg-purple-600 text-white"
+      case "manual":
+        return "bg-orange-600 text-white"
       default:
         return "bg-gray-600 text-white"
     }
@@ -340,6 +365,7 @@ export function BookingManagement() {
   }
 
   const testBookingsCount = bookings.filter((b) => b.booking.isTestBooking === true).length
+  const manualBookingsCount = bookings.filter((b) => b.booking.isManualBooking === true).length
   const withWaiversCount = bookings.filter((b) => b.booking.liabilityWaiverId).length
 
   return (
@@ -347,16 +373,6 @@ export function BookingManagement() {
       <div>
         <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
-        {/*debug && (
-          <div className="text-xs text-gray-500 mt-1">
-            <p>
-              Debug: {debug.totalBookings} reservas, {debug.withWaivers} con documentos firmados
-            </p>
-            {debug.sampleWaiverIds && debug.sampleWaiverIds.length > 0 && (
-              <p>IDs de documentos: {debug.sampleWaiverIds.join(", ")}</p>
-            )}
-          </div>
-        )*/}
       </div>
 
       {/* Filtros de fecha */}
@@ -415,6 +431,14 @@ export function BookingManagement() {
               )
             </Button>
             <Button
+              variant={dateFilter === "manual" ? "default" : "outline"}
+              onClick={() => setDateFilter("manual")}
+              className={dateFilter === "manual" ? "bg-orange-600 text-white hover:bg-orange-700" : ""}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Manuales ({manualBookingsCount})
+            </Button>
+            <Button
               variant={dateFilter === "test" ? "default" : "outline"}
               onClick={() => setDateFilter("test")}
               className={dateFilter === "test" ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
@@ -432,7 +456,9 @@ export function BookingManagement() {
                   ? " para mañana"
                   : dateFilter === "test"
                     ? " de prueba"
-                    : ""}
+                    : dateFilter === "manual"
+                      ? " manuales"
+                      : ""}
             </div>
           )}
           <div className="mt-2 text-xs text-gray-500">
@@ -494,14 +520,19 @@ export function BookingManagement() {
           {filteredBookings.map((booking) => {
             // Debug específico para cada reserva
             const hasWaiver = booking.booking.liabilityWaiverId && booking.booking.liabilityWaiverId !== null
-            console.log(
-              `🔍 Rendering booking ${booking.booking.id}: liabilityWaiverId = ${booking.booking.liabilityWaiverId}, hasWaiver = ${hasWaiver}`,
-            )
+            const isManual = booking.booking.isManualBooking === true
+            const salesPersonName = getSalesPersonName(booking.booking.salesPerson)
 
             return (
               <Card
                 key={booking.booking.id}
-                className={`bg-white border border-gray-200 hover:shadow-lg transition-all ${booking.booking.isTestBooking ? "border-l-4 border-l-purple-500" : ""}`}
+                className={`bg-white border border-gray-200 hover:shadow-lg transition-all ${
+                  booking.booking.isTestBooking
+                    ? "border-l-4 border-l-purple-500"
+                    : isManual
+                      ? "border-l-4 border-l-orange-500"
+                      : ""
+                }`}
               >
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -515,10 +546,22 @@ export function BookingManagement() {
                             Prueba
                           </Badge>
                         )}
+                        {isManual && (
+                          <Badge className="ml-2 bg-orange-600 text-white">
+                            <Settings className="h-3 w-3 mr-1" />
+                            Manual
+                          </Badge>
+                        )}
                       </CardTitle>
                       <CardDescription className="flex items-center mt-1">
                         <Ship className="h-4 w-4 mr-1" />
-                        {booking.vehicle?.name || "Producto eliminado"}
+                        {/* ✅ MEJORADO: Mostrar información del vehículo */}
+                        {booking.booking.vehicleName || booking.vehicle?.name || "Producto eliminado"}
+                        {(booking.booking.vehicleType || booking.vehicle?.type) && (
+                          <span className="text-gray-500 ml-1">
+                            ({booking.booking.vehicleType || booking.vehicle?.type})
+                          </span>
+                        )}
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 flex-wrap">
@@ -558,6 +601,13 @@ export function BookingManagement() {
                           <Phone className="h-3 w-3 mr-2" />
                           {booking.booking.customerPhone}
                         </div>
+                        {/* ✅ NUEVO: Mostrar comercial si es reserva manual */}
+                        {salesPersonName && (
+                          <div className="flex items-center text-gray-600">
+                            <UserCheck className="h-3 w-3 mr-2" />
+                            <span className="font-medium">Comercial: {salesPersonName}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -603,15 +653,8 @@ export function BookingManagement() {
                             className="bg-purple-600 text-white hover:bg-purple-700"
                           >
                             <ExternalLink className="h-4 w-4 mr-1" />
-                            Ver Documento (ID: {booking.booking.liabilityWaiverId})
+                            Ver Documento
                           </Button>
-                        )}
-
-                        {/* Debug visual para verificar */}
-                        {!hasWaiver && (
-                          <div className="text-xs text-gray-400 p-2 bg-gray-50 rounded">
-                            Sin documento (ID: {booking.booking.liabilityWaiverId || "null"})
-                          </div>
                         )}
 
                         {/* Lógica de estados automática */}
@@ -700,6 +743,7 @@ export function BookingManagement() {
 
                   <div className="mt-4 text-xs text-gray-500">
                     Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
+                    {isManual && salesPersonName && <span className="ml-2">• Comercial: {salesPersonName}</span>}
                   </div>
                 </CardContent>
               </Card>
@@ -715,7 +759,9 @@ export function BookingManagement() {
                 ? "No hay reservas"
                 : dateFilter === "test"
                   ? "No hay reservas de prueba"
-                  : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
+                  : dateFilter === "manual"
+                    ? "No hay reservas manuales"
+                    : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
             </h3>
             <p className="text-gray-500">
               {dateFilter === "all"

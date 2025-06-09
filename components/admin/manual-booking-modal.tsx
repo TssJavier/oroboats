@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, Clock, User, AlertTriangle, FileText, Loader2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar, Clock, User, AlertTriangle, FileText, Loader2, UserCheck } from "lucide-react"
 import { toast } from "sonner"
 
 interface Vehicle {
@@ -23,6 +24,7 @@ interface Vehicle {
     label: string
   }>
   securityDeposit?: number
+  stock?: number
 }
 
 interface TimeSlot {
@@ -31,6 +33,9 @@ interface TimeSlot {
   duration: string
   label: string
   price: number
+  available: boolean
+  availableUnits: number
+  totalUnits: number
 }
 
 interface ManualBookingModalProps {
@@ -40,6 +45,13 @@ interface ManualBookingModalProps {
   onSuccess: () => void
 }
 
+// Lista de comerciales disponibles
+const SALES_STAFF = [
+  { id: "manuel", name: "Manuel" },
+  { id: "fermin", name: "Fermín" },
+  { id: "javier", name: "Javier" },
+]
+
 export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: ManualBookingModalProps) {
   const [formData, setFormData] = useState({
     customerName: "",
@@ -47,6 +59,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     customerEmail: "",
     bookingDate: "",
     notes: "",
+    salesPerson: "", // Nuevo campo para el comercial
   })
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
@@ -72,6 +85,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     try {
       console.log("🕐 Fetching available slots for vehicle:", vehicle.id, "date:", formData.bookingDate)
 
+      // Usar la API mejorada que tiene en cuenta el stock
       const response = await fetch("/api/vehicles/time-slots", {
         method: "POST",
         headers: {
@@ -90,7 +104,14 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
       const data = await response.json()
       console.log("✅ Available slots:", data.availableSlots)
 
-      setAvailableSlots(data.availableSlots || [])
+      // Filtrar slots que realmente tienen unidades disponibles
+      const filteredSlots = data.availableSlots.filter((slot: TimeSlot) => slot.availableUnits > 0)
+
+      setAvailableSlots(filteredSlots || [])
+
+      // Debug de stock
+      console.log(`📊 Stock total del vehículo: ${vehicle.stock || 1}`)
+      console.log(`📊 Slots con disponibilidad: ${filteredSlots.length}`)
     } catch (error) {
       console.error("❌ Error fetching slots:", error)
       toast.error("Error al cargar los horarios disponibles")
@@ -137,6 +158,11 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
 
     if (!selectedSlot) {
       toast.error("Debes seleccionar un horario disponible")
+      return
+    }
+
+    if (!formData.salesPerson) {
+      toast.error("Debes seleccionar un comercial")
       return
     }
 
@@ -188,6 +214,9 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
           totalPrice: selectedSlot.price,
           notes: formData.notes,
           isManualBooking: true,
+          salesPerson: formData.salesPerson, // Añadir el comercial
+          vehicleName: vehicle.name, // Guardar el nombre del vehículo
+          vehicleType: vehicle.type, // Guardar el tipo de vehículo
         }),
       })
 
@@ -208,6 +237,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
         customerEmail: "",
         bookingDate: "",
         notes: "",
+        salesPerson: "",
       })
       setSelectedSlot(null)
       setAvailableSlots([])
@@ -316,6 +346,34 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
             </div>
           </div>
 
+          {/* Selección de comercial */}
+          <div className="space-y-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Comercial
+            </h3>
+
+            <div className="w-full md:w-1/2">
+              <Label htmlFor="salesPerson">Comercial que realiza la venta *</Label>
+              <Select
+                value={formData.salesPerson}
+                onValueChange={(value) => handleInputChange("salesPerson", value)}
+                required
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecciona un comercial" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SALES_STAFF.map((staff) => (
+                    <SelectItem key={staff.id} value={staff.id}>
+                      {staff.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Selección de fecha */}
           <div className="space-y-4">
             <h3 className="font-semibold flex items-center gap-2">
@@ -380,6 +438,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                           ? "border-gold bg-gold/10 shadow-md"
                           : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
                       }`}
+                      disabled={!slot.available || slot.availableUnits < 1}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-semibold text-gray-900">
@@ -388,7 +447,14 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                         <span className="text-lg font-bold text-gold">€{slot.price}</span>
                       </div>
                       <div className="text-sm text-gray-600">{slot.label}</div>
-                      <div className="text-xs text-gray-500 mt-1">Duración: {slot.duration}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Duración: {slot.duration} •
+                        {slot.availableUnits > 0 ? (
+                          <span className="text-green-600"> {slot.availableUnits} disponible(s)</span>
+                        ) : (
+                          <span className="text-red-600"> No disponible</span>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -436,7 +502,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
             <Button
               type="submit"
               className="flex-1 bg-gold text-black hover:bg-gold/90"
-              disabled={loading || !selectedSlot}
+              disabled={loading || !selectedSlot || !formData.salesPerson}
             >
               {loading ? (
                 <>
