@@ -65,16 +65,17 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       customDurationEnabled,
       extraFeatures,
       securityDeposit,
-      stock, // ✅ AÑADIDO: Campo stock
+      stock, // ✅ CAMPO STOCK INCLUIDO
     } = body
 
-    console.log("🔧 Processing data:", {
+    console.log("🔧 Processing data with STOCK:", {
+      name,
+      stock: stock || 1,
       extraFeatures: extraFeatures ? "present" : "missing",
       securityDeposit: securityDeposit || 0,
-      stock: stock || 1, // ✅ AÑADIDO: Log del stock
     })
 
-    // ✅ USAR SQL DIRECTO PARA ASEGURAR QUE EL STOCK SE GUARDA
+    // ✅ ARREGLADO: Usar SQL directo para asegurar que el stock se guarda
     const result = await db.execute(sql`
       UPDATE vehicles 
       SET 
@@ -93,18 +94,22 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         custom_duration_enabled = ${customDurationEnabled},
         extra_features = ${JSON.stringify(extraFeatures || [])},
         security_deposit = ${Number(securityDeposit) || 0},
-        stock = ${Number(stock) || 1},
-        updated_at = NOW()
+        stock = ${Number(stock) || 1}
       WHERE id = ${id}
       RETURNING *
     `)
 
-    // Drizzle returns the result as an array, not as .rows
-    const updatedVehicle = Array.isArray(result) ? result[0] : result;
-    console.log("✅ Vehicle updated successfully with stock:", updatedVehicle?.stock)
+    // ✅ ARREGLADO: Manejo correcto del resultado de Drizzle
+    const updatedVehicle = Array.isArray(result) ? result[0] : result
+    
+    console.log("✅ Vehicle updated successfully!")
+    console.log("📦 Stock saved as:", updatedVehicle?.stock)
+    console.log("🔍 Full updated vehicle:", updatedVehicle)
+    
     return NextResponse.json(updatedVehicle)
   } catch (error) {
     console.error("❌ Error updating vehicle:", error)
+    console.error("❌ Error details:", error instanceof Error ? error.message : String(error))
     return NextResponse.json(
       {
         error: "Failed to update vehicle",
