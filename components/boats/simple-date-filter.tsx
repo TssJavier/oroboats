@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+
+import { useState, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, ChevronDown, Search } from "lucide-react"
+import { Calendar, Search } from "lucide-react"
 
 interface SimpleDateFilterProps {
   onDateSelect: (date: string) => void
@@ -13,25 +15,21 @@ interface SimpleDateFilterProps {
 
 const translations = {
   es: {
-    chooseDate: "Elegir fecha",
     today: "Hoy",
     tomorrow: "Mañana",
     searching: "Buscando...",
-    selectDate: "Selecciona una fecha",
   },
   en: {
-    chooseDate: "Choose date",
     today: "Today",
     tomorrow: "Tomorrow",
     searching: "Searching...",
-    selectDate: "Select a date",
   },
 }
 
 export function SimpleDateFilter({ onDateSelect, isLoading = false, language }: SimpleDateFilterProps) {
   const t = translations[language]
-  const [isOpen, setIsOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>("")
+  const dateInputRef = useRef<HTMLInputElement>(null)
 
   const getTodayDate = () => {
     return new Date().toISOString().split("T")[0]
@@ -55,78 +53,89 @@ export function SimpleDateFilter({ onDateSelect, isLoading = false, language }: 
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date)
-    setIsOpen(false)
     onDateSelect(date)
   }
 
-  const handleQuickDate = (date: string) => {
-    handleDateSelect(date)
+  const handleTodayClick = () => {
+    handleDateSelect(getTodayDate())
+  }
+
+  const handleTomorrowClick = () => {
+    handleDateSelect(getTomorrowDate())
+  }
+
+  const handleCalendarClick = () => {
+    // Activar el input oculto cuando se hace clic en el botón
+    if (dateInputRef.current) {
+      dateInputRef.current.showPicker()
+    }
+  }
+
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value) {
+      handleDateSelect(e.target.value)
+    }
   }
 
   return (
     <div className="mb-8">
       <Card className="bg-white border border-gray-200 shadow-sm">
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-center">
-            {/* Botón principal de fecha */}
-            <div className="relative flex-1 w-full sm:w-auto">
+          <div className="flex flex-col gap-4">
+            {/* Fecha seleccionada */}
+            {selectedDate && (
+              <div className="text-center">
+                <span className="text-lg font-semibold text-gray-800">{formatDateForDisplay(selectedDate)}</span>
+              </div>
+            )}
+
+            {/* Botones */}
+            <div className="flex justify-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full justify-between border-gray-300 hover:border-gold hover:bg-gold/5 h-12"
+                onClick={handleTodayClick}
+                className="border-gray-300 hover:border-gold hover:bg-gold/5"
                 disabled={isLoading}
               >
-                <div className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-3 text-gold" />
-                  <span className="font-medium">
-                    {selectedDate ? formatDateForDisplay(selectedDate) : t.chooseDate}
-                  </span>
-                </div>
-                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                {t.today}
               </Button>
 
-              {/* Calendario desplegable */}
-              {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4">
-                  <div className="space-y-3">
-                    {/* Botones rápidos */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuickDate(getTodayDate())}
-                        className="text-sm border-gray-300 hover:bg-gold/10"
-                      >
-                        {t.today}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuickDate(getTomorrowDate())}
-                        className="text-sm border-gray-300 hover:bg-gold/10"
-                      >
-                        {t.tomorrow}
-                      </Button>
-                    </div>
+              <Button
+                variant="outline"
+                onClick={handleTomorrowClick}
+                className="border-gray-300 hover:border-gold hover:bg-gold/5"
+                disabled={isLoading}
+              >
+                {t.tomorrow}
+              </Button>
 
-                    {/* Input de fecha */}
-                    <div>
-                      <input
-                        type="date"
-                        min={getTodayDate()}
-                        onChange={(e) => handleDateSelect(e.target.value)}
-                        className="w-full p-2 border border-gray-200 rounded-md bg-gray-50 text-sm"
-                        placeholder={t.selectDate}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* ✅ BOTÓN DE CALENDARIO CON INPUT POSICIONADO */}
+              <div className="relative">
+                <Button
+                  variant="outline"
+                  onClick={handleCalendarClick}
+                  className="border-gray-300 hover:border-gold hover:bg-gold/5 px-3 cursor-pointer"
+                  disabled={isLoading}
+                >
+                  <Calendar className="h-5 w-5 text-gold" />
+                </Button>
+
+                {/* Input posicionado en el área específica */}
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  min={getTodayDate()}
+                  value={selectedDate}
+                  onChange={handleDateInputChange}
+                  className="fixed top-[335px] left-2/4 transform -translate-x-[110px] opacity-0 pointer-events-none z-50"
+                  style={{ width: "1px", height: "1px" }}
+                />
+              </div>
             </div>
 
             {/* Estado de búsqueda */}
             {isLoading && (
-              <div className="flex items-center text-gold">
+              <div className="flex items-center justify-center text-gold">
                 <Search className="h-4 w-4 mr-2 animate-pulse" />
                 <span className="text-sm font-medium">{t.searching}</span>
               </div>

@@ -811,7 +811,7 @@ function VehicleCard({
   })()
 
   return (
-    <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden">
+    <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden flex flex-col h-full">
       <div className="relative">
         <div className="w-full h-72 bg-gray-50 flex items-center justify-center overflow-hidden">
           <Image
@@ -871,8 +871,9 @@ function VehicleCard({
         <CardDescription className="text-gray-600 text-base">{vehicle.description}</CardDescription>
       </CardHeader>
 
-      <CardContent>
-        <div className="space-y-4 mb-6">
+      {/* ✅ CONTENIDO PRINCIPAL CON FLEX-GROW PARA EQUILIBRAR ALTURAS */}
+      <CardContent className="flex-grow flex flex-col">
+        <div className="space-y-4 mb-6 flex-grow">
           <div className="flex items-center justify-between text-base">
             <span className="flex items-center text-gray-500 font-medium">
               <Users className="h-5 w-5 mr-2 text-gold" />
@@ -888,7 +889,7 @@ function VehicleCard({
               <Clock className="h-5 w-5 mr-2 text-gold" />
               {t.prices}:
             </span>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {(() => {
                 // Agrupar precios por categoría
                 const groupedPricing = new Map()
@@ -929,44 +930,42 @@ function VehicleCard({
                 })
 
                 return Array.from(groupedPricing.values()).map((option, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-4 text-center border border-gray-200">
-                    <div className="text-xl font-bold text-gold">€{option.price}</div>
-                    <div className="text-sm text-gray-600 font-medium">{option.label}</div>
+                  <div key={index} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                    <div className="text-lg font-bold text-gold">€{option.price}</div>
+                    <div className="text-xs text-gray-600 font-medium">{option.label}</div>
                   </div>
                 ))
               })()}
             </div>
           </div>
 
-          <div className="space-y-3">
-            <span className="text-gray-500 text-base font-medium">{t.includes}:</span>
-            <div className="flex flex-wrap gap-2">
-              {vehicle.includes.map((item, index) => (
-                <Badge key={index} variant="outline" className="text-sm py-1 px-3">
-                  {item}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Extras */}
-          {enabledExtras.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {enabledExtras.map((extra, index) => (
-                <div
-                  key={index}
-                  className="flex items-center bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg px-3 py-2 hover:shadow-sm transition-shadow"
-                  title={extra.description}
-                >
-                  {getExtraIcon(extra.id)}
-                  <span className="text-xs text-purple-700 ml-2 font-medium">{translateExtraName(extra.id, t)}</span>
-                  {extra.price && extra.price > 0 && (
-                    <span className="text-xs text-purple-600 ml-1">(+{extra.price}€)</span>
-                  )}
+          {/* ✅ EXTRAS CON ALTURA FIJA PARA EQUILIBRAR LAYOUT - TODOS VISIBLES EN FILAS DE 3 */}
+          <div className="min-h-[80px]">
+            {enabledExtras.length > 0 ? (
+              <div className="space-y-2">
+                <span className="text-gray-500 text-sm font-medium">Extras:</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {enabledExtras.map((extra, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-col items-center bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg px-2 py-2 hover:shadow-sm transition-shadow text-center"
+                      title={extra.description}
+                    >
+                      {getExtraIcon(extra.id)}
+                      <span className="text-xs text-purple-700 mt-1 font-medium leading-tight">
+                        {translateExtraName(extra.id, t)}
+                      </span>
+                      {extra.price && extra.price > 0 && (
+                        <span className="text-xs text-purple-600">(+{extra.price}€)</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="h-[80px]"></div> // Espacio reservado para mantener altura consistente
+            )}
+          </div>
 
           {/* Fianza */}
           {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
@@ -982,20 +981,23 @@ function VehicleCard({
           )}
         </div>
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <span className="text-gray-500 text-base">{t.from}</span>
-            <div className="text-3xl font-bold text-gold">€{getLowestPrice()}</div>
+        {/* ✅ SECCIÓN INFERIOR FIJA */}
+        <div className="mt-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <span className="text-gray-500 text-base">{t.from}</span>
+              <div className="text-3xl font-bold text-gold">€{getLowestPrice()}</div>
+            </div>
           </div>
-        </div>
 
-        <Button
-          onClick={() => onReserveClick(vehicle)}
-          className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg py-3 h-12"
-        >
-          <Calendar className="h-5 w-5 mr-2" />
-          {t.reserve}
-        </Button>
+          <Button
+            onClick={() => onReserveClick(vehicle)}
+            className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg py-3 h-12"
+          >
+            <Calendar className="h-5 w-5 mr-2" />
+            {t.reserve}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
