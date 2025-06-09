@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Euro, Loader2, AlertCircle, Users } from "lucide-react"
+import { Clock, Euro, Loader2, AlertCircle, Package, CheckCircle } from "lucide-react"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
 
@@ -42,10 +42,11 @@ interface TimeSlot {
   totalUnits?: number
 }
 
-interface PricingOption {
-  duration: string
-  price: number
+interface DurationOption {
+  key: string
   label: string
+  description: string
+  price: number
 }
 
 const translations = {
@@ -66,10 +67,13 @@ const translations = {
     fullDay: "Día completo",
     restrictedJetski: "Motos sin licencia: No disponible de 14:00 a 16:00",
     restrictedBoat: "Barcos sin licencia: No disponible de 14:00 a 16:00 (solo medio día)",
-    unitsAvailable: "unidades disponibles",
+    vehiclesAvailable: "vehículos disponibles",
+    vehicleAvailable: "vehículo disponible",
     halfDay: "Medio día",
-    halfHour: "Media hora",
-    byHours: "Por horas",
+    halfHour: "30 minutos",
+    oneHour: "1 hora",
+    twoHours: "2 horas",
+    fourHours: "4 horas",
   },
   en: {
     selectDuration: "Select duration",
@@ -88,10 +92,13 @@ const translations = {
     fullDay: "Full day",
     restrictedJetski: "Jet skis without license: Not available from 14:00 to 16:00",
     restrictedBoat: "Boats without license: Not available from 14:00 to 16:00 (half-day only)",
-    unitsAvailable: "units available",
+    vehiclesAvailable: "vehicles available",
+    vehicleAvailable: "vehicle available",
     halfDay: "Half day",
-    halfHour: "Half hour",
-    byHours: "By hours",
+    halfHour: "30 minutes",
+    oneHour: "1 hour",
+    twoHours: "2 hours",
+    fourHours: "4 hours",
   },
 }
 
@@ -133,9 +140,6 @@ export function TimePicker({
     setError(null)
 
     try {
-      // Verificar que vehicleId sea válido
-      console.log("🔍 Verificando vehicleId:", vehicleId, typeof vehicleId)
-
       if (!vehicleId || isNaN(Number(vehicleId))) {
         console.error("❌ vehicleId inválido:", vehicleId)
         setError("ID de vehículo inválido")
@@ -143,22 +147,17 @@ export function TimePicker({
         return
       }
 
-      // Formatear la fecha correctamente (YYYY-MM-DD)
       const formattedDate = selectedDate.includes("T") ? selectedDate.split("T")[0] : selectedDate
 
-      // Añadir logs para depuración
       console.log(`🔍 Solicitando slots:`)
-      console.log(`   - Vehicle ID: ${vehicleId} (tipo: ${typeof vehicleId})`)
+      console.log(`   - Vehicle ID: ${vehicleId}`)
       console.log(`   - Fecha: ${formattedDate}`)
       console.log(`   - Tipo de duración: ${selectedDurationType}`)
 
-      // ✅ CORRECTO: Usar la ruta con [id] no [vehicleId]
       const url = `/api/availability/${vehicleId}/slots?date=${encodeURIComponent(formattedDate)}&durationType=${encodeURIComponent(selectedDurationType)}`
       console.log(`🌐 URL completa: ${url}`)
 
       const response = await fetch(url)
-
-      console.log(`🔄 Respuesta: ${response.status} ${response.statusText}`)
 
       if (response.ok) {
         const data = await response.json()
@@ -190,7 +189,6 @@ export function TimePicker({
       price: slot.price,
     })
 
-    // ✅ Scroll automático al botón "Siguiente" después de seleccionar
     setTimeout(() => {
       if (nextButtonRef?.current) {
         nextButtonRef.current.scrollIntoView({
@@ -199,13 +197,12 @@ export function TimePicker({
           inline: "nearest",
         })
       } else {
-        // Fallback: scroll hacia abajo si no hay referencia
         window.scrollBy({
           top: 300,
           behavior: "smooth",
         })
       }
-    }, 100) // Pequeño delay para asegurar que el estado se actualice
+    }, 100)
   }
 
   const getSpainTime = (): Date => {
@@ -227,85 +224,98 @@ export function TimePicker({
     return availableSlots.filter((slot) => {
       if (!slot.available || slot.restricted) return false
 
-      // Si no es hoy, mostrar todos los slots disponibles
       if (!isSelectedDateToday) return true
 
-      // Para el día de hoy, solo bloquear slots que YA HAN EMPEZADO
       const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
       const slotStartTimeInMinutes = slotHours * 60 + slotMinutes
       const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
-
-      console.log(`🕐 Slot ${slot.time}: ${slotStartTimeInMinutes} min vs Current: ${currentTimeInMinutes} min`)
 
       return slotStartTimeInMinutes >= currentTimeInMinutes
     })
   }
 
-  const getSlotLabel = (slot: TimeSlot) => {
-    let label = `${slot.time} - ${slot.endTime}`
-
-    // Añadir información de stock si está disponible
-    if (slot.availableUnits !== undefined && slot.totalUnits !== undefined) {
-      if (slot.totalUnits > 1) {
-        label += ` (${slot.availableUnits} ${t.unitsAvailable})`
-      }
-    }
-
-    return label
-  }
-
   const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
 
-  // ✅ ARREGLADO: Mejor categorización para motos de agua
-  const durationTypes = []
+  // ✅ ARREGLADO: Opciones individuales para motos con licencia
+  const getDurationOptions = (): DurationOption[] => {
+    const options: DurationOption[] = []
 
-  // Para barcos
-  if (vehicle.type === "boat") {
-    const halfdayOptions = pricingOptions.filter((p) => p.duration.startsWith("halfday"))
-    const fulldayOptions = pricingOptions.filter((p) => p.duration.startsWith("fullday"))
+    if (vehicle.type === "boat") {
+      // Para barcos: agrupar por tipo
+      const halfdayOptions = pricingOptions.filter((p) => p.duration.startsWith("halfday"))
+      const fulldayOptions = pricingOptions.filter((p) => p.duration.startsWith("fullday"))
 
-    if (halfdayOptions.length > 0) {
-      durationTypes.push({
-        key: "halfday",
-        label: t.halfDay,
-        options: halfdayOptions,
+      if (halfdayOptions.length > 0) {
+        const minPrice = Math.min(...halfdayOptions.map((o) => o.price))
+        options.push({
+          key: "halfday",
+          label: t.halfDay,
+          description: `${halfdayOptions.length} opciones`,
+          price: minPrice,
+        })
+      }
+
+      if (fulldayOptions.length > 0) {
+        const minPrice = Math.min(...fulldayOptions.map((o) => o.price))
+        options.push({
+          key: "fullday",
+          label: t.fullDay,
+          description: "11 horas de aventura",
+          price: minPrice,
+        })
+      }
+    } else if (vehicle.type === "jetski") {
+      // ✅ ARREGLADO: Para motos, mostrar opciones individuales
+      const durationMap = {
+        "30min": { label: t.halfHour, description: "Diversión rápida" },
+        "1hour": { label: t.oneHour, description: "Experiencia completa" },
+        "2hour": { label: t.twoHours, description: "Aventura extendida" },
+        "4hour": { label: t.fourHours, description: "Medio día de diversión" },
+        halfday: { label: t.halfDay, description: "4 horas de aventura" },
+        fullday: { label: t.fullDay, description: "Día completo de diversión" },
+      }
+
+      // Crear una opción por cada duración disponible
+      pricingOptions.forEach((pricing) => {
+        const durationInfo = durationMap[pricing.duration as keyof typeof durationMap]
+        if (durationInfo) {
+          options.push({
+            key: pricing.duration,
+            label: durationInfo.label,
+            description: durationInfo.description,
+            price: pricing.price,
+          })
+        }
       })
     }
 
-    if (fulldayOptions.length > 0) {
-      durationTypes.push({
-        key: "fullday",
-        label: t.fullDay,
-        options: fulldayOptions,
-      })
+    return options
+  }
+
+  const durationOptions = getDurationOptions()
+
+  // ✅ ARREGLADO: Mejor información de stock
+  const getStockInfo = (slot: TimeSlot) => {
+    if (slot.availableUnits === undefined || slot.totalUnits === undefined) {
+      return null
+    }
+
+    if (slot.totalUnits <= 1) {
+      return null // No mostrar stock si solo hay 1 unidad total
+    }
+
+    const available = slot.availableUnits
+    const total = slot.totalUnits
+
+    if (available === 0) {
+      return { text: "Sin stock", color: "text-red-600", icon: "❌" }
+    } else if (available === 1) {
+      return { text: `${available} ${t.vehicleAvailable}`, color: "text-orange-600", icon: "⚠️" }
+    } else {
+      return { text: `${available} ${t.vehiclesAvailable}`, color: "text-green-600", icon: "✅" }
     }
   }
 
-  // Para motos de agua
-  if (vehicle.type === "jetski") {
-    const halfHourOptions = pricingOptions.filter((p) => p.duration === "30min")
-    const hourlyOptions = pricingOptions.filter(
-      (p) => p.duration !== "30min" && !p.duration.startsWith("halfday") && !p.duration.startsWith("fullday"),
-    )
-
-    if (halfHourOptions.length > 0) {
-      durationTypes.push({
-        key: "30min",
-        label: t.halfHour,
-        options: halfHourOptions,
-      })
-    }
-
-    if (hourlyOptions.length > 0) {
-      durationTypes.push({
-        key: "hourly",
-        label: t.byHours,
-        options: hourlyOptions,
-      })
-    }
-  }
-
-  // Función para obtener el mensaje de restricción apropiado
   const getRestrictionMessage = () => {
     if (vehicleCategory === "jetski_no_license") {
       return t.restrictedJetski
@@ -317,20 +327,20 @@ export function TimePicker({
 
   return (
     <div className="space-y-6">
-      {/* Duration Type Selection */}
+      {/* ✅ MEJORADO: Selección de duración más clara */}
       <Card className="bg-white border border-gray-200">
         <CardContent className="p-6">
           <h4 className="text-lg font-semibold text-black mb-4">{t.selectDuration}</h4>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {durationTypes.map((type) => (
+            {durationOptions.map((option) => (
               <button
-                key={type.key}
-                onClick={() => setSelectedDurationType(type.key)}
+                key={option.key}
+                onClick={() => setSelectedDurationType(option.key)}
                 className={`
                   p-4 rounded-lg border-2 transition-all duration-200 text-left
                   ${
-                    selectedDurationType === type.key
+                    selectedDurationType === option.key
                       ? "border-gold bg-gold/10"
                       : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
                   }
@@ -338,11 +348,11 @@ export function TimePicker({
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-semibold text-black">{type.label}</div>
-                    <div className="text-sm text-gray-600">{type.options.length} opciones</div>
+                    <div className="font-semibold text-black">{option.label}</div>
+                    <div className="text-sm text-gray-600">{option.description}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-gold">Desde €{Math.min(...type.options.map((o) => o.price))}</div>
+                    <div className="text-xl font-bold text-gold">€{option.price}</div>
                   </div>
                 </div>
               </button>
@@ -351,7 +361,7 @@ export function TimePicker({
         </CardContent>
       </Card>
 
-      {/* Información de restricciones para vehículos sin licencia */}
+      {/* Información de restricciones */}
       {(vehicleCategory === "jetski_no_license" || vehicleCategory === "boat_no_license") && (
         <Card className="bg-orange-50 border border-orange-200">
           <CardContent className="p-4">
@@ -366,7 +376,7 @@ export function TimePicker({
         </Card>
       )}
 
-      {/* Time Slots */}
+      {/* ✅ MEJORADO: Slots de tiempo con mejor UI */}
       {selectedDurationType ? (
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-6">
@@ -401,6 +411,7 @@ export function TimePicker({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {getFilteredSlots().map((slot, index) => {
                       const isSelected = selectedTime?.start === slot.time && selectedTime?.duration === slot.duration
+                      const stockInfo = getStockInfo(slot)
 
                       return (
                         <Button
@@ -408,7 +419,7 @@ export function TimePicker({
                           variant={isSelected ? "default" : "outline"}
                           onClick={() => handleTimeSlotClick(slot)}
                           className={`
-                            h-auto p-4 flex flex-col items-center justify-center min-h-[100px]
+                            h-auto p-4 flex flex-col items-center justify-center min-h-[120px]
                             ${
                               isSelected
                                 ? "bg-gold text-black hover:bg-gold/90"
@@ -416,17 +427,29 @@ export function TimePicker({
                             }
                           `}
                         >
-                          <div className="font-semibold text-center mb-2">{getSlotLabel(slot)}</div>
-                          <div className="text-sm opacity-75">€{slot.price}</div>
-                          {slot.availableUnits !== undefined &&
-                            slot.totalUnits !== undefined &&
-                            slot.totalUnits > 1 && (
-                              <div className="flex items-center mt-1 text-xs">
-                                <Users className="h-3 w-3 mr-1" />
-                                {slot.availableUnits}/{slot.totalUnits}
-                              </div>
-                            )}
-                          {isSelected && <Badge className="mt-2 bg-black text-white text-xs">{t.selected}</Badge>}
+                          {/* Horario */}
+                          <div className="font-semibold text-center mb-2">
+                            {slot.time} - {slot.endTime}
+                          </div>
+
+                          {/* Precio */}
+                          <div className="text-lg font-bold text-gold mb-2">€{slot.price}</div>
+
+                          {/* ✅ MEJORADO: Información de stock más clara */}
+                          {stockInfo && (
+                            <div className={`text-xs flex items-center ${stockInfo.color}`}>
+                              <Package className="h-3 w-3 mr-1" />
+                              {stockInfo.text}
+                            </div>
+                          )}
+
+                          {/* Badge de seleccionado */}
+                          {isSelected && (
+                            <Badge className="mt-2 bg-black text-white text-xs flex items-center">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              {t.selected}
+                            </Badge>
+                          )}
                         </Button>
                       )
                     })}
