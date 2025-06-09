@@ -2,6 +2,313 @@ import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 
+// ✅ FUNCIÓN CORREGIDA: Generar slots con verificación ESTRICTA de solapamientos entre TODAS las duraciones
+function generateSlotsWithStrictStock(
+  pricing: any[],
+  existingBookings: any[],
+  date: string,
+  durationType: string | null,
+  vehicleStock: number,
+  vehicleType: string,
+  requiresLicense: boolean,
+) {
+  // Verificar que pricing es un array válido
+  if (!Array.isArray(pricing)) {
+    console.log("❌ ERROR: pricing no es un array:", typeof pricing)
+    return []
+  }
+
+  console.log("✅ Pricing verificado como array con", pricing.length, "elementos")
+
+  console.log("🔧 GENERANDO SLOTS con verificación ESTRICTA de solapamientos")
+  console.log("📦 Stock total del vehículo:", vehicleStock)
+  console.log("🎯 Filtro de duración:", durationType)
+  console.log("🔑 Requiere licencia:", requiresLicense)
+  console.log("📋 Reservas existentes:", existingBookings.length)
+
+  // Mostrar todas las reservas existentes para debugging
+  console.log("📋 RESERVAS EXISTENTES DETALLADAS:")
+  existingBookings.forEach((booking, index) => {
+    console.log(
+      `   ${index + 1}. ${booking.customer_name || "Sin nombre"}: ${booking.start_time}-${booking.end_time} (${booking.duration || "Sin duración"})`,
+    )
+  })
+
+  const slots = []
+  const workStart = 10 * 60 // 10:00 AM
+  const workEnd = 21 * 60 // 9:00 PM
+
+  // ✅ RESTRICCIÓN HORARIA: Motos sin licencia solo de 14:00 a 16:00
+  const restrictedStart = 14 * 60 // 14:00
+  const restrictedEnd = 16 * 60 // 16:00
+
+  // Filtrar pricing por tipo de duración
+  let relevantPricing = pricing
+  if (durationType) {
+    console.log("🔍 Filtrando pricing por durationType:", durationType)
+
+    if (durationType === "halfday") {
+      relevantPricing = pricing.filter((p) => p.duration.startsWith("halfday"))
+    } else if (durationType === "fullday") {
+      relevantPricing = pricing.filter((p) => p.duration.startsWith("fullday"))
+    } else if (durationType === "30min") {
+      relevantPricing = pricing.filter((p) => p.duration === "30min")
+    } else if (durationType === "hourly") {
+      relevantPricing = pricing.filter(
+        (p) => p.duration !== "30min" && !p.duration.startsWith("halfday") && !p.duration.startsWith("fullday"),
+      )
+    } else {
+      relevantPricing = pricing.filter((p) => p.duration === durationType)
+    }
+  }
+
+  console.log(`⏱️ Procesando ${relevantPricing.length} opciones de pricing para tipo: ${durationType}`)
+
+  // ✅ FUNCIÓN AUXILIAR: Verificar solapamientos con TODAS las reservas existentes
+  function checkSlotAvailability(
+    startTime: string,
+    endTime: string,
+  ): {
+    available: boolean
+    availableUnits: number
+    conflicts: string[]
+  } {
+    const startMinutes = timeToMinutes(startTime)
+    const endMinutes = timeToMinutes(endTime)
+
+    console.log(`🔍 Verificando disponibilidad para ${startTime}-${endTime}`)
+
+    // Contar solapamientos con TODAS las reservas existentes
+    const overlappingBookings = existingBookings.filter((booking) => {
+      const bookingStart = timeToMinutes(booking.start_time)
+      const bookingEnd = timeToMinutes(booking.end_time)
+
+      // ✅ DETECCIÓN CORRECTA DE SOLAPAMIENTOS
+      const overlaps = startMinutes < bookingEnd && endMinutes > bookingStart
+
+      if (overlaps) {
+        console.log(
+          `   🚫 SOLAPAMIENTO: ${startTime}-${endTime} solapa con ${booking.start_time}-${booking.end_time} (${booking.customer_name}, ${booking.duration})`,
+        )
+      }
+
+      return overlaps
+    })
+
+    const usedStock = overlappingBookings.length
+    const availableUnits = Math.max(0, vehicleStock - usedStock)
+    const conflicts = overlappingBookings.map(
+      (b) => `${b.customer_name}: ${b.start_time}-${b.end_time} (${b.duration})`,
+    )
+
+    console.log(`   📊 Stock usado: ${usedStock}/${vehicleStock}, Disponible: ${availableUnits}`)
+
+    return {
+      available: availableUnits > 0,
+      availableUnits,
+      conflicts,
+    }
+  }
+
+  // Generar slots para cada opción de pricing
+  for (const option of relevantPricing) {
+    if (!option || !option.duration) continue
+
+    const duration = getDuration(option.duration)
+    console.log(`⏱️ Procesando ${option.label}: ${duration} min`)
+
+    // Para barcos, usar horarios específicos basados en la duración
+    if (vehicleType === "boat") {
+      if (option.duration.startsWith("halfday")) {
+        // Extraer horario específico del duration (ej: "halfday_10_14" -> 10:00-14:00)
+        const match = option.duration.match(/halfday_(\d+)_(\d+)/)
+        if (match) {
+          const startHour = Number.parseInt(match[1])
+          const endHour = Number.parseInt(match[2])
+          const startTime = `${startHour.toString().padStart(2, "0")}:00`
+          const endTime = `${endHour.toString().padStart(2, "0")}:00`
+
+          // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
+          const availability = checkSlotAvailability(startTime, endTime)
+
+          console.log(`🚤 BARCO MEDIO DÍA: ${startTime}-${endTime}`)
+          console.log(`   Disponible: ${availability.available}, Unidades: ${availability.availableUnits}`)
+
+          // Solo añadir si no es pasado y hay unidades disponibles
+          if (!isInPast(startHour * 60, date) && availability.available) {
+            slots.push({
+              time: startTime,
+              endTime: endTime,
+              duration: option.duration,
+              label: option.label,
+              price: option.price,
+              available: true,
+              availableUnits: availability.availableUnits,
+              totalUnits: vehicleStock,
+              type: "halfday",
+              conflicts: availability.conflicts,
+            })
+            console.log(
+              `✅ BARCO MEDIO DÍA AÑADIDO: ${startTime}-${endTime} - Disponible: ${availability.availableUnits}`,
+            )
+          } else {
+            console.log(
+              `❌ BARCO MEDIO DÍA BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(startHour * 60, date)}, Disponible: ${availability.available}`,
+            )
+          }
+        }
+      } else if (option.duration.startsWith("fullday")) {
+        // ✅ CRÍTICO: Día completo 10:00-21:00
+        const startTime = "10:00"
+        const endTime = "21:00"
+
+        // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
+        const availability = checkSlotAvailability(startTime, endTime)
+
+        console.log(`🚤 BARCO DÍA COMPLETO: ${startTime}-${endTime}`)
+        console.log(`   Disponible: ${availability.available}, Unidades: ${availability.availableUnits}`)
+
+        if (!isInPast(10 * 60, date) && availability.available) {
+          slots.push({
+            time: startTime,
+            endTime: endTime,
+            duration: option.duration,
+            label: option.label,
+            price: option.price,
+            available: true,
+            availableUnits: availability.availableUnits,
+            totalUnits: vehicleStock,
+            type: "fullday",
+            conflicts: availability.conflicts,
+          })
+          console.log(
+            `✅ BARCO DÍA COMPLETO AÑADIDO: ${startTime}-${endTime} - Disponible: ${availability.availableUnits}`,
+          )
+        } else {
+          console.log(
+            `❌ BARCO DÍA COMPLETO BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(10 * 60, date)}, Disponible: ${availability.available}`,
+          )
+        }
+      }
+    } else {
+      // Para motos de agua, generar slots cada 30 minutos
+      console.log(`🏍️ Generando slots de jetski para ${option.duration} (${duration} min)`)
+
+      for (let start = workStart; start + duration <= workEnd; start += 30) {
+        const end = start + duration
+        const startTime = minutesToTime(start)
+        const endTime = minutesToTime(end)
+
+        // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
+        const availability = checkSlotAvailability(startTime, endTime)
+
+        // ✅ RESTRICCIÓN para motos SIN licencia (no pueden reservar de 14:00 a 16:00)
+        let isRestricted = false
+        if (vehicleType === "jetski" && !requiresLicense) {
+          // Verificar si el slot se solapa con el horario restringido (14:00-16:00)
+          if (start < restrictedEnd && end > restrictedStart) {
+            isRestricted = true
+            console.log(`🚫 JETSKI SIN LICENCIA RESTRINGIDO: ${startTime}-${endTime} (solapa con 14:00-16:00)`)
+          }
+        }
+
+        // Verificar si es pasado y si está disponible
+        if (!isInPast(start, date) && availability.available && !isRestricted) {
+          slots.push({
+            time: startTime,
+            endTime: endTime,
+            duration: option.duration,
+            label: option.label,
+            price: option.price,
+            available: true,
+            availableUnits: availability.availableUnits,
+            totalUnits: vehicleStock,
+            type: "regular",
+            conflicts: availability.conflicts,
+          })
+          console.log(
+            `✅ JETSKI SLOT AÑADIDO: ${startTime}-${endTime} (${option.duration}) - Disponible: ${availability.availableUnits}`,
+          )
+        } else {
+          const reason = isRestricted
+            ? "Horario restringido"
+            : isInPast(start, date)
+              ? "Hora pasada"
+              : "Sin stock disponible"
+          console.log(
+            `❌ JETSKI SLOT BLOQUEADO: ${startTime}-${endTime} - Razón: ${reason}, Disponible: ${availability.available}`,
+          )
+        }
+      }
+    }
+  }
+
+  // Ordenar por hora
+  slots.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time))
+
+  console.log("✅ SLOTS FINALES DISPONIBLES con VERIFICACIÓN ESTRICTA para fecha", date, ":")
+  slots.forEach((slot, index) => {
+    console.log(
+      `  ${index + 1}. ${slot.time}-${slot.endTime} (${slot.duration}) - €${slot.price} - Stock: ${slot.availableUnits}/${slot.totalUnits}`,
+    )
+    if (slot.conflicts && slot.conflicts.length > 0) {
+      console.log(`      Conflictos detectados: ${slot.conflicts.join(", ")}`)
+    }
+  })
+
+  return slots
+}
+
+function minutesToTime(minutes: number) {
+  const hour = Math.floor(minutes / 60)
+  const minute = minutes % 60
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+}
+
+function timeToMinutes(time: string) {
+  const [hour, minute] = time.split(":")
+  return Number.parseInt(hour) * 60 + Number.parseInt(minute)
+}
+
+function isInPast(timeInMinutes: number, date: string) {
+  const now = new Date()
+  const [year, month, day] = date.split("-").map(Number)
+  const bookingDate = new Date(year, month - 1, day) // Month is 0-indexed
+
+  // Set booking date to the time provided in minutes
+  bookingDate.setHours(Math.floor(timeInMinutes / 60), timeInMinutes % 60, 0, 0)
+
+  // If the booking date is in the past, return true
+  return bookingDate < now
+}
+
+function getDuration(durationString: string) {
+  if (durationString === "30min") {
+    return 30
+  } else if (durationString === "1hr") {
+    return 60
+  } else if (durationString === "2hr") {
+    return 120
+  } else if (durationString === "3hr") {
+    return 180
+  } else if (durationString === "4hr") {
+    return 240
+  } else if (durationString === "fullday") {
+    return 660 // 11 hours
+  } else if (durationString.startsWith("halfday")) {
+    return 240 // 4 hours
+  }
+  return 60 // Default to 1 hour
+}
+
+function normalizeTime(time: string) {
+  if (!time) return "00:00"
+  const [hour, minute] = time.split(":")
+  const normalizedHour = hour.padStart(2, "0")
+  const normalizedMinute = minute.padStart(2, "0")
+  return `${normalizedHour}:${normalizedMinute}`
+}
+
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     console.log("🚀 Availability API started with FIXED STOCK support")
@@ -10,7 +317,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const date = searchParams.get("date")
     const durationType = searchParams.get("durationType")
 
-    const vehicleId = params.id
+    const vehicleId = (await params).id
 
     if (!vehicleId || !date) {
       console.log("❌ Missing required parameters")
@@ -43,16 +350,46 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       vehicle = vehicleQuery[0]
       console.log("✅ Vehicle found:", vehicle.name, "Stock:", vehicle.stock || 1)
 
-      // Parsear pricing
-      if (typeof vehicle.pricing === "string") {
-        try {
-          vehicle.pricing = JSON.parse(vehicle.pricing) as any[]
-          console.log("✅ Pricing parsed, options:", (vehicle.pricing as any[]).length)
-        } catch (e) {
-          console.log("⚠️ Error parsing pricing, using defaults")
-          vehicle.pricing = []
+      // Parsear pricing correctamente
+      let pricing = []
+      try {
+        if (typeof vehicle.pricing === "string") {
+          pricing = JSON.parse(vehicle.pricing)
+        } else if (Array.isArray(vehicle.pricing)) {
+          pricing = vehicle.pricing
+        } else if (vehicle.pricing && typeof vehicle.pricing === "object") {
+          // Si es un objeto, convertirlo a array
+          pricing = Object.values(vehicle.pricing)
+        }
+
+        console.log("✅ Pricing parsed successfully:", pricing.length, "options")
+        console.log("📋 Pricing data:", JSON.stringify(pricing, null, 2))
+      } catch (e) {
+        console.log("⚠️ Error parsing pricing:", e)
+        pricing = []
+      }
+
+      // Verificar que pricing es un array antes de continuar
+      if (!Array.isArray(pricing)) {
+        console.log("❌ Pricing is not an array, converting...")
+        pricing = []
+      }
+
+      // Filtrar pricing por tipo de duración si se especifica
+      let relevantPricing = pricing
+      if (durationType) {
+        console.log("🔍 Filtering pricing by durationType:", durationType)
+
+        if (durationType === "halfday") {
+          relevantPricing = pricing.filter((p) => p.duration.startsWith("halfday"))
+        } else if (durationType === "fullday") {
+          relevantPricing = pricing.filter((p) => p.duration.startsWith("fullday"))
+        } else {
+          relevantPricing = pricing.filter((p) => p.duration === durationType)
         }
       }
+
+      console.log(`⏱️ Found ${relevantPricing.length} pricing options for type: ${durationType}`)
 
       // ✅ CRÍTICO: Obtener reservas CONFIRMADAS para la fecha específica
       console.log(`📅 Fetching CONFIRMED bookings for vehicle ${vehicleId} on ${date}...`)
@@ -66,11 +403,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           duration,
           status,
           created_at,
-          booking_date
+          booking_date,
+          time_slot
         FROM bookings 
         WHERE vehicle_id = ${vehicleId} 
         AND booking_date = ${date}
-        AND status IN ('confirmed', 'pending')
+        AND status IN ('confirmed', 'pending', 'completed')
         ORDER BY start_time ASC
       `)
 
@@ -102,12 +440,23 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ slots: [] })
     }
 
-    // ✅ ARREGLADO: Generar slots con verificación ESTRICTA de stock
-    console.log("⚙️ Generating slots with STRICT STOCK verification for date:", date)
-    console.log("📦 Vehicle stock:", vehicle.stock || 1)
+    // Contar reservas por slot
+    const bookingCounts = new Map()
+    for (const booking of existingBookings) {
+      const slotKey = booking.time_slot
+      const currentCount = bookingCounts.get(slotKey) || 0
+      bookingCounts.set(slotKey, currentCount + 1)
+    }
 
-    const slots = generateSlotsWithStrictStock(
-      vehicle.pricing as any[],
+    // ✅ ARREGLADO: Generar slots con restricciones de licencia
+    const availableSlots = generateSlotsWithStrictStock(
+      (Array.isArray(vehicle.pricing)
+        ? vehicle.pricing
+        : typeof vehicle.pricing === "string"
+        ? (() => { try { return JSON.parse(vehicle.pricing); } catch { return []; } })()
+        : vehicle.pricing && typeof vehicle.pricing === "object"
+        ? Object.values(vehicle.pricing)
+        : []),
       existingBookings,
       date,
       durationType,
@@ -116,12 +465,25 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       Boolean(vehicle.requires_license),
     )
 
-    console.log("✅ Generated slots with strict stock:", slots.length)
+    console.log("✅ Generated available slots:", availableSlots.length)
+
+    // Determinar categoría del vehículo para el frontend
+    let vehicleCategory = vehicle.type
+    if (vehicle.type === "jetski") {
+      vehicleCategory = vehicle.requires_license ? "jetski_license" : "jetski_no_license"
+    } else if (vehicle.type === "boat") {
+      vehicleCategory = vehicle.requires_license ? "boat_license" : "boat_no_license"
+    }
 
     return NextResponse.json({
-      slots: slots,
-      vehicleType: vehicle.type,
-      vehicleCategory: getVehicleCategory(vehicle.type as string, Boolean(vehicle.requires_license)),
+      slots: availableSlots,
+      vehicleInfo: {
+        name: vehicle.name,
+        type: vehicle.type,
+        stock: vehicle.stock || 1,
+        requiresLicense: Boolean(vehicle.requires_license),
+      },
+      vehicleCategory: vehicleCategory,
       debug: {
         vehicleName: vehicle.name,
         vehicleStock: vehicle.stock || 1,
@@ -145,280 +507,5 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       },
       { status: 500 },
     )
-  }
-}
-
-function getVehicleCategory(type: string, requiresLicense: boolean): string {
-  if (type === "jetski") {
-    return requiresLicense ? "jetski_license" : "jetski_no_license"
-  } else if (type === "boat") {
-    return requiresLicense ? "boat_license" : "boat_no_license"
-  }
-  return "unknown"
-}
-
-// ✅ FUNCIÓN PARA NORMALIZAR TIEMPO (quitar segundos)
-function normalizeTime(timeStr: string): string {
-  if (!timeStr) return ""
-
-  // Si tiene formato "HH:MM:SS", convertir a "HH:MM"
-  if (timeStr.includes(":") && timeStr.split(":").length === 3) {
-    const parts = timeStr.split(":")
-    return `${parts[0]}:${parts[1]}`
-  }
-
-  // Si ya tiene formato "HH:MM", devolverlo tal como está
-  return timeStr
-}
-
-function generateSlotsWithStrictStock(
-  pricing: any[],
-  existingBookings: any[],
-  date: string,
-  durationType: string | null,
-  vehicleStock: number,
-  vehicleType: string,
-  requiresLicense: boolean,
-) {
-  console.log("🔧 Generating slots with STRICT STOCK verification for date:", date)
-  console.log("📦 Total vehicle stock:", vehicleStock)
-  console.log("🎯 Duration type filter:", durationType)
-
-  const slots = []
-  const workStart = 10 * 60 // 10:00 AM
-  const workEnd = 21 * 60 // 9:00 PM
-
-  // Filtrar pricing por tipo de duración
-  let relevantPricing = pricing
-  if (durationType) {
-    console.log("🔍 Filtering pricing by durationType:", durationType)
-
-    if (durationType === "halfday") {
-      relevantPricing = pricing.filter((p) => p.duration.startsWith("halfday"))
-    } else if (durationType === "fullday") {
-      relevantPricing = pricing.filter((p) => p.duration.startsWith("fullday"))
-    } else if (durationType === "30min") {
-      relevantPricing = pricing.filter((p) => p.duration === "30min")
-    } else if (durationType === "hourly") {
-      relevantPricing = pricing.filter(
-        (p) => p.duration !== "30min" && !p.duration.startsWith("halfday") && !p.duration.startsWith("fullday"),
-      )
-    } else {
-      relevantPricing = pricing.filter((p) => p.duration === durationType)
-    }
-  }
-
-  console.log(`⏱️ Processing ${relevantPricing.length} pricing options for type: ${durationType}`)
-
-  // ✅ CRÍTICO: Contar reservas por slot EXACTO con NORMALIZACIÓN DE TIEMPO
-  const bookingCounts = new Map<string, number>()
-
-  for (const booking of existingBookings) {
-    // ✅ ARREGLADO: Normalizar tiempos para que coincidan las claves
-    const normalizedStartTime = normalizeTime(booking.start_time)
-    const normalizedEndTime = normalizeTime(booking.end_time)
-    const slotKey = `${normalizedStartTime}-${normalizedEndTime}`
-
-    const currentCount = bookingCounts.get(slotKey) || 0
-    bookingCounts.set(slotKey, currentCount + 1)
-
-    console.log(
-      `📊 STRICT: Booking count for slot ${slotKey}: ${currentCount + 1} (normalized from ${booking.start_time}-${booking.end_time})`,
-    )
-  }
-
-  console.log("📋 All booking counts (normalized):")
-  for (const [slot, count] of bookingCounts.entries()) {
-    console.log(`   - ${slot}: ${count} reservas`)
-  }
-
-  // Generar slots para cada opción de pricing
-  for (const option of relevantPricing) {
-    if (!option || !option.duration) continue
-
-    const duration = getDuration(option.duration)
-    console.log(`⏱️ Processing ${option.label}: ${duration} min`)
-
-    // Para barcos, usar horarios específicos basados en la duración
-    if (vehicleType === "boat") {
-      if (option.duration.startsWith("halfday")) {
-        // Extraer horario específico del duration (ej: "halfday_10_14" -> 10:00-14:00)
-        const match = option.duration.match(/halfday_(\d+)_(\d+)/)
-        if (match) {
-          const startHour = Number.parseInt(match[1])
-          const endHour = Number.parseInt(match[2])
-          const startTime = `${startHour.toString().padStart(2, "0")}:00`
-          const endTime = `${endHour.toString().padStart(2, "0")}:00`
-
-          const slotKey = `${startTime}-${endTime}`
-          const bookingsForSlot = bookingCounts.get(slotKey) || 0
-          const availableUnits = Math.max(0, vehicleStock - bookingsForSlot)
-
-          console.log(
-            `🚤 BOAT HALFDAY: ${slotKey} - Bookings: ${bookingsForSlot}, Stock: ${vehicleStock}, Available: ${availableUnits}`,
-          )
-
-          // Solo añadir si no es pasado y hay unidades disponibles
-          if (!isInPast(startHour * 60, date) && availableUnits > 0) {
-            slots.push({
-              time: startTime,
-              endTime: endTime,
-              duration: option.duration,
-              label: option.label,
-              price: option.price,
-              available: true,
-              availableUnits: availableUnits,
-              totalUnits: vehicleStock,
-              type: "halfday",
-            })
-            console.log(`✅ BOAT HALFDAY SLOT ADDED: ${startTime}-${endTime} - Available: ${availableUnits}`)
-          } else {
-            console.log(
-              `❌ BOAT HALFDAY SLOT BLOCKED: ${startTime}-${endTime} - Past: ${isInPast(startHour * 60, date)}, Available: ${availableUnits}`,
-            )
-          }
-        }
-      } else if (option.duration.startsWith("fullday")) {
-        // ✅ CRÍTICO: Día completo 10:00-21:00
-        const startTime = "10:00"
-        const endTime = "21:00"
-        const slotKey = `${startTime}-${endTime}`
-        const bookingsForSlot = bookingCounts.get(slotKey) || 0
-        const availableUnits = Math.max(0, vehicleStock - bookingsForSlot)
-
-        console.log(
-          `🚤 BOAT FULLDAY: ${slotKey} - Bookings: ${bookingsForSlot}, Stock: ${vehicleStock}, Available: ${availableUnits}`,
-        )
-
-        if (!isInPast(10 * 60, date) && availableUnits > 0) {
-          slots.push({
-            time: startTime,
-            endTime: endTime,
-            duration: option.duration,
-            label: option.label,
-            price: option.price,
-            available: true,
-            availableUnits: availableUnits,
-            totalUnits: vehicleStock,
-            type: "fullday",
-          })
-          console.log(`✅ BOAT FULLDAY SLOT ADDED: ${startTime}-${endTime} - Available: ${availableUnits}`)
-        } else {
-          console.log(
-            `❌ BOAT FULLDAY SLOT BLOCKED: ${startTime}-${endTime} - Past: ${isInPast(10 * 60, date)}, Available: ${availableUnits}`,
-          )
-        }
-      }
-    } else {
-      // Para motos de agua, generar slots cada 30 minutos
-      console.log(`🏍️ Generating jetski slots for ${option.duration} (${duration} min)`)
-
-      for (let start = workStart; start + duration <= workEnd; start += 30) {
-        const end = start + duration
-        const startTime = minutesToTime(start)
-        const endTime = minutesToTime(end)
-        const slotKey = `${startTime}-${endTime}`
-
-        const bookingsForSlot = bookingCounts.get(slotKey) || 0
-        const availableUnits = Math.max(0, vehicleStock - bookingsForSlot)
-
-        // Verificar si es pasado
-        if (!isInPast(start, date) && availableUnits > 0) {
-          slots.push({
-            time: startTime,
-            endTime: endTime,
-            duration: option.duration,
-            label: option.label,
-            price: option.price,
-            available: true,
-            availableUnits: availableUnits,
-            totalUnits: vehicleStock,
-            type: "regular",
-          })
-          console.log(
-            `✅ JETSKI SLOT ADDED: ${startTime}-${endTime} (${option.duration}) - Available: ${availableUnits}`,
-          )
-        } else {
-          console.log(
-            `❌ JETSKI SLOT BLOCKED: ${startTime}-${endTime} - Past: ${isInPast(start, date)}, Available: ${availableUnits}`,
-          )
-        }
-      }
-    }
-  }
-
-  // Ordenar por hora
-  slots.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time))
-
-  console.log("✅ FINAL AVAILABLE SLOTS with STRICT STOCK for date", date, ":")
-  slots.forEach((slot, index) => {
-    console.log(
-      `  ${index + 1}. ${slot.time}-${slot.endTime} (${slot.duration}) - €${slot.price} - Stock: ${slot.availableUnits}/${slot.totalUnits}`,
-    )
-  })
-
-  return slots
-}
-
-function timeToMinutes(timeStr: string): number {
-  if (!timeStr || typeof timeStr !== "string") return 0
-
-  try {
-    const parts = timeStr.split(":")
-    if (parts.length !== 2) return 0
-
-    const hours = Number.parseInt(parts[0]) || 0
-    const minutes = Number.parseInt(parts[1]) || 0
-
-    return hours * 60 + minutes
-  } catch {
-    return 0
-  }
-}
-
-function minutesToTime(minutes: number): string {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
-}
-
-function getDuration(duration: string): number {
-  if (!duration) return 30
-
-  const durationMap: Record<string, number> = {
-    "30min": 30,
-    "1hour": 60,
-    "2hour": 120,
-    "3hour": 180,
-    "4hour": 240,
-    halfday: 240,
-    fullday: 660, // 11 horas (10:00-21:00)
-  }
-
-  // Para duraciones específicas de barcos
-  if (duration.startsWith("halfday_")) {
-    return 240 // 4 horas
-  }
-  if (duration.startsWith("fullday_")) {
-    return 660 // 11 horas
-  }
-
-  return durationMap[duration] || 60
-}
-
-function isInPast(slotStart: number, date: string): boolean {
-  try {
-    const now = new Date()
-    const slotDate = new Date(date)
-
-    // Solo verificar si es hoy
-    if (slotDate.toDateString() !== now.toDateString()) {
-      return false
-    }
-
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    return slotStart <= currentMinutes
-  } catch {
-    return false
   }
 }

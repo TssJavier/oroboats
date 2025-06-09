@@ -63,25 +63,29 @@ export function isPastSlot(slotStart: number, selectedDate: string): boolean {
   return isPast
 }
 
-// ✅ NUEVA FUNCIÓN: Verificar disponibilidad de stock
+// ✅ FUNCIÓN CORREGIDA: Verificar disponibilidad de stock con detección de solapamientos entre TODAS las duraciones
 export function checkStockAvailability(
   checkStartTime: string,
   checkEndTime: string,
   existingBookings: ExistingBooking[],
   totalStock: number,
-): { available: boolean; usedStock: number; availableStock: number } {
+): { available: boolean; usedStock: number; availableStock: number; conflicts: string[] } {
   const checkStart = timeToMinutes(checkStartTime)
   const checkEnd = timeToMinutes(checkEndTime)
 
-  console.log(`📦 Verificando stock para slot ${checkStartTime}-${checkEndTime}`)
+  console.log(`📦 VERIFICANDO STOCK para slot ${checkStartTime}-${checkEndTime}`)
   console.log(`📦 Stock total disponible: ${totalStock}`)
+  console.log(`📦 Reservas existentes a verificar: ${existingBookings.length}`)
 
-  // Contar cuántas reservas solapan con este horario
-  const overlappingBookings = existingBookings.filter((booking) => {
+  // ✅ CRÍTICO: Detectar TODOS los solapamientos independientemente de la duración
+  const overlappingBookings = []
+  const conflicts = []
+
+  for (const booking of existingBookings) {
     let bookingStart: string
     let bookingEnd: string
 
-    // Extraer horarios del booking
+    // Extraer horarios del booking (múltiples formatos)
     const timeSlot = booking.time_slot || booking.timeSlot
     if (timeSlot && timeSlot.includes("-")) {
       ;[bookingStart, bookingEnd] = timeSlot.split("-").map((t) => t.trim())
@@ -90,50 +94,73 @@ export function checkStockAvailability(
       bookingEnd = booking.endTime
     } else {
       console.log("⚠️ Booking sin formato válido:", booking)
-      return false
+      continue
     }
 
     // Convertir a minutos para comparación precisa
     const bookingStartMin = timeToMinutes(bookingStart)
     const bookingEndMin = timeToMinutes(bookingEnd)
 
-    // Detectar solapamiento
+    // ✅ DETECCIÓN MEJORADA DE SOLAPAMIENTOS
+    // Dos rangos se solapan si: checkStart < bookingEnd && checkEnd > bookingStart
     const overlaps = checkStart < bookingEndMin && checkEnd > bookingStartMin
 
     if (overlaps) {
       const customerName = booking.customer_name || booking.customerName || "Cliente"
-      console.log(
-        `📦 SOLAPAMIENTO: ${checkStartTime}-${checkEndTime} solapa con ${bookingStart}-${bookingEnd} (${customerName})`,
-      )
-    }
+      const bookingDuration = booking.duration || "Sin duración"
 
-    return overlaps
-  })
+      overlappingBookings.push(booking)
+      conflicts.push(`${customerName}: ${bookingStart}-${bookingEnd} (${bookingDuration})`)
+
+      console.log(`🚫 SOLAPAMIENTO DETECTADO:`)
+      console.log(`   Nuevo slot: ${checkStartTime}-${checkEndTime}`)
+      console.log(`   Reserva existente: ${bookingStart}-${bookingEnd} (${customerName}, ${bookingDuration})`)
+      console.log(`   Minutos: Nuevo [${checkStart}-${checkEnd}] vs Existente [${bookingStartMin}-${bookingEndMin}]`)
+    }
+  }
 
   const usedStock = overlappingBookings.length
-  const availableStock = totalStock - usedStock
+  const availableStock = Math.max(0, totalStock - usedStock)
 
-  console.log(`📦 Stock usado en este horario: ${usedStock}`)
-  console.log(`📦 Stock disponible: ${availableStock}`)
+  console.log(`📦 RESULTADO STOCK:`)
+  console.log(`   - Solapamientos encontrados: ${usedStock}`)
+  console.log(`   - Stock usado: ${usedStock}/${totalStock}`)
+  console.log(`   - Stock disponible: ${availableStock}`)
+  console.log(`   - ¿Disponible?: ${availableStock > 0}`)
+
+  if (conflicts.length > 0) {
+    console.log(`🚫 CONFLICTOS:`)
+    conflicts.forEach((conflict, index) => {
+      console.log(`   ${index + 1}. ${conflict}`)
+    })
+  }
 
   return {
     available: availableStock > 0,
     usedStock,
     availableStock,
+    conflicts, // ✅ NUEVO: Lista de conflictos para debugging
   }
 }
 
-// ✅ FUNCIÓN ACTUALIZADA: Detectar conflictos considerando stock
+// ✅ FUNCIÓN ACTUALIZADA: Detectar conflictos considerando stock y devolver detalles
 export function hasConflict(
   checkStartTime: string,
   checkEndTime: string,
   existingBookings: ExistingBooking[],
   totalStock = 1, // Por defecto 1 unidad (comportamiento anterior)
-): boolean {
+): { hasConflict: boolean; details: any } {
   const stockCheck = checkStockAvailability(checkStartTime, checkEndTime, existingBookings, totalStock)
 
-  // Si hay stock disponible, no hay conflicto
-  return !stockCheck.available
+  return {
+    hasConflict: !stockCheck.available,
+    details: {
+      availableStock: stockCheck.availableStock,
+      usedStock: stockCheck.usedStock,
+      totalStock: totalStock,
+      conflicts: stockCheck.conflicts,
+    },
+  }
 }
 
 // ✅ NUEVA FUNCIÓN: Generar slots específicos para barcos

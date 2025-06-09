@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Obtener vehículo con stock
     const vehicleQuery = await db.execute(sql`
-      SELECT id, name, type, pricing, available, stock
+      SELECT id, name, type, pricing, available, stock, requires_license
       FROM vehicles 
       WHERE id = ${vehicleId}
       LIMIT 1
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const vehicle = vehicleQuery[0]
-    console.log("✅ [ADMIN] Vehicle found:", vehicle.name)
+    console.log("✅ [ADMIN] Vehicle found:", vehicle.name, "Requires license:", vehicle.requires_license)
 
     // Parsear pricing
     let pricing = []
@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
       date,
       typeof vehicle.stock === "number" ? vehicle.stock : 1,
       vehicle.type as string,
+      Boolean(vehicle.requires_license),
     )
 
     return NextResponse.json({
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
         vehicleName: vehicle.name,
         vehicleType: vehicle.type,
         vehicleStock: vehicle.stock || 1,
+        requiresLicense: vehicle.requires_license,
         existingBookings: existingBookings.length,
         bookingsFound: existingBookings.map((b) => `${b.customer_name}: ${b.time_slot} (${b.status})`),
         date: date,
@@ -137,44 +139,78 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ✅ FUNCIÓN AUXILIAR MEJORADA: Verificar solapamientos entre TODAS las duraciones
+function checkSlotConflicts(
+  startTime: string,
+  endTime: string,
+  existingBookings: any[],
+  vehicleStock: number,
+): {
+  available: boolean
+  availableUnits: number
+  conflicts: string[]
+  usedStock: number
+} {
+  const startMinutes = timeToMinutes(startTime)
+  const endMinutes = timeToMinutes(endTime)
+
+  console.log(`🔍 [ADMIN] Verificando conflictos para ${startTime}-${endTime}`)
+
+  // ✅ DETECTAR TODOS LOS SOLAPAMIENTOS independientemente de la duración
+  const overlappingBookings = existingBookings.filter((booking) => {
+    if (!booking.time_slot || !booking.time_slot.includes("-")) {
+      return false
+    }
+
+    const [bookingStart, bookingEnd] = booking.time_slot.split("-").map((t: string) => t.trim())
+    const bookingStartMin = timeToMinutes(bookingStart)
+    const bookingEndMin = timeToMinutes(bookingEnd)
+
+    // ✅ DETECCIÓN CORRECTA DE SOLAPAMIENTOS
+    const overlaps = startMinutes < bookingEndMin && endMinutes > bookingStartMin
+
+    if (overlaps) {
+      console.log(
+        `   🚫 [ADMIN] SOLAPAMIENTO: ${startTime}-${endTime} solapa con ${bookingStart}-${bookingEnd} (${booking.customer_name})`,
+      )
+    }
+
+    return overlaps
+  })
+
+  const usedStock = overlappingBookings.length
+  const availableUnits = Math.max(0, vehicleStock - usedStock)
+  const conflicts = overlappingBookings.map((b) => `${b.customer_name}: ${b.time_slot} (${b.status})`)
+
+  console.log(`   📊 [ADMIN] Stock usado: ${usedStock}/${vehicleStock}, Disponible: ${availableUnits}`)
+
+  return {
+    available: availableUnits > 0,
+    availableUnits,
+    conflicts,
+    usedStock,
+  }
+}
+
 function generateAdminSlots(
   pricing: any[],
   existingBookings: any[],
   date: string,
   vehicleStock: number,
   vehicleType: string,
+  requiresLicense: boolean,
 ) {
   const slots = []
   const workStart = 10 * 60 // 10:00
   const workEnd = 21 * 60 // 21:00
 
-  // ✅ ADMIN: Convertir time_slot a rangos ocupados
-  const occupiedRanges = []
-  for (const booking of existingBookings) {
-    if (booking.time_slot && booking.time_slot.includes("-")) {
-      const [startTime, endTime] = booking.time_slot.split("-")
-      const startMinutes = timeToMinutes(startTime.trim())
-      const endMinutes = timeToMinutes(endTime.trim())
+  // ✅ RESTRICCIÓN HORARIA: Motos sin licencia solo de 14:00 a 16:00
+  const restrictedStart = 14 * 60 // 14:00
+  const restrictedEnd = 16 * 60 // 16:00
 
-      occupiedRanges.push({
-        start: startMinutes,
-        end: endMinutes,
-        customer: booking.customer_name,
-        status: booking.status,
-        timeSlot: booking.time_slot.trim(),
-      })
-    }
-  }
-
-  // Contar reservas por slot
-  const bookingCounts = new Map()
-  for (const booking of existingBookings) {
-    if (booking.time_slot) {
-      const slotKey = booking.time_slot.trim()
-      const currentCount = bookingCounts.get(slotKey) || 0
-      bookingCounts.set(slotKey, currentCount + 1)
-    }
-  }
+  console.log("🔧 [ADMIN] Generando slots con verificación ESTRICTA de solapamientos")
+  console.log(`📦 [ADMIN] Stock total: ${vehicleStock}`)
+  console.log(`📋 [ADMIN] Reservas existentes: ${existingBookings.length}`)
 
   // Generar slots para cada opción de pricing
   for (const option of pricing) {
@@ -197,46 +233,79 @@ function generateAdminSlots(
 
       const startTime = `${startHour.toString().padStart(2, "0")}:00`
       const endTime = `${endHour.toString().padStart(2, "0")}:00`
-      const timeSlot = `${startTime}-${endTime}`
 
-      // Verificar disponibilidad
-      const bookingsForSlot = bookingCounts.get(timeSlot) || 0
-      const availableUnits = Math.max(0, vehicleStock - bookingsForSlot)
+      // ✅ VERIFICAR RESTRICCIONES DE LICENCIA
+      const slotStartMinutes = startHour * 60
+      const slotEndMinutes = endHour * 60
 
-      if (!isInPast(startHour * 60, date)) {
+      let isAllowed = true
+      if (vehicleType === "jetski" && requiresLicense) {
+        // Motos CON licencia NO pueden alquilarse de 14:00 a 16:00
+        if (slotStartMinutes < restrictedEnd && slotEndMinutes > restrictedStart) {
+          isAllowed = false
+          console.log(`🚫 [ADMIN] Slot ${startTime}-${endTime} bloqueado para jetski con licencia (horas restringidas)`)
+        }
+      } else if (vehicleType === "jetski" && !requiresLicense) {
+        // Motos SIN licencia SOLO pueden alquilarse de 14:00 a 16:00
+        if (slotStartMinutes < restrictedStart || slotEndMinutes > restrictedEnd) {
+          isAllowed = false
+          console.log(
+            `🚫 [ADMIN] Slot ${startTime}-${endTime} bloqueado para jetski sin licencia (fuera de horas permitidas)`,
+          )
+        }
+      }
+
+      // ✅ VERIFICAR DISPONIBILIDAD CON DETECCIÓN ESTRICTA DE SOLAPAMIENTOS
+      const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
+
+      if (!isInPast(startHour * 60, date) && isAllowed) {
         slots.push({
           startTime: startTime,
           endTime: endTime,
           duration: option.duration,
           label: option.label || `Medio día (${startTime} - ${endTime})`,
           price: option.price || 50,
-          available: availableUnits > 0,
-          availableUnits: availableUnits,
+          available: availability.available,
+          availableUnits: availability.availableUnits,
           totalUnits: vehicleStock,
-          conflicts: bookingsForSlot,
+          conflicts: availability.usedStock,
+          restricted: !isAllowed,
+          conflictDetails: availability.conflicts,
         })
       }
     } else if (option.duration.startsWith("fullday_") || option.duration === "fullday") {
       // Para día completo, siempre es de 10:00 a 21:00
       const startTime = "10:00"
       const endTime = "21:00"
-      const timeSlot = `${startTime}-${endTime}`
 
-      // Verificar disponibilidad
-      const bookingsForSlot = bookingCounts.get(timeSlot) || 0
-      const availableUnits = Math.max(0, vehicleStock - bookingsForSlot)
+      // ✅ VERIFICAR RESTRICCIONES DE LICENCIA PARA DÍA COMPLETO
+      let isAllowed = true
+      if (vehicleType === "jetski" && requiresLicense) {
+        // Motos CON licencia NO pueden hacer día completo (incluye horas restringidas)
+        isAllowed = false
+        console.log(`🚫 [ADMIN] Día completo bloqueado para jetski con licencia (incluye horas restringidas)`)
+      } else if (vehicleType === "jetski" && !requiresLicense) {
+        // Motos SIN licencia NO pueden hacer día completo (solo 14:00-16:00)
+        isAllowed = false
+        console.log(`🚫 [ADMIN] Día completo bloqueado para jetski sin licencia (fuera de horas permitidas)`)
+      }
 
-      if (!isInPast(10 * 60, date)) {
+      // ✅ VERIFICAR DISPONIBILIDAD CON DETECCIÓN ESTRICTA DE SOLAPAMIENTOS
+      const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
+
+      if (!isInPast(10 * 60, date) && isAllowed) {
         slots.push({
           startTime: startTime,
           endTime: endTime,
           duration: option.duration,
           label: option.label || `Día completo (${startTime} - ${endTime})`,
           price: option.price || 100,
-          available: availableUnits > 0,
-          availableUnits: availableUnits,
+          available: availability.available,
+          availableUnits: availability.availableUnits,
           totalUnits: vehicleStock,
-          conflicts: bookingsForSlot,
+          conflicts: availability.usedStock,
+          restricted: !isAllowed,
+          conflictDetails: availability.conflicts,
         })
       }
     } else {
@@ -248,27 +317,37 @@ function generateAdminSlots(
         const end = start + duration
         const startTime = minutesToTime(start)
         const endTime = minutesToTime(end)
-        const timeSlot = `${startTime}-${endTime}`
 
-        // Verificar disponibilidad
-        const bookingsForSlot = bookingCounts.get(timeSlot) || 0
-        const availableUnits = Math.max(0, vehicleStock - bookingsForSlot)
+        // ✅ VERIFICAR RESTRICCIONES DE LICENCIA
+        let isAllowed = true
+        if (vehicleType === "jetski" && requiresLicense) {
+          // Motos CON licencia NO pueden alquilarse de 14:00 a 16:00
+          if (start < restrictedEnd && end > restrictedStart) {
+            isAllowed = false
+          }
+        } else if (vehicleType === "jetski" && !requiresLicense) {
+          // Motos SIN licencia SOLO pueden alquilarse de 14:00 a 16:00
+          if (start < restrictedStart || end > restrictedEnd) {
+            isAllowed = false
+          }
+        }
 
-        // Contar conflictos para slots que se solapan
-        const conflicts = occupiedRanges.filter((range) => start < range.end && end > range.start)
-        const conflictCount = conflicts.length
+        // ✅ VERIFICAR DISPONIBILIDAD CON DETECCIÓN ESTRICTA DE SOLAPAMIENTOS
+        const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
 
-        if (!isInPast(start, date)) {
+        if (!isInPast(start, date) && isAllowed) {
           slots.push({
             startTime: startTime,
             endTime: endTime,
             duration: option.duration,
             label: option.label || `${getDurationLabel(option.duration)} (${startTime} - ${endTime})`,
             price: option.price || 50,
-            available: availableUnits > 0,
-            availableUnits: availableUnits,
+            available: availability.available,
+            availableUnits: availability.availableUnits,
             totalUnits: vehicleStock,
-            conflicts: conflictCount,
+            conflicts: availability.usedStock,
+            restricted: !isAllowed,
+            conflictDetails: availability.conflicts,
           })
         }
       }
