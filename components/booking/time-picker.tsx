@@ -74,6 +74,15 @@ const translations = {
     oneHour: "1 hora",
     twoHours: "2 horas",
     fourHours: "4 horas",
+    options: "opciones",
+    quickFun: "Diversión rápida",
+    completeExperience: "Experiencia completa",
+    extendedAdventure: "Aventura extendida",
+    halfDayFun: "Medio día de diversión",
+    hoursOfAdventure: "horas de aventura",
+    fullDayFun: "Día completo de diversión",
+    withoutStock: "Sin stock",
+    retry: "Reintentar",
   },
   en: {
     selectDuration: "Select duration",
@@ -99,6 +108,15 @@ const translations = {
     oneHour: "1 hour",
     twoHours: "2 hours",
     fourHours: "4 hours",
+    options: "options",
+    quickFun: "Quick fun",
+    completeExperience: "Complete experience",
+    extendedAdventure: "Extended adventure",
+    halfDayFun: "Half day of fun",
+    hoursOfAdventure: "hours of adventure",
+    fullDayFun: "Full day of fun",
+    withoutStock: "Out of stock",
+    retry: "Retry",
   },
 }
 
@@ -250,7 +268,7 @@ export function TimePicker({
         options.push({
           key: "halfday",
           label: t.halfDay,
-          description: `${halfdayOptions.length} opciones`,
+          description: `${halfdayOptions.length} ${t.options}`,
           price: minPrice,
         })
       }
@@ -260,19 +278,19 @@ export function TimePicker({
         options.push({
           key: "fullday",
           label: t.fullDay,
-          description: "11 horas de aventura",
+          description: `11 ${t.hoursOfAdventure}`,
           price: minPrice,
         })
       }
     } else if (vehicle.type === "jetski") {
       // ✅ ARREGLADO: Para motos, mostrar opciones individuales
       const durationMap = {
-        "30min": { label: t.halfHour, description: "Diversión rápida" },
-        "1hour": { label: t.oneHour, description: "Experiencia completa" },
-        "2hour": { label: t.twoHours, description: "Aventura extendida" },
-        "4hour": { label: t.fourHours, description: "Medio día de diversión" },
-        halfday: { label: t.halfDay, description: "4 horas de aventura" },
-        fullday: { label: t.fullDay, description: "Día completo de diversión" },
+        "30min": { label: t.halfHour, description: t.quickFun },
+        "1hour": { label: t.oneHour, description: t.completeExperience },
+        "2hour": { label: t.twoHours, description: t.extendedAdventure },
+        "4hour": { label: t.fourHours, description: t.halfDayFun },
+        halfday: { label: t.halfDay, description: `4 ${t.hoursOfAdventure}` },
+        fullday: { label: t.fullDay, description: t.fullDayFun },
       }
 
       // Crear una opción por cada duración disponible
@@ -308,7 +326,7 @@ export function TimePicker({
     const total = slot.totalUnits
 
     if (available === 0) {
-      return { text: "Sin stock", color: "text-red-600", icon: "❌" }
+      return { text: t.withoutStock, color: "text-red-600", icon: "❌" }
     } else if (available === 1) {
       return { text: `${available} ${t.vehicleAvailable}`, color: "text-orange-600", icon: "⚠️" }
     } else {
@@ -361,15 +379,15 @@ export function TimePicker({
         </CardContent>
       </Card>
 
-      {/* Información de restricciones */}
-      {(vehicleCategory === "jetski_no_license" || vehicleCategory === "boat_no_license") && (
+      {/* Información de restricciones - SOLO para motos sin licencia */}
+      {vehicleCategory === "jetski_no_license" && (
         <Card className="bg-orange-50 border border-orange-200">
           <CardContent className="p-4">
             <div className="flex items-center">
               <AlertCircle className="h-5 w-5 text-orange-600 mr-3" />
               <div>
-                <h4 className="font-semibold text-orange-800">Horario restringido</h4>
-                <p className="text-orange-700 text-sm">{getRestrictionMessage()}</p>
+                <h4 className="font-semibold text-orange-800">{t.restrictedSlot}</h4>
+                <p className="text-orange-700 text-sm">{t.restrictedJetski}</p>
               </div>
             </div>
           </CardContent>
@@ -402,7 +420,7 @@ export function TimePicker({
                   variant="outline"
                   className="mt-4 border-red-300 text-red-600 hover:bg-red-50"
                 >
-                  Reintentar
+                  {t.retry}
                 </Button>
               </div>
             ) : (
