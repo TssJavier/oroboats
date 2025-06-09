@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
       salesPerson,
       vehicleName,
       vehicleType,
+      liabilityWaiverId, // 🆕 NUEVO: ID del documento de exención firmado
     } = body
 
     // Validaciones básicas
@@ -54,6 +55,26 @@ export async function POST(request: NextRequest) {
 
     if (!startTime || !endTime) {
       return NextResponse.json({ error: "Faltan horarios de inicio y fin" }, { status: 400 })
+    }
+
+    // 🆕 NUEVO: Validar que el documento de exención esté firmado (opcional pero recomendado)
+    if (liabilityWaiverId) {
+      console.log(`🔍 Verifying liability waiver ID: ${liabilityWaiverId}`)
+
+      const waiverResult = await db.execute(sql`
+        SELECT id, customer_name, customer_email, signed_at 
+        FROM liability_waivers 
+        WHERE id = ${liabilityWaiverId}
+      `)
+
+      if (!waiverResult || waiverResult.length === 0) {
+        return NextResponse.json({ error: "Documento de exención no encontrado" }, { status: 404 })
+      }
+
+      const waiver = waiverResult[0]
+      console.log(`✅ Verified waiver for ${waiver.customer_name} signed at ${waiver.signed_at}`)
+    } else {
+      console.log("⚠️ No liability waiver provided - proceeding without waiver")
     }
 
     // Verificar que el vehículo existe y obtener su información
@@ -155,6 +176,7 @@ export async function POST(request: NextRequest) {
           sales_person,
           vehicle_name,
           vehicle_type,
+          liability_waiver_id,
           created_at,
           updated_at
         ) VALUES (
@@ -177,6 +199,7 @@ export async function POST(request: NextRequest) {
           ${salesPerson},
           ${vehicleName || vehicle.name},
           ${vehicleType || vehicle.type},
+          ${liabilityWaiverId || null},
           NOW(),
           NOW()
         )
@@ -189,6 +212,21 @@ export async function POST(request: NextRequest) {
         throw new Error("No se pudo obtener el ID de la reserva creada")
       }
 
+      // 🆕 NUEVO: Si hay un waiver asociado, actualizar la relación bidireccional
+      if (liabilityWaiverId) {
+        try {
+          await db.execute(sql`
+            UPDATE liability_waivers 
+            SET booking_id = ${bookingId}
+            WHERE id = ${liabilityWaiverId}
+          `)
+          console.log(`✅ Updated liability waiver ${liabilityWaiverId} with booking ID ${bookingId}`)
+        } catch (waiverUpdateError) {
+          console.error("⚠️ Warning: Could not update waiver with booking ID:", waiverUpdateError)
+          // No fallar la reserva por esto, solo logear el warning
+        }
+      }
+
       console.log("✅ Manual booking created successfully!")
       console.log(`   - Booking ID: ${bookingId}`)
       console.log(`   - Customer: ${customerName}`)
@@ -198,6 +236,7 @@ export async function POST(request: NextRequest) {
       console.log(`   - Time: ${timeSlot}`)
       console.log(`   - Duration: ${finalDuration} (${durationMinutes} min)`)
       console.log(`   - Price: €${totalPrice}`)
+      console.log(`   - Liability Waiver: ${liabilityWaiverId ? `ID ${liabilityWaiverId}` : "None"}`)
       console.log(`   - Remaining stock: ${vehicleStock - bookingsCount - 1}`)
 
       return NextResponse.json({
@@ -216,6 +255,7 @@ export async function POST(request: NextRequest) {
           totalPrice,
           availableStock: vehicleStock - bookingsCount - 1,
           totalStock: vehicleStock,
+          liabilityWaiverId: liabilityWaiverId || null, // 🆕 NUEVO: Incluir en la respuesta
         },
       })
     } catch (dbError) {

@@ -5,9 +5,9 @@ import { jwtVerify } from "jose"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // 🔒 VERIFICAR AUTENTICACIÓN (solo esta parte es nueva)
+    // 🔒 VERIFICAR AUTENTICACIÓN
     const token = request.cookies.get("admin-token")?.value
     if (!token) {
       return new NextResponse("Acceso no autorizado", { status: 401 })
@@ -19,8 +19,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return new NextResponse("Token inválido", { status: 401 })
     }
 
-    // 📄 TU CÓDIGO ORIGINAL QUE FUNCIONA
-    const waiverId = Number.parseInt(params.id)
+    // ✅ CORREGIDO: Await params antes de usar
+    const resolvedParams = await params
+    const waiverId = Number.parseInt(resolvedParams.id)
     console.log(`🔍 PDF: Generating document for waiver ID ${waiverId}`)
 
     if (isNaN(waiverId)) {
@@ -28,10 +29,27 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Invalid waiver ID" }, { status: 400 })
     }
 
-    // Obtener el documento de la base de datos
+    // ✅ MEJORADO: Query más específica para debug
+    console.log(`🔍 PDF: Querying waiver ${waiverId}...`)
+
     const result = await db.execute(sql`
       SELECT 
-        lw.*,
+        lw.id,
+        lw.customer_name,
+        lw.customer_email,
+        lw.waiver_content,
+        lw.ip_address,
+        lw.user_agent,
+        lw.signature_data,
+        lw.signed_at,
+        lw.booking_id,
+        LENGTH(lw.signature_data) as signature_length,
+        CASE 
+          WHEN lw.signature_data IS NULL THEN 'NULL'
+          WHEN lw.signature_data = '' THEN 'EMPTY'
+          WHEN lw.signature_data LIKE 'data:image/%' THEN 'VALID_BASE64'
+          ELSE 'UNKNOWN_FORMAT'
+        END as signature_status,
         b.customer_name as booking_customer_name,
         b.customer_email as booking_customer_email,
         b.booking_date,
@@ -53,6 +71,15 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const waiver = result[0] as any
     console.log(`✅ PDF: Found waiver for ${waiver.customer_name}`)
+    console.log(`🖊️ PDF: Signature status: ${waiver.signature_status}`)
+    console.log(`📏 PDF: Signature length: ${waiver.signature_length || 0} characters`)
+
+    // Debug adicional para la firma
+    if (waiver.signature_data) {
+      console.log(`🔍 PDF: Signature preview: ${waiver.signature_data.substring(0, 50)}...`)
+    } else {
+      console.log(`⚠️ PDF: No signature data found for waiver ${waiverId}`)
+    }
 
     // Generar HTML optimizado para impresión/PDF
     const htmlContent = `
@@ -115,6 +142,46 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
               margin-top: 20px;
               border-radius: 5px;
               border: 2px solid #4CAF50;
+              position: relative;
+              min-height: 150px;
+            }
+            
+            .signature-image {
+              position: absolute;
+              bottom: 15px;
+              right: 15px;
+              max-width: 250px;
+              max-height: 100px;
+              border: 1px solid #333;
+              border-radius: 5px;
+              background: white;
+              padding: 5px;
+            }
+            
+            .signature-placeholder {
+              position: absolute;
+              bottom: 15px;
+              right: 15px;
+              width: 250px;
+              height: 100px;
+              border: 2px dashed #999;
+              border-radius: 5px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #666;
+              font-style: italic;
+              background: #f9f9f9;
+            }
+            
+            .debug-info {
+              background: #fff3cd;
+              border: 1px solid #ffeaa7;
+              padding: 10px;
+              border-radius: 5px;
+              margin: 10px 0;
+              font-size: 10px;
+              color: #856404;
             }
             
             .footer {
@@ -221,6 +288,20 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             <p><strong>Dirección IP:</strong> ${waiver.ip_address || "N/A"}</p>
             <p><strong>ID del documento:</strong> ${waiver.id}</p>
             <p><strong>Estado:</strong> ✅ <span style="color: green; font-weight: bold;">FIRMADO DIGITALMENTE</span></p>
+            
+            ${
+              waiver.signature_data && waiver.signature_status === "VALID_BASE64"
+                ? `<img src="${waiver.signature_data}" alt="Firma digital del cliente" class="signature-image" />`
+                : `<div class="signature-placeholder">
+                     ${
+                       waiver.signature_status === "NULL"
+                         ? "Sin firma digital guardada"
+                         : waiver.signature_status === "EMPTY"
+                           ? "Firma vacía"
+                           : "Formato de firma no válido"
+                     }
+                   </div>`
+            }
           </div>
 
           <div class="footer">
@@ -246,7 +327,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     console.log(`✅ PDF: Generated HTML document for waiver ${waiverId}`)
 
-    // Devolver como HTML para que se abra correctamente en el navegador
     return new NextResponse(htmlContent, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
@@ -259,7 +339,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       {
         error: "Failed to generate document",
         details: error instanceof Error ? error.message : "Unknown error",
-        waiverId: params.id,
+        waiverId: (await params).id,
       },
       { status: 500 },
     )

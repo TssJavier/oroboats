@@ -26,16 +26,22 @@ export async function POST(request: NextRequest) {
     console.log("📅 Creating booking with confirmed payment:", bookingData)
     console.log("🔍 Liability Waiver ID in booking data:", bookingData.liabilityWaiverId)
 
-    // Añadir información de pago
+    // ✅ AÑADIR LIABILITY WAIVER ID DIRECTAMENTE A LOS DATOS DE RESERVA
     const finalBookingData = {
       ...bookingData,
       paymentId: paymentIntentId,
       paymentStatus: "completed",
       status: "confirmed",
+      liability_waiver_id: bookingData.liabilityWaiverId ? Number(bookingData.liabilityWaiverId) : null,
     }
+
+    // ✅ MOSTRAR DATOS COMPLETOS PARA DEBUG
+    console.log("🔍 DB: Creating booking with data:", JSON.stringify(finalBookingData, null, 2))
+    console.log("🔍 DB: timeSlot value:", finalBookingData.timeSlot)
 
     // Crear la reserva en la base de datos
     const booking = await createBooking(finalBookingData)
+    console.log("✅ DB: Booking created successfully:", booking)
     console.log("✅ Booking created after payment:", booking[0])
 
     // ✅ ACTUALIZAR EL LIABILITY_WAIVER_ID EN LA RESERVA
@@ -46,6 +52,7 @@ export async function POST(request: NextRequest) {
 
         console.log(`🔗 Updating booking ${bookingId} with liability waiver ${waiverId}`)
 
+        // ✅ USAR SQL DIRECTO PARA ASEGURAR LA ACTUALIZACIÓN
         await db.execute(sql`
           UPDATE bookings 
           SET liability_waiver_id = ${waiverId}
@@ -127,13 +134,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Enviar emails (no bloquear si fallan)
-    sendAdminNotification(emailData).catch((error) => {
-      console.error("⚠️ Failed to send admin notification:", error)
-    })
+    try {
+      await sendAdminNotification(emailData)
+    } catch (error) {
+      console.error("Error sending admin notification:", error)
+    }
 
-    sendCustomerConfirmation(emailData).catch((error) => {
-      console.error("⚠️ Failed to send customer confirmation:", error)
-    })
+    try {
+      await sendCustomerConfirmation(emailData)
+    } catch (error) {
+      console.error("Error sending customer confirmation:", error)
+    }
 
     return NextResponse.json({
       success: true,

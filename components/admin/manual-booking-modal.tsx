@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, Clock, User, AlertTriangle, FileText, Loader2, UserCheck } from "lucide-react"
 import { toast } from "sonner"
+import { ManualWaiverModal } from "./manual-waiver-modal"
 
 interface Vehicle {
   id: number
@@ -59,13 +60,17 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     customerEmail: "",
     bookingDate: "",
     notes: "",
-    salesPerson: "", // Nuevo campo para el comercial
+    salesPerson: "",
   })
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 🆕 NUEVOS ESTADOS PARA LA FIRMA
+  const [showWaiverModal, setShowWaiverModal] = useState(false)
+  const [liabilityWaiverId, setLiabilityWaiverId] = useState<number | null>(null)
 
   // Cargar slots disponibles cuando cambie la fecha
   useEffect(() => {
@@ -136,6 +141,13 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     console.log("🎯 Selected slot:", slot)
   }
 
+  // 🆕 MANEJAR FIRMA COMPLETADA
+  const handleWaiverSigned = (waiverId: number) => {
+    setLiabilityWaiverId(waiverId)
+    setShowWaiverModal(false)
+    toast.success("Documento firmado correctamente")
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!vehicle || !selectedSlot) return
@@ -163,6 +175,13 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
 
     if (!formData.salesPerson) {
       toast.error("Debes seleccionar un comercial")
+      return
+    }
+
+    // 🆕 VALIDAR QUE ESTÉ FIRMADO EL DOCUMENTO
+    if (!liabilityWaiverId) {
+      toast.error("El cliente debe firmar el documento de exención de responsabilidad")
+      setShowWaiverModal(true)
       return
     }
 
@@ -210,13 +229,14 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
           timeSlot: `${selectedSlot.startTime}-${selectedSlot.endTime}`,
           startTime: selectedSlot.startTime,
           endTime: selectedSlot.endTime,
-          duration: duration, // Usar la duración calculada
+          duration: duration,
           totalPrice: selectedSlot.price,
           notes: formData.notes,
           isManualBooking: true,
-          salesPerson: formData.salesPerson, // Añadir el comercial
-          vehicleName: vehicle.name, // Guardar el nombre del vehículo
-          vehicleType: vehicle.type, // Guardar el tipo de vehículo
+          salesPerson: formData.salesPerson,
+          vehicleName: vehicle.name,
+          vehicleType: vehicle.type,
+          liabilityWaiverId: liabilityWaiverId, // 🆕 INCLUIR ID DEL DOCUMENTO FIRMADO
         }),
       })
 
@@ -241,6 +261,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
       })
       setSelectedSlot(null)
       setAvailableSlots([])
+      setLiabilityWaiverId(null) // 🆕 LIMPIAR ID DE FIRMA
 
       onSuccess()
       onClose()
@@ -260,265 +281,333 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
   if (!vehicle) return null
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-gold" />
-            Reserva Manual - {vehicle.name}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-gold" />
+              Reserva Manual - {vehicle.name}
+            </DialogTitle>
+          </DialogHeader>
 
-        {/* Advertencias importantes */}
-        <div className="space-y-3">
-          {vehicle.requiresLicense && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          {/* Advertencias importantes */}
+          <div className="space-y-3">
+            {vehicle.requiresLicense && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-blue-800">⚠️ Licencia Requerida</h4>
+                    <p className="text-sm text-blue-700">
+                      Este vehículo requiere licencia náutica. Asegúrate de que el cliente la traiga.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
+                <FileText className="h-5 w-5 text-orange-600 mt-0.5" />
                 <div>
-                  <h4 className="font-semibold text-blue-800">⚠️ Licencia Requerida</h4>
-                  <p className="text-sm text-blue-700">
-                    Este vehículo requiere licencia náutica. Asegúrate de que el cliente la traiga.
-                  </p>
+                  <h4 className="font-semibold text-orange-800">📋 Documentación Requerida</h4>
+                  <ul className="text-sm text-orange-700 mt-1 space-y-1">
+                    <li>• Consentimiento de exención de responsabilidad firmado</li>
+                    <li>• DNI o documento de identidad válido</li>
+                    {vehicle.requiresLicense && <li>• Licencia náutica vigente</li>}
+                    {vehicle.securityDeposit && <li>• Fianza de €{vehicle.securityDeposit} (tarjeta/efectivo)</li>}
+                  </ul>
                 </div>
               </div>
             </div>
-          )}
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <FileText className="h-5 w-5 text-orange-600 mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-orange-800">📋 Documentación Requerida</h4>
-                <ul className="text-sm text-orange-700 mt-1 space-y-1">
-                  <li>• Consentimiento de exención de responsabilidad firmado</li>
-                  <li>• DNI o documento de identidad válido</li>
-                  {vehicle.requiresLicense && <li>• Licencia náutica vigente</li>}
-                  {vehicle.securityDeposit && <li>• Fianza de €{vehicle.securityDeposit} (tarjeta/efectivo)</li>}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Información del cliente */}
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Información del Cliente
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="customerName">Nombre completo *</Label>
-                <Input
-                  id="customerName"
-                  value={formData.customerName}
-                  onChange={(e) => handleInputChange("customerName", e.target.value)}
-                  placeholder="Nombre del cliente"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="customerPhone">Teléfono *</Label>
-                <Input
-                  id="customerPhone"
-                  type="tel"
-                  value={formData.customerPhone}
-                  onChange={(e) => handleInputChange("customerPhone", e.target.value)}
-                  placeholder="+34 600 000 000"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="customerEmail">Email (opcional)</Label>
-              <Input
-                id="customerEmail"
-                type="email"
-                value={formData.customerEmail}
-                onChange={(e) => handleInputChange("customerEmail", e.target.value)}
-                placeholder="cliente@email.com"
-              />
-            </div>
           </div>
 
-          {/* Selección de comercial */}
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
-              Comercial
-            </h3>
-
-            <div className="w-full md:w-1/2">
-              <Label htmlFor="salesPerson">Comercial que realiza la venta *</Label>
-              <Select
-                value={formData.salesPerson}
-                onValueChange={(value) => handleInputChange("salesPerson", value)}
-                required
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona un comercial" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SALES_STAFF.map((staff) => (
-                    <SelectItem key={staff.id} value={staff.id}>
-                      {staff.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Selección de fecha */}
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Fecha de la Reserva
-            </h3>
-
-            <div className="w-full md:w-1/3">
-              <Label htmlFor="bookingDate">Fecha *</Label>
-              <Input
-                id="bookingDate"
-                type="date"
-                value={formData.bookingDate}
-                onChange={(e) => handleInputChange("bookingDate", e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Selección de horario */}
-          {formData.bookingDate && (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Información del cliente */}
             <div className="space-y-4">
               <h3 className="font-semibold flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Horarios Disponibles
+                <User className="h-4 w-4" />
+                Información del Cliente
               </h3>
 
-              {loadingSlots ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-gold" />
-                  <span className="ml-2 text-gray-600">Cargando horarios disponibles...</span>
-                </div>
-              ) : error ? (
-                <div className="text-center py-6 bg-red-50 rounded-lg border border-red-200">
-                  <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                  <p className="text-red-700">{error}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
-                    onClick={fetchAvailableSlots}
-                  >
-                    Reintentar
-                  </Button>
-                </div>
-              ) : availableSlots.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                  <p className="text-gray-600">No hay horarios disponibles para esta fecha</p>
-                  <p className="text-sm text-gray-500">Prueba con otra fecha</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {availableSlots.map((slot, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => handleSlotSelect(slot)}
-                      className={`p-4 rounded-lg border-2 transition-all text-left ${
-                        selectedSlot === slot
-                          ? "border-gold bg-gold/10 shadow-md"
-                          : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
-                      }`}
-                      disabled={!slot.available || slot.availableUnits < 1}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-gray-900">
-                          {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                        </span>
-                        <span className="text-lg font-bold text-gold">€{slot.price}</span>
-                      </div>
-                      <div className="text-sm text-gray-600">{slot.label}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Duración: {slot.duration} •
-                        {slot.availableUnits > 0 ? (
-                          <span className="text-green-600"> {slot.availableUnits} disponible(s)</span>
-                        ) : (
-                          <span className="text-red-600"> No disponible</span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Slot seleccionado */}
-          {selectedSlot && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h4 className="font-semibold text-green-800">Horario Seleccionado</h4>
-                  <p className="text-green-700">
-                    {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)} ({selectedSlot.label})
-                  </p>
+                  <Label htmlFor="customerName">Nombre completo *</Label>
+                  <Input
+                    id="customerName"
+                    value={formData.customerName}
+                    onChange={(e) => handleInputChange("customerName", e.target.value)}
+                    placeholder="Nombre del cliente"
+                    required
+                  />
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-green-600">€{selectedSlot.price}</div>
-                  {vehicle.securityDeposit && (
-                    <div className="text-sm text-green-700">+ Fianza: €{vehicle.securityDeposit}</div>
-                  )}
+
+                <div>
+                  <Label htmlFor="customerPhone">Teléfono *</Label>
+                  <Input
+                    id="customerPhone"
+                    type="tel"
+                    value={formData.customerPhone}
+                    onChange={(e) => handleInputChange("customerPhone", e.target.value)}
+                    placeholder="+34 600 000 000"
+                    required
+                  />
                 </div>
               </div>
+
+              <div>
+                <Label htmlFor="customerEmail">Email (opcional)</Label>
+                <Input
+                  id="customerEmail"
+                  type="email"
+                  value={formData.customerEmail}
+                  onChange={(e) => handleInputChange("customerEmail", e.target.value)}
+                  placeholder="cliente@email.com"
+                />
+              </div>
             </div>
-          )}
 
-          {/* Notas adicionales */}
-          <div>
-            <Label htmlFor="notes">Notas adicionales</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => handleInputChange("notes", e.target.value)}
-              placeholder="Observaciones, instrucciones especiales..."
-              rows={3}
-            />
-          </div>
+            {/* Selección de comercial */}
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <UserCheck className="h-4 w-4" />
+                Comercial
+              </h3>
 
-          {/* Botones */}
-          <div className="flex gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="flex-1 bg-gold text-black hover:bg-gold/90"
-              disabled={loading || !selectedSlot || !formData.salesPerson}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Creando...
-                </>
+              <div className="w-full md:w-1/2">
+                <Label htmlFor="salesPerson">Comercial que realiza la venta *</Label>
+                <Select
+                  value={formData.salesPerson}
+                  onValueChange={(value) => handleInputChange("salesPerson", value)}
+                  required
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona un comercial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SALES_STAFF.map((staff) => (
+                      <SelectItem key={staff.id} value={staff.id}>
+                        {staff.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Selección de fecha */}
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Fecha de la Reserva
+              </h3>
+
+              <div className="w-full md:w-1/3">
+                <Label htmlFor="bookingDate">Fecha *</Label>
+                <Input
+                  id="bookingDate"
+                  type="date"
+                  value={formData.bookingDate}
+                  onChange={(e) => handleInputChange("bookingDate", e.target.value)}
+                  min={new Date().toISOString().split("T")[0]}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Selección de horario */}
+            {formData.bookingDate && (
+              <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Horarios Disponibles
+                </h3>
+
+                {loadingSlots ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-gold" />
+                    <span className="ml-2 text-gray-600">Cargando horarios disponibles...</span>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-6 bg-red-50 rounded-lg border border-red-200">
+                    <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                    <p className="text-red-700">{error}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
+                      onClick={fetchAvailableSlots}
+                    >
+                      Reintentar
+                    </Button>
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <Clock className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-600">No hay horarios disponibles para esta fecha</p>
+                    <p className="text-sm text-gray-500">Prueba con otra fecha</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {availableSlots.map((slot, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleSlotSelect(slot)}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          selectedSlot === slot
+                            ? "border-gold bg-gold/10 shadow-md"
+                            : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
+                        }`}
+                        disabled={!slot.available || slot.availableUnits < 1}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-gray-900">
+                            {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                          </span>
+                          <span className="text-lg font-bold text-gold">€{slot.price}</span>
+                        </div>
+                        <div className="text-sm text-gray-600">{slot.label}</div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Duración: {slot.duration} •
+                          {slot.availableUnits > 0 ? (
+                            <span className="text-green-600"> {slot.availableUnits} disponible(s)</span>
+                          ) : (
+                            <span className="text-red-600"> No disponible</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Slot seleccionado */}
+            {selectedSlot && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-green-800">Horario Seleccionado</h4>
+                    <p className="text-green-700">
+                      {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)} ({selectedSlot.label})
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-green-600">€{selectedSlot.price}</div>
+                    {vehicle.securityDeposit && (
+                      <div className="text-sm text-green-700">+ Fianza: €{vehicle.securityDeposit}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 🆕 SECCIÓN DE FIRMA DIGITAL */}
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Exención de Responsabilidad
+              </h3>
+
+              {liabilityWaiverId ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileText className="h-5 w-5 text-green-600 mr-2" />
+                      <div>
+                        <h4 className="font-semibold text-green-800">✅ Documento Firmado</h4>
+                        <p className="text-green-700 text-sm">El cliente ha firmado la exención de responsabilidad</p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-green-300 text-green-700 hover:bg-green-50"
+                      onClick={() => setShowWaiverModal(true)}
+                    >
+                      Volver a firmar
+                    </Button>
+                  </div>
+                </div>
               ) : (
-                <>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Crear Reserva
-                </>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
+                      <div>
+                        <h4 className="font-semibold text-yellow-800">⚠️ Firma Requerida</h4>
+                        <p className="text-yellow-700 text-sm">
+                          El cliente debe firmar el documento antes de crear la reserva
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                      onClick={() => setShowWaiverModal(true)}
+                      disabled={!formData.customerName.trim()}
+                    >
+                      Firmar Documento
+                    </Button>
+                  </div>
+                </div>
               )}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            </div>
+
+            {/* Notas adicionales */}
+            <div>
+              <Label htmlFor="notes">Notas adicionales</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleInputChange("notes", e.target.value)}
+                placeholder="Observaciones, instrucciones especiales..."
+                rows={3}
+              />
+            </div>
+
+            {/* Botones */}
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-gold text-black hover:bg-gold/90"
+                disabled={loading || !selectedSlot || !formData.salesPerson || !liabilityWaiverId}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Crear Reserva
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🆕 MODAL DE FIRMA */}
+      <ManualWaiverModal
+        isOpen={showWaiverModal}
+        onClose={() => setShowWaiverModal(false)}
+        onWaiverSigned={handleWaiverSigned}
+        customerName={formData.customerName}
+        customerEmail={
+          formData.customerEmail || `${formData.customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`
+        }
+      />
+    </>
   )
 }
