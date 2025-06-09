@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { vehicles, vehicleAvailability, bookings } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
@@ -64,39 +65,44 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
       customDurationEnabled,
       extraFeatures,
       securityDeposit,
+      stock, // ✅ AÑADIDO: Campo stock
     } = body
 
     console.log("🔧 Processing data:", {
       extraFeatures: extraFeatures ? "present" : "missing",
       securityDeposit: securityDeposit || 0,
+      stock: stock || 1, // ✅ AÑADIDO: Log del stock
     })
 
-    // ✅ AQUÍ ESTABA EL PROBLEMA - AHORA INCLUIMOS TODOS LOS CAMPOS
-    const result = await db
-      .update(vehicles)
-      .set({
-        name,
-        type,
-        category,
-        requiresLicense,
-        capacity,
-        pricing,
-        availableDurations,
-        includes,
-        fuelIncluded,
-        description,
-        image,
-        available,
-        customDurationEnabled,
-        // ✅ AÑADIDOS LOS CAMPOS QUE FALTABAN
-        extraFeatures: extraFeatures || [],
-        securityDeposit: securityDeposit !== undefined && securityDeposit !== null ? String(securityDeposit) : "0",
-      })
-      .where(eq(vehicles.id, id))
-      .returning()
+    // ✅ USAR SQL DIRECTO PARA ASEGURAR QUE EL STOCK SE GUARDA
+    const result = await db.execute(sql`
+      UPDATE vehicles 
+      SET 
+        name = ${name},
+        type = ${type},
+        category = ${category},
+        requires_license = ${requiresLicense},
+        capacity = ${capacity},
+        pricing = ${JSON.stringify(pricing)},
+        available_durations = ${JSON.stringify(availableDurations)},
+        includes = ${JSON.stringify(includes)},
+        fuel_included = ${fuelIncluded},
+        description = ${description},
+        image = ${image},
+        available = ${available},
+        custom_duration_enabled = ${customDurationEnabled},
+        extra_features = ${JSON.stringify(extraFeatures || [])},
+        security_deposit = ${Number(securityDeposit) || 0},
+        stock = ${Number(stock) || 1},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `)
 
-    console.log("✅ Vehicle updated successfully:", result[0])
-    return NextResponse.json(result[0])
+    // Drizzle returns the result as an array, not as .rows
+    const updatedVehicle = Array.isArray(result) ? result[0] : result;
+    console.log("✅ Vehicle updated successfully with stock:", updatedVehicle?.stock)
+    return NextResponse.json(updatedVehicle)
   } catch (error) {
     console.error("❌ Error updating vehicle:", error)
     return NextResponse.json(

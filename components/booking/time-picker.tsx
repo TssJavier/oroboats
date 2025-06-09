@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Euro, Loader2, AlertCircle } from "lucide-react"
+import { Clock, Euro, Loader2, AlertCircle, Users } from "lucide-react"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
 
@@ -30,11 +30,16 @@ interface TimePickerProps {
 
 interface TimeSlot {
   time: string
+  endTime: string
   available: boolean
   type?: string
   restricted?: boolean
   restrictionReason?: string
-  endTime?: string
+  duration: string
+  label: string
+  price: number
+  availableUnits?: number
+  totalUnits?: number
 }
 
 interface PricingOption {
@@ -58,9 +63,13 @@ const translations = {
     selectDurationFirst: "Selecciona una duración primero",
     morning: "Mañana",
     afternoon: "Tarde",
-    fullDay: "Todo el día",
+    fullDay: "Día completo",
     restrictedJetski: "Motos sin licencia: No disponible de 14:00 a 16:00",
     restrictedBoat: "Barcos sin licencia: No disponible de 14:00 a 16:00 (solo medio día)",
+    unitsAvailable: "unidades disponibles",
+    halfDay: "Medio día",
+    halfHour: "Media hora",
+    byHours: "Por horas",
   },
   en: {
     selectDuration: "Select duration",
@@ -79,6 +88,10 @@ const translations = {
     fullDay: "Full day",
     restrictedJetski: "Jet skis without license: Not available from 14:00 to 16:00",
     restrictedBoat: "Boats without license: Not available from 14:00 to 16:00 (half-day only)",
+    unitsAvailable: "units available",
+    halfDay: "Half day",
+    halfHour: "Half hour",
+    byHours: "By hours",
   },
 }
 
@@ -93,7 +106,7 @@ export function TimePicker({
   const { language } = useApp()
   const t = translations[language]
 
-  const [selectedDuration, setSelectedDuration] = useState<PricingOption | null>(null)
+  const [selectedDurationType, setSelectedDurationType] = useState<string | null>(null)
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(false)
   const [vehicleCategory, setVehicleCategory] = useState<string>("")
@@ -108,13 +121,13 @@ export function TimePicker({
   }, [vehicleId, selectedDate, vehicle])
 
   useEffect(() => {
-    if (selectedDate && selectedDuration) {
+    if (selectedDate && selectedDurationType) {
       fetchAvailableSlots()
     }
-  }, [selectedDate, vehicleId, selectedDuration])
+  }, [selectedDate, vehicleId, selectedDurationType])
 
   const fetchAvailableSlots = async () => {
-    if (!selectedDuration) return
+    if (!selectedDurationType) return
 
     setLoading(true)
     setError(null)
@@ -137,10 +150,10 @@ export function TimePicker({
       console.log(`🔍 Solicitando slots:`)
       console.log(`   - Vehicle ID: ${vehicleId} (tipo: ${typeof vehicleId})`)
       console.log(`   - Fecha: ${formattedDate}`)
-      console.log(`   - Duración: ${selectedDuration.duration}`)
+      console.log(`   - Tipo de duración: ${selectedDurationType}`)
 
-      // Usar la ruta correcta con [Id]
-      const url = `/api/availability/${vehicleId}/slots?date=${encodeURIComponent(formattedDate)}&duration=${encodeURIComponent(selectedDuration.duration)}`
+      // ✅ CORRECTO: Usar la ruta con [id] no [vehicleId]
+      const url = `/api/availability/${vehicleId}/slots?date=${encodeURIComponent(formattedDate)}&durationType=${encodeURIComponent(selectedDurationType)}`
       console.log(`🌐 URL completa: ${url}`)
 
       const response = await fetch(url)
@@ -168,13 +181,13 @@ export function TimePicker({
   }
 
   const handleTimeSlotClick = (slot: TimeSlot) => {
-    if (!selectedDuration || !slot.available) return
+    if (!slot.available) return
 
     onTimeSelect({
       start: slot.time,
-      end: slot.endTime || slot.time,
-      duration: selectedDuration.duration,
-      price: selectedDuration.price,
+      end: slot.endTime,
+      duration: slot.duration,
+      price: slot.price,
     })
 
     // ✅ Scroll automático al botón "Siguiente" después de seleccionar
@@ -222,9 +235,6 @@ export function TimePicker({
       const slotStartTimeInMinutes = slotHours * 60 + slotMinutes
       const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
 
-      // ✅ NUEVO: Solo bloquear si el slot YA EMPEZÓ (no si está por empezar)
-      // Ejemplo: Si son las 7:15 (435 min) y el slot es 7:30 (450 min), SÍ se puede reservar
-      // Solo se bloquea si son las 7:35 (455 min) y el slot es 7:30 (450 min)
       console.log(`🕐 Slot ${slot.time}: ${slotStartTimeInMinutes} min vs Current: ${currentTimeInMinutes} min`)
 
       return slotStartTimeInMinutes >= currentTimeInMinutes
@@ -232,19 +242,68 @@ export function TimePicker({
   }
 
   const getSlotLabel = (slot: TimeSlot) => {
-    if (slot.type === "morning-half") return `${t.morning} (10:00 - 15:00)`
-    if (slot.type === "afternoon-half") return `${t.afternoon} (15:00 - 21:00)`
-    if (slot.type === "fullday") return `${t.fullDay} (10:00 - 21:00)`
+    let label = `${slot.time} - ${slot.endTime}`
 
-    // Para slots regulares, mostrar el rango de tiempo
-    if (slot.endTime) {
-      return `${slot.time} - ${slot.endTime}`
+    // Añadir información de stock si está disponible
+    if (slot.availableUnits !== undefined && slot.totalUnits !== undefined) {
+      if (slot.totalUnits > 1) {
+        label += ` (${slot.availableUnits} ${t.unitsAvailable})`
+      }
     }
 
-    return slot.time
+    return label
   }
 
   const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
+
+  // ✅ ARREGLADO: Mejor categorización para motos de agua
+  const durationTypes = []
+
+  // Para barcos
+  if (vehicle.type === "boat") {
+    const halfdayOptions = pricingOptions.filter((p) => p.duration.startsWith("halfday"))
+    const fulldayOptions = pricingOptions.filter((p) => p.duration.startsWith("fullday"))
+
+    if (halfdayOptions.length > 0) {
+      durationTypes.push({
+        key: "halfday",
+        label: t.halfDay,
+        options: halfdayOptions,
+      })
+    }
+
+    if (fulldayOptions.length > 0) {
+      durationTypes.push({
+        key: "fullday",
+        label: t.fullDay,
+        options: fulldayOptions,
+      })
+    }
+  }
+
+  // Para motos de agua
+  if (vehicle.type === "jetski") {
+    const halfHourOptions = pricingOptions.filter((p) => p.duration === "30min")
+    const hourlyOptions = pricingOptions.filter(
+      (p) => p.duration !== "30min" && !p.duration.startsWith("halfday") && !p.duration.startsWith("fullday"),
+    )
+
+    if (halfHourOptions.length > 0) {
+      durationTypes.push({
+        key: "30min",
+        label: t.halfHour,
+        options: halfHourOptions,
+      })
+    }
+
+    if (hourlyOptions.length > 0) {
+      durationTypes.push({
+        key: "hourly",
+        label: t.byHours,
+        options: hourlyOptions,
+      })
+    }
+  }
 
   // Función para obtener el mensaje de restricción apropiado
   const getRestrictionMessage = () => {
@@ -258,20 +317,20 @@ export function TimePicker({
 
   return (
     <div className="space-y-6">
-      {/* Duration Selection */}
+      {/* Duration Type Selection */}
       <Card className="bg-white border border-gray-200">
         <CardContent className="p-6">
           <h4 className="text-lg font-semibold text-black mb-4">{t.selectDuration}</h4>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pricingOptions.map((option, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {durationTypes.map((type) => (
               <button
-                key={index}
-                onClick={() => setSelectedDuration(option)}
+                key={type.key}
+                onClick={() => setSelectedDurationType(type.key)}
                 className={`
                   p-4 rounded-lg border-2 transition-all duration-200 text-left
                   ${
-                    selectedDuration?.duration === option.duration
+                    selectedDurationType === type.key
                       ? "border-gold bg-gold/10"
                       : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
                   }
@@ -279,11 +338,11 @@ export function TimePicker({
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-semibold text-black">{option.label}</div>
-                    <div className="text-sm text-gray-600">{option.duration}</div>
+                    <div className="font-semibold text-black">{type.label}</div>
+                    <div className="text-sm text-gray-600">{type.options.length} opciones</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gold">€{option.price}</div>
+                    <div className="text-sm text-gold">Desde €{Math.min(...type.options.map((o) => o.price))}</div>
                   </div>
                 </div>
               </button>
@@ -308,7 +367,7 @@ export function TimePicker({
       )}
 
       {/* Time Slots */}
-      {selectedDuration ? (
+      {selectedDurationType ? (
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -341,8 +400,7 @@ export function TimePicker({
                 {getFilteredSlots().length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {getFilteredSlots().map((slot, index) => {
-                      const isSelected =
-                        selectedTime?.start === slot.time && selectedTime?.duration === selectedDuration.duration
+                      const isSelected = selectedTime?.start === slot.time && selectedTime?.duration === slot.duration
 
                       return (
                         <Button
@@ -350,7 +408,7 @@ export function TimePicker({
                           variant={isSelected ? "default" : "outline"}
                           onClick={() => handleTimeSlotClick(slot)}
                           className={`
-                            h-auto p-4 flex flex-col items-center justify-center min-h-[80px]
+                            h-auto p-4 flex flex-col items-center justify-center min-h-[100px]
                             ${
                               isSelected
                                 ? "bg-gold text-black hover:bg-gold/90"
@@ -358,7 +416,16 @@ export function TimePicker({
                             }
                           `}
                         >
-                          <div className="font-semibold text-center">{getSlotLabel(slot)}</div>
+                          <div className="font-semibold text-center mb-2">{getSlotLabel(slot)}</div>
+                          <div className="text-sm opacity-75">€{slot.price}</div>
+                          {slot.availableUnits !== undefined &&
+                            slot.totalUnits !== undefined &&
+                            slot.totalUnits > 1 && (
+                              <div className="flex items-center mt-1 text-xs">
+                                <Users className="h-3 w-3 mr-1" />
+                                {slot.availableUnits}/{slot.totalUnits}
+                              </div>
+                            )}
                           {isSelected && <Badge className="mt-2 bg-black text-white text-xs">{t.selected}</Badge>}
                         </Button>
                       )

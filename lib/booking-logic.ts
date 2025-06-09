@@ -16,6 +16,8 @@ export interface ExistingBooking {
   status?: string
   booking_date?: string // Añadir booking_date
   bookingDate?: string // Añadir bookingDate
+  vehicle_id?: number // ✅ NUEVO: Para identificar qué vehículo
+  vehicleId?: number
 }
 
 // Función auxiliar para convertir hora (HH:MM) a minutos
@@ -61,23 +63,25 @@ export function isPastSlot(slotStart: number, selectedDate: string): boolean {
   return isPast
 }
 
-// Función mejorada para detectar conflictos con reservas existentes
-export function hasConflict(
+// ✅ NUEVA FUNCIÓN: Verificar disponibilidad de stock
+export function checkStockAvailability(
   checkStartTime: string,
   checkEndTime: string,
   existingBookings: ExistingBooking[],
-): boolean {
+  totalStock: number,
+): { available: boolean; usedStock: number; availableStock: number } {
   const checkStart = timeToMinutes(checkStartTime)
   const checkEnd = timeToMinutes(checkEndTime)
 
-  console.log(`🔍 Verificando conflicto para slot ${checkStartTime}-${checkEndTime}`)
+  console.log(`📦 Verificando stock para slot ${checkStartTime}-${checkEndTime}`)
+  console.log(`📦 Stock total disponible: ${totalStock}`)
 
-  return existingBookings.some((booking) => {
-    // Extraer tiempo de inicio y fin del booking
+  // Contar cuántas reservas solapan con este horario
+  const overlappingBookings = existingBookings.filter((booking) => {
     let bookingStart: string
     let bookingEnd: string
 
-    // Priorizar time_slot de la BD
+    // Extraer horarios del booking
     const timeSlot = booking.time_slot || booking.timeSlot
     if (timeSlot && timeSlot.includes("-")) {
       ;[bookingStart, bookingEnd] = timeSlot.split("-").map((t) => t.trim())
@@ -93,30 +97,131 @@ export function hasConflict(
     const bookingStartMin = timeToMinutes(bookingStart)
     const bookingEndMin = timeToMinutes(bookingEnd)
 
-    // Detectar solapamiento: hay conflicto si los rangos se solapan
+    // Detectar solapamiento
     const overlaps = checkStart < bookingEndMin && checkEnd > bookingStartMin
 
     if (overlaps) {
       const customerName = booking.customer_name || booking.customerName || "Cliente"
       console.log(
-        `❌ CONFLICTO DETECTADO: ${checkStartTime}-${checkEndTime} solapa con ${bookingStart}-${bookingEnd} (${customerName})`,
+        `📦 SOLAPAMIENTO: ${checkStartTime}-${checkEndTime} solapa con ${bookingStart}-${bookingEnd} (${customerName})`,
       )
-    } else {
-      console.log(`✅ Sin conflicto: ${checkStartTime}-${checkEndTime} vs ${bookingStart}-${bookingEnd}`)
     }
 
     return overlaps
   })
+
+  const usedStock = overlappingBookings.length
+  const availableStock = totalStock - usedStock
+
+  console.log(`📦 Stock usado en este horario: ${usedStock}`)
+  console.log(`📦 Stock disponible: ${availableStock}`)
+
+  return {
+    available: availableStock > 0,
+    usedStock,
+    availableStock,
+  }
 }
 
-// Función mejorada para generar slots
+// ✅ FUNCIÓN ACTUALIZADA: Detectar conflictos considerando stock
+export function hasConflict(
+  checkStartTime: string,
+  checkEndTime: string,
+  existingBookings: ExistingBooking[],
+  totalStock = 1, // Por defecto 1 unidad (comportamiento anterior)
+): boolean {
+  const stockCheck = checkStockAvailability(checkStartTime, checkEndTime, existingBookings, totalStock)
+
+  // Si hay stock disponible, no hay conflicto
+  return !stockCheck.available
+}
+
+// ✅ NUEVA FUNCIÓN: Generar slots específicos para barcos
+function generateBoatSlots(
+  existingBookings: ExistingBooking[],
+  selectedDate: string,
+  durationType: string,
+  totalStock = 1,
+): any[] {
+  console.log(`🚤 Generando slots específicos para barcos - Duración: ${durationType}, Stock: ${totalStock}`)
+
+  const slots = []
+
+  if (durationType === "halfday" || durationType === "medio día") {
+    // ✅ MEDIO DÍA: Generar los 8 slots de 4 horas específicos
+    const fourHourSlots = [
+      { start: "10:00", end: "14:00", label: "10:00 - 14:00" },
+      { start: "11:00", end: "15:00", label: "11:00 - 15:00" },
+      { start: "12:00", end: "16:00", label: "12:00 - 16:00" },
+      { start: "13:00", end: "17:00", label: "13:00 - 17:00" },
+      { start: "14:00", end: "18:00", label: "14:00 - 18:00" },
+      { start: "15:00", end: "19:00", label: "15:00 - 19:00" },
+      { start: "16:00", end: "20:00", label: "16:00 - 20:00" },
+      { start: "17:00", end: "21:00", label: "17:00 - 21:00" },
+    ]
+
+    for (const timeSlot of fourHourSlots) {
+      const stockCheck = checkStockAvailability(timeSlot.start, timeSlot.end, existingBookings, totalStock)
+      const isPast = isPastSlot(timeToMinutes(timeSlot.start), selectedDate)
+
+      const slot = {
+        time: timeSlot.start,
+        available: stockCheck.available && !isPast,
+        type: "boat-4hour",
+        restricted: false,
+        restrictionReason: undefined,
+        endTime: timeSlot.end,
+        label: timeSlot.label,
+        stockInfo: stockCheck, // ✅ NUEVO: Información de stock
+      }
+
+      console.log(
+        `Slot 4h ${slot.label}: ${slot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (stock: ${stockCheck.availableStock}/${totalStock}, pasado: ${isPast})`,
+      )
+
+      slots.push(slot)
+    }
+  } else if (durationType === "fullday" || durationType === "día completo") {
+    // ✅ DÍA COMPLETO: Solo 1 slot de 11 horas
+    const fullDaySlot = {
+      start: "10:00",
+      end: "21:00",
+      label: "10:00 - 21:00",
+    }
+
+    const stockCheck = checkStockAvailability(fullDaySlot.start, fullDaySlot.end, existingBookings, totalStock)
+    const isPast = isPastSlot(timeToMinutes(fullDaySlot.start), selectedDate)
+
+    const slot = {
+      time: fullDaySlot.start,
+      available: stockCheck.available && !isPast,
+      type: "boat-fullday",
+      restricted: false,
+      restrictionReason: undefined,
+      endTime: fullDaySlot.end,
+      label: fullDaySlot.label,
+      stockInfo: stockCheck, // ✅ NUEVO: Información de stock
+    }
+
+    console.log(
+      `Slot día completo ${slot.label}: ${slot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (stock: ${stockCheck.availableStock}/${totalStock}, pasado: ${isPast})`,
+    )
+
+    slots.push(slot)
+  }
+
+  return slots
+}
+
+// ✅ FUNCIÓN ACTUALIZADA: Generar slots con soporte para stock
 export function generateSlotsForVehicle(
   vehicleType: string,
   businessSchedule: { startTime: string; endTime: string },
-  existingBookings: any[],
+  existingBookings: ExistingBooking[],
   durationType = "regular",
   vehicleCategory = "default",
-  selectedDate?: string, // Nuevo parámetro para fecha seleccionada
+  selectedDate?: string,
+  totalStock = 1, // ✅ NUEVO: Parámetro de stock
 ) {
   console.log("⚙️ Generando slots con parámetros:")
   console.log(`   - Tipo: ${vehicleType}`)
@@ -125,6 +230,7 @@ export function generateSlotsForVehicle(
   console.log(`   - Duración: ${durationType}`)
   console.log(`   - Fecha seleccionada: ${selectedDate || "No especificada"}`)
   console.log(`   - Reservas existentes: ${existingBookings.length}`)
+  console.log(`   - Stock total: ${totalStock}`) // ✅ NUEVO
 
   // Mostrar detalles de reservas existentes
   console.log("📋 Detalles de reservas existentes:")
@@ -133,6 +239,21 @@ export function generateSlotsForVehicle(
     const customer = booking.customer_name || booking.customerName || "Sin nombre"
     console.log(`   ${index + 1}. ${customer}: ${timeSlot} (${booking.status})`)
   })
+
+  // Obtener la fecha actual para comparaciones
+  const today = new Date().toISOString().split("T")[0]
+  const bookingDate = selectedDate || existingBookings[0]?.bookingDate || today
+
+  console.log(`📅 Fecha para verificación de slots pasados: ${bookingDate} (hoy: ${today})`)
+
+  // ✅ NUEVA LÓGICA: Si es un barco, usar slots específicos según duración
+  if (vehicleType === "boat") {
+    console.log("🚤 Detectado vehículo tipo BARCO - Usando slots específicos")
+    return generateBoatSlots(existingBookings, bookingDate, durationType, totalStock)
+  }
+
+  // ✅ LÓGICA EXISTENTE ACTUALIZADA: Para jetskis y otros vehículos con stock
+  console.log("🏍️ Vehículo tipo JETSKI/OTRO - Usando lógica regular con stock")
 
   // Convertir horarios a minutos para facilitar cálculos
   const startMinutes = timeToMinutes(businessSchedule.startTime)
@@ -165,13 +286,6 @@ export function generateSlotsForVehicle(
 
   console.log(`⏱️ Intervalo seleccionado: ${intervalMinutes} minutos`)
 
-  // Obtener la fecha actual para comparaciones
-  const today = new Date().toISOString().split("T")[0]
-  // Usar la fecha seleccionada o la fecha de la primera reserva o hoy
-  const bookingDate = selectedDate || existingBookings[0]?.bookingDate || today
-
-  console.log(`📅 Fecha para verificación de slots pasados: ${bookingDate} (hoy: ${today})`)
-
   // Generar todos los slots posibles
   const slots = []
 
@@ -186,32 +300,33 @@ export function generateSlotsForVehicle(
       const startTimeString = minutesToTime(slotStart)
       const endTimeString = minutesToTime(slotEnd)
 
-      // Verificar si el slot actual está ocupado usando la función hasConflict
-      const isOccupied = hasConflict(startTimeString, endTimeString, existingBookings)
+      // ✅ ACTUALIZADO: Verificar stock en lugar de conflicto simple
+      const stockCheck = checkStockAvailability(startTimeString, endTimeString, existingBookings, totalStock)
 
-      // Verificar si el slot ya ha pasado usando la función mejorada
+      // Verificar si el slot ya ha pasado
       const isPast = isPastSlot(slotStart, bookingDate)
 
       // Añadir el slot a la lista
       const slot = {
         time: startTimeString,
-        available: !isOccupied && !isPast,
+        available: stockCheck.available && !isPast,
         type: "regular",
         restricted: false,
         restrictionReason: undefined,
         endTime: endTimeString,
         label: `${startTimeString} - ${endTimeString}`,
+        stockInfo: stockCheck, // ✅ NUEVO: Información de stock
       }
 
       console.log(
-        `Slot ${slot.label}: ${slot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${isOccupied}, pasado: ${isPast})`,
+        `Slot ${slot.label}: ${slot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (stock: ${stockCheck.availableStock}/${totalStock}, pasado: ${isPast})`,
       )
 
       slots.push(slot)
     }
   }
 
-  // Para slots de medio día y día completo
+  // Para slots de medio día y día completo (solo para jetskis)
   if (["halfday", "fullday", "medio día", "día completo"].includes(durationType)) {
     console.log(`🕐 Generando slots de medio día/día completo...`)
 
@@ -222,21 +337,22 @@ export function generateSlotsForVehicle(
       const morningStartString = minutesToTime(morningStart)
       const morningEndString = minutesToTime(morningEnd)
 
-      const morningOccupied = hasConflict(morningStartString, morningEndString, existingBookings)
+      const stockCheck = checkStockAvailability(morningStartString, morningEndString, existingBookings, totalStock)
       const morningPast = isPastSlot(morningStart, bookingDate)
 
       const morningSlot = {
         time: morningStartString,
-        available: !morningOccupied && !morningPast,
+        available: stockCheck.available && !morningPast,
         type: "morning-half",
         restricted: false,
         restrictionReason: undefined,
         endTime: morningEndString,
         label: `Mañana (${morningStartString} - ${morningEndString})`,
+        stockInfo: stockCheck,
       }
 
       console.log(
-        `Slot ${morningSlot.label}: ${morningSlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${morningOccupied}, pasado: ${morningPast})`,
+        `Slot ${morningSlot.label}: ${morningSlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (stock: ${stockCheck.availableStock}/${totalStock}, pasado: ${morningPast})`,
       )
 
       slots.push(morningSlot)
@@ -249,21 +365,22 @@ export function generateSlotsForVehicle(
       const afternoonStartString = minutesToTime(afternoonStart)
       const afternoonEndString = minutesToTime(afternoonEnd)
 
-      const afternoonOccupied = hasConflict(afternoonStartString, afternoonEndString, existingBookings)
+      const stockCheck = checkStockAvailability(afternoonStartString, afternoonEndString, existingBookings, totalStock)
       const afternoonPast = isPastSlot(afternoonStart, bookingDate)
 
       const afternoonSlot = {
         time: afternoonStartString,
-        available: !afternoonOccupied && !afternoonPast,
+        available: stockCheck.available && !afternoonPast,
         type: "afternoon-half",
         restricted: false,
         restrictionReason: undefined,
         endTime: afternoonEndString,
         label: `Tarde (${afternoonStartString} - ${afternoonEndString})`,
+        stockInfo: stockCheck,
       }
 
       console.log(
-        `Slot ${afternoonSlot.label}: ${afternoonSlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${afternoonOccupied}, pasado: ${afternoonPast})`,
+        `Slot ${afternoonSlot.label}: ${afternoonSlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (stock: ${stockCheck.availableStock}/${totalStock}, pasado: ${afternoonPast})`,
       )
 
       slots.push(afternoonSlot)
@@ -276,21 +393,22 @@ export function generateSlotsForVehicle(
       const fullDayStartString = minutesToTime(fullDayStart)
       const fullDayEndString = minutesToTime(fullDayEnd)
 
-      const fullDayOccupied = hasConflict(fullDayStartString, fullDayEndString, existingBookings)
+      const stockCheck = checkStockAvailability(fullDayStartString, fullDayEndString, existingBookings, totalStock)
       const fullDayPast = isPastSlot(fullDayStart, bookingDate)
 
       const fullDaySlot = {
         time: fullDayStartString,
-        available: !fullDayOccupied && !fullDayPast,
+        available: stockCheck.available && !fullDayPast,
         type: "fullday",
         restricted: false,
         restrictionReason: undefined,
         endTime: fullDayEndString,
         label: `Día completo (${fullDayStartString} - ${fullDayEndString})`,
+        stockInfo: stockCheck,
       }
 
       console.log(
-        `Slot ${fullDaySlot.label}: ${fullDaySlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (ocupado: ${fullDayOccupied}, pasado: ${fullDayPast})`,
+        `Slot ${fullDaySlot.label}: ${fullDaySlot.available ? "✅ DISPONIBLE" : "❌ NO DISPONIBLE"} (stock: ${stockCheck.availableStock}/${totalStock}, pasado: ${fullDayPast})`,
       )
 
       slots.push(fullDaySlot)
@@ -301,13 +419,6 @@ export function generateSlotsForVehicle(
   console.log(`✅ Slots generados: ${slots.length}`)
   console.log(`   - Disponibles: ${slots.filter((s) => s.available).length}`)
   console.log(`   - No disponibles: ${slots.filter((s) => !s.available).length}`)
-
-  // Mostrar slots disponibles e indisponibles
-  console.log(`✅ Slots disponibles:`)
-  slots.filter((s) => s.available).forEach((s) => console.log(`   - ${s.label}`))
-
-  console.log(`❌ Slots no disponibles:`)
-  slots.filter((s) => !s.available).forEach((s) => console.log(`   - ${s.label}`))
 
   return slots
 }

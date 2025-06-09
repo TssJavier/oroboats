@@ -19,6 +19,7 @@ import {
   Eye,
   EyeOff,
   Calendar,
+  Package,
 } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
@@ -54,6 +55,7 @@ interface Vehicle {
   customDurationEnabled: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  stock?: number // ✅ NUEVO: Campo de stock
 }
 
 export function VehicleManagement() {
@@ -133,7 +135,6 @@ export function VehicleManagement() {
         const errorData = await response.json().catch(() => ({}))
         console.error("❌ Delete failed with error:", errorData)
 
-        // Mostrar error específico basado en el código de estado
         if (response.status === 500) {
           throw new Error("Error del servidor. Verifica que la base de datos esté conectada y que las tablas existan.")
         } else if (response.status === 404) {
@@ -147,7 +148,7 @@ export function VehicleManagement() {
       console.log("✅ Vehicle deleted successfully:", result)
 
       toast.success("Vehículo eliminado correctamente")
-      await fetchVehicles() // Recargar la lista
+      await fetchVehicles()
     } catch (error) {
       console.error("❌ Error deleting vehicle:", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido al eliminar el vehículo"
@@ -173,7 +174,6 @@ export function VehicleManagement() {
   const handleManualBookingSuccess = () => {
     setShowManualBooking(false)
     setSelectedVehicleForBooking(null)
-    // Opcional: recargar vehículos si necesitas actualizar algún estado
   }
 
   const handleManualBookingClose = () => {
@@ -261,7 +261,7 @@ export function VehicleManagement() {
         <Card className="bg-red-50 border border-red-200">
           <CardContent className="text-center py-12">
             <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-red-800 mb-2">Error al eliminar el producto</h3>
+            <h3 className="text-xl font-semibold text-red-800 mb-2">Error al cargar productos</h3>
             <p className="text-red-600 mb-4">{error}</p>
             <div className="flex gap-4 justify-center">
               <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
@@ -356,12 +356,16 @@ export function VehicleManagement() {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center text-gray-500">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center text-gray-500">
                       <Users className="h-4 w-4 mr-1" />
-                      Capacidad
-                    </span>
-                    <span className="font-semibold">{vehicle.capacity} personas</span>
+                      <span>Capacidad: {vehicle.capacity}</span>
+                    </div>
+                    {/* ✅ NUEVO: Mostrar stock */}
+                    <div className="flex items-center text-gray-500">
+                      <Package className="h-4 w-4 mr-1" />
+                      <span>Stock: {vehicle.stock || 1}</span>
+                    </div>
                   </div>
 
                   {vehicle.pricing && vehicle.pricing.length > 0 && (
@@ -384,6 +388,15 @@ export function VehicleManagement() {
                   {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
                     <div className="bg-blue-50 border border-blue-200 rounded p-2">
                       <span className="text-sm text-blue-800 font-medium">Fianza: €{vehicle.securityDeposit}</span>
+                    </div>
+                  )}
+
+                  {/* ✅ NUEVO: Información de stock destacada */}
+                  {vehicle.stock && vehicle.stock > 1 && (
+                    <div className="bg-green-50 border border-green-200 rounded p-2">
+                      <span className="text-sm text-green-800 font-medium">
+                        📦 {vehicle.stock} unidades disponibles
+                      </span>
                     </div>
                   )}
 

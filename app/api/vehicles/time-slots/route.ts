@@ -5,139 +5,100 @@ import { db } from "@/lib/db"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 
+// ✅ ESTA RUTA ES PARA: Admin que gestiona horarios (POST request con auth)
+// URL: /api/vehicles/time-slots (POST)
+// Uso: Admin dashboard para ver/gestionar slots de vehículos específicos
+
 export async function POST(request: NextRequest) {
   try {
-    console.log("🚀 Time-slots API started")
+    console.log("🚀 [ADMIN] Time-slots API started")
 
-    // Verificar autenticación
+    // ✅ REQUIERE AUTENTICACIÓN DE ADMIN
     const token = request.cookies.get("admin-token")?.value
     if (!token) {
-      console.log("❌ No token")
       return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     await jwtVerify(token, JWT_SECRET)
-    console.log("✅ Authenticated")
+    console.log("✅ [ADMIN] Authenticated")
 
-    // Obtener datos del request
     const requestData = await request.json()
-    console.log("📝 Request data:", requestData)
-
     const { vehicleId, date } = requestData
 
     if (!vehicleId || !date) {
-      console.log("❌ Missing data")
       return NextResponse.json({ error: "Vehicle ID and date required" }, { status: 400 })
     }
 
-    // USAR LA MISMA CONFIGURACIÓN QUE FUNCIONA EN OTRAS APIS
-    let vehicle = null
-    let existingBookings = []
+    console.log(`🔍 [ADMIN] Request: Vehicle ${vehicleId}, Date: ${date}`)
 
-    try {
-      console.log("🔌 Using same DB config as working APIs...")
+    // Obtener vehículo con stock
+    const vehicleQuery = await db.execute(sql`
+      SELECT id, name, type, pricing, available, stock
+      FROM vehicles 
+      WHERE id = ${vehicleId}
+      LIMIT 1
+    `)
 
-      // Obtener vehículo usando la misma sintaxis que funciona
-      console.log(`🚗 Fetching vehicle ${vehicleId}...`)
-
-      const vehicleQuery = await db.execute(sql`
-        SELECT id, name, pricing, available
-        FROM vehicles 
-        WHERE id = ${vehicleId}
-        LIMIT 1
-      `)
-
-      if (!vehicleQuery || vehicleQuery.length === 0) {
-        console.log("❌ Vehicle not found")
-        return NextResponse.json({ error: "Vehicle not found" }, { status: 404 })
-      }
-
-      vehicle = vehicleQuery[0]
-      console.log("✅ Vehicle found:", vehicle.name)
-
-      // Parsear pricing
-      if (typeof vehicle.pricing === "string") {
-        try {
-          vehicle.pricing = JSON.parse(vehicle.pricing) as any[]
-          console.log("✅ Pricing parsed, options:", (vehicle.pricing as any[]).length)
-        } catch (e) {
-          console.log("⚠️ Error parsing pricing, using defaults")
-          vehicle.pricing = [
-            { label: "30 minutos", duration: "30min", price: 600 },
-            { label: "1 hora", duration: "1hour", price: 700 },
-          ]
-        }
-      }
-
-      // Obtener reservas para la fecha específica usando la misma sintaxis
-      console.log(`📅 Fetching bookings for vehicle ${vehicleId} on ${date}...`)
-
-      const bookingsQuery = await db.execute(sql`
-        SELECT 
-          id,
-          customer_name,
-          time_slot,
-          status,
-          created_at,
-          booking_date
-        FROM bookings 
-        WHERE vehicle_id = ${vehicleId} 
-        AND booking_date = ${date}
-        AND status IN ('confirmed', 'completed', 'pending')
-        ORDER BY time_slot ASC
-      `)
-
-      existingBookings = bookingsQuery || []
-
-      console.log("📊 REAL bookings found for date", date, ":", existingBookings.length)
-      existingBookings.forEach((booking, index) => {
-        console.log(
-          `  ${index + 1}. ${booking.customer_name} - ${booking.time_slot} (${booking.status}) - Date: ${booking.booking_date}`,
-        )
-      })
-
-      console.log("✅ Database connection successful - using REAL data")
-    } catch (dbError) {
-      console.log("❌ Database query FAILED")
-      console.log("Error type:", dbError?.constructor?.name)
-      console.log("Error message:", dbError instanceof Error ? dbError.message : String(dbError))
-
-      // NO USAR FALLBACK - devolver error para forzar la corrección
-      return NextResponse.json(
-        {
-          error: "Database connection failed",
-          details: dbError instanceof Error ? dbError.message : String(dbError),
-          suggestion: "Check database configuration",
-        },
-        { status: 500 },
-      )
+    if (!vehicleQuery || vehicleQuery.length === 0) {
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 })
     }
 
+    const vehicle = vehicleQuery[0]
+    console.log("✅ [ADMIN] Vehicle found:", vehicle.name)
+
+    // Parsear pricing
+    if (typeof vehicle.pricing === "string") {
+      try {
+        vehicle.pricing = JSON.parse(vehicle.pricing)
+      } catch (e) {
+        vehicle.pricing = []
+      }
+    }
+
+    // ✅ IMPORTANTE: Esta API usa time_slot (formato "HH:MM-HH:MM") para compatibilidad con datos existentes
+    const bookingsQuery = await db.execute(sql`
+      SELECT 
+        id,
+        customer_name,
+        time_slot,
+        status,
+        created_at,
+        booking_date
+      FROM bookings 
+      WHERE vehicle_id = ${vehicleId} 
+      AND booking_date = ${date}
+      AND status IN ('confirmed', 'completed', 'pending')
+      ORDER BY time_slot ASC
+    `)
+
+    const existingBookings = bookingsQuery || []
+    console.log("📊 [ADMIN] Bookings found:", existingBookings.length)
+
     if (!vehicle.available) {
-      console.log("❌ Vehicle not available")
       return NextResponse.json({ availableSlots: [] })
     }
 
-    // Generar slots con datos REALES
-    console.log("⚙️ Generating slots with REAL booking conflicts for date:", date)
-    const slots = generateSlots(vehicle.pricing as any[], existingBookings, date)
-
-    console.log("✅ Generated slots:", slots.length)
+    // Generar slots para admin (sin filtro de tipo)
+    const slots = generateAdminSlots(
+      vehicle.pricing as any[],
+      existingBookings,
+      date,
+      typeof vehicle.stock === "number" ? vehicle.stock : 1
+    )
 
     return NextResponse.json({
       availableSlots: slots,
       debug: {
         vehicleName: vehicle.name,
+        vehicleStock: vehicle.stock || 1,
         existingBookings: existingBookings.length,
-        bookingsFound: existingBookings.map(
-          (b) => `${b.customer_name}: ${b.time_slot} (${b.status}) - ${b.booking_date}`,
-        ),
+        bookingsFound: existingBookings.map((b) => `${b.customer_name}: ${b.time_slot} (${b.status})`),
         date: date,
         databaseConnected: true,
       },
     })
   } catch (error) {
-    console.error("❌ API Error:", error)
+    console.error("❌ [ADMIN] API Error:", error)
     return NextResponse.json(
       {
         error: "Server error",
@@ -148,16 +109,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateSlots(pricing: any[], existingBookings: any[], date: string) {
-  console.log("🔧 Generating slots with REAL conflicts for date:", date)
-
+function generateAdminSlots(pricing: any[], existingBookings: any[], date: string, vehicleStock: number) {
   const slots = []
-  const workStart = 10 * 60 // 10:00 AM
-  const workEnd = 21 * 60 // 9:00 PM
+  const workStart = 10 * 60
+  const workEnd = 21 * 60
 
-  console.log(`⏰ Work hours: ${minutesToTime(workStart)} - ${minutesToTime(workEnd)}`)
-
-  // Convertir reservas REALES a rangos ocupados
+  // ✅ ADMIN: Convertir time_slot a rangos ocupados
   const occupiedRanges = []
   for (const booking of existingBookings) {
     if (booking.time_slot && booking.time_slot.includes("-")) {
@@ -170,82 +127,46 @@ function generateSlots(pricing: any[], existingBookings: any[], date: string) {
         end: endMinutes,
         customer: booking.customer_name,
         status: booking.status,
-        bookingDate: booking.booking_date,
       })
-      console.log(
-        `🚫 OCCUPIED: ${startTime.trim()}-${endTime.trim()} by ${booking.customer_name} (${booking.status}) on ${booking.booking_date}`,
-      )
     }
   }
-
-  console.log("🚫 Total REAL occupied ranges for date", date, ":", occupiedRanges.length)
 
   // Generar slots para cada opción de pricing
   for (const option of pricing) {
     if (!option || !option.duration) continue
 
     const duration = getDuration(option.duration)
-    console.log(`⏱️ Processing ${option.label}: ${duration} min`)
 
-    // Generar slots cada 30 minutos
     for (let start = workStart; start + duration <= workEnd; start += 30) {
       const end = start + duration
 
-      // Verificar conflictos con reservas REALES
-      const conflictingRange = occupiedRanges.find((range) => {
-        return start < range.end && end > range.start
-      })
+      // Contar conflictos para calcular stock disponible
+      const conflicts = occupiedRanges.filter((range) => start < range.end && end > range.start)
+      const availableUnits = Math.max(0, vehicleStock - conflicts.length)
 
-      if (conflictingRange) {
-        console.log(
-          `❌ REAL CONFLICT: ${minutesToTime(start)}-${minutesToTime(end)} conflicts with ${conflictingRange.customer}'s booking ${minutesToTime(conflictingRange.start)}-${minutesToTime(conflictingRange.end)} on ${conflictingRange.bookingDate}`,
-        )
-        continue
+      if (!isInPast(start, date)) {
+        slots.push({
+          startTime: minutesToTime(start),
+          endTime: minutesToTime(end),
+          duration: option.duration,
+          label: option.label || option.duration,
+          price: option.price || 50,
+          available: availableUnits > 0,
+          availableUnits: availableUnits,
+          totalUnits: vehicleStock,
+          conflicts: conflicts.length,
+        })
       }
-
-      // Verificar si es pasado
-      const isPast = isInPast(start, date)
-      if (isPast) {
-        console.log(`⏰ PAST: ${minutesToTime(start)}-${minutesToTime(end)} is in the past`)
-        continue
-      }
-
-      slots.push({
-        startTime: minutesToTime(start),
-        endTime: minutesToTime(end),
-        duration: option.duration,
-        label: option.label || option.duration,
-        price: option.price || 50,
-      })
-      console.log(`✅ AVAILABLE: ${minutesToTime(start)}-${minutesToTime(end)} (${option.label}) - €${option.price}`)
     }
   }
 
-  // Ordenar por hora
-  slots.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
-
-  console.log("✅ FINAL AVAILABLE SLOTS for date", date, "(after REAL conflicts):")
-  slots.forEach((slot, index) => {
-    console.log(`  ${index + 1}. ${slot.startTime}-${slot.endTime} (${slot.label}) - €${slot.price}`)
-  })
-
-  return slots
+  return slots.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
 }
 
 function timeToMinutes(timeStr: string): number {
-  if (!timeStr || typeof timeStr !== "string") return 0
-
-  try {
-    const parts = timeStr.split(":")
-    if (parts.length !== 2) return 0
-
-    const hours = Number.parseInt(parts[0]) || 0
-    const minutes = Number.parseInt(parts[1]) || 0
-
-    return hours * 60 + minutes
-  } catch {
-    return 0
-  }
+  if (!timeStr) return 0
+  const [hours, minutes] = timeStr.split(":").map(Number)
+  return hours * 60 + minutes
 }
 
 function minutesToTime(minutes: number): string {
@@ -255,8 +176,6 @@ function minutesToTime(minutes: number): string {
 }
 
 function getDuration(duration: string): number {
-  if (!duration) return 30
-
   const durationMap: Record<string, number> = {
     "30min": 30,
     "1hour": 60,
@@ -266,7 +185,6 @@ function getDuration(duration: string): number {
     halfday: 240,
     fullday: 480,
   }
-
   return durationMap[duration] || 60
 }
 
@@ -274,12 +192,7 @@ function isInPast(slotStart: number, date: string): boolean {
   try {
     const now = new Date()
     const slotDate = new Date(date)
-
-    // Solo verificar si es hoy
-    if (slotDate.toDateString() !== now.toDateString()) {
-      return false
-    }
-
+    if (slotDate.toDateString() !== now.toDateString()) return false
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
     return slotStart <= currentMinutes
   } catch {

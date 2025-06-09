@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ImageUpload } from "./image-upload"
-import { ArrowLeft, Plus, Trash2, Save, Award, AlertCircle, Euro, Clock } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Save, Award, AlertCircle, Euro, Clock, Package } from "lucide-react"
 
 interface PricingOption {
   duration: string
@@ -41,6 +41,7 @@ interface Vehicle {
   customDurationEnabled: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  stock?: number // Nuevo campo para stock/inventario
 }
 
 interface VehicleFormProps {
@@ -49,29 +50,40 @@ interface VehicleFormProps {
   onCancel: () => void
 }
 
-// Franjas horarias disponibles según categoría
+// ✅ NUEVAS FRANJAS HORARIAS - IGUALES PARA BARCOS CON Y SIN LICENCIA
 const TIME_SLOTS = {
   boat_no_license: [
-    { duration: "halfday_morning", label: "Medio día mañana (10:00 - 14:00)", hours: 4 },
-    { duration: "halfday_afternoon", label: "Medio día tarde (16:00 - 20:00)", hours: 4 },
-    { duration: "halfday_evening", label: "Medio día noche (17:00 - 21:00)", hours: 4 },
+    { duration: "halfday_10_14", label: "Medio día (10:00 - 14:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_11_15", label: "Medio día (11:00 - 15:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_12_16", label: "Medio día (12:00 - 16:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_13_17", label: "Medio día (13:00 - 17:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_14_18", label: "Medio día (14:00 - 18:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_15_19", label: "Medio día (15:00 - 19:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_16_20", label: "Medio día (16:00 - 20:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_17_21", label: "Medio día (17:00 - 21:00)", hours: 4, defaultPrice: 390 },
+    { duration: "fullday_10_21", label: "Día completo (10:00 - 21:00)", hours: 11, defaultPrice: 590 },
   ],
   boat_with_license: [
-    { duration: "halfday_morning", label: "Medio día mañana (10:00 - 14:00)", hours: 4 },
-    { duration: "halfday_afternoon", label: "Medio día tarde (14:00 - 18:00)", hours: 4 },
-    { duration: "halfday_evening", label: "Medio día noche (17:00 - 21:00)", hours: 4 },
-    { duration: "fullday", label: "Día completo (10:00 - 21:00)", hours: 11 },
+    { duration: "halfday_10_14", label: "Medio día (10:00 - 14:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_11_15", label: "Medio día (11:00 - 15:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_12_16", label: "Medio día (12:00 - 16:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_13_17", label: "Medio día (13:00 - 17:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_14_18", label: "Medio día (14:00 - 18:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_15_19", label: "Medio día (15:00 - 19:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_16_20", label: "Medio día (16:00 - 20:00)", hours: 4, defaultPrice: 390 },
+    { duration: "halfday_17_21", label: "Medio día (17:00 - 21:00)", hours: 4, defaultPrice: 390 },
+    { duration: "fullday_10_21", label: "Día completo (10:00 - 21:00)", hours: 11, defaultPrice: 590 },
   ],
   jetski_no_license: [
-    { duration: "30min", label: "30 minutos", hours: 0.5 },
-    { duration: "1hour", label: "1 hora", hours: 1 },
+    { duration: "30min", label: "30 minutos", hours: 0.5, defaultPrice: 60 },
+    { duration: "1hour", label: "1 hora", hours: 1, defaultPrice: 90 },
   ],
   jetski_with_license: [
-    { duration: "30min", label: "30 minutos", hours: 0.5 },
-    { duration: "1hour", label: "1 hora", hours: 1 },
-    { duration: "2hour", label: "2 horas", hours: 2 },
-    { duration: "halfday", label: "Medio día (4 horas)", hours: 4 },
-    { duration: "fullday", label: "Día completo (8 horas)", hours: 8 },
+    { duration: "30min", label: "30 minutos", hours: 0.5, defaultPrice: 60 },
+    { duration: "1hour", label: "1 hora", hours: 1, defaultPrice: 90 },
+    { duration: "2hour", label: "2 horas", hours: 2, defaultPrice: 160 },
+    { duration: "halfday", label: "Medio día (4 horas)", hours: 4, defaultPrice: 250 },
+    { duration: "fullday", label: "Día completo (8 horas)", hours: 8, defaultPrice: 400 },
   ],
 }
 
@@ -136,6 +148,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     customDurationEnabled: false,
     extraFeatures: AVAILABLE_EXTRA_FEATURES.map((f) => ({ ...f })),
     securityDeposit: 0,
+    stock: 1, // ✅ NUEVO: Stock por defecto
   })
   const [newInclude, setNewInclude] = useState("")
   const [loading, setLoading] = useState(false)
@@ -147,6 +160,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         ...vehicle,
         extraFeatures: vehicle.extraFeatures || AVAILABLE_EXTRA_FEATURES.map((f) => ({ ...f })),
         securityDeposit: vehicle.securityDeposit || 0,
+        stock: vehicle.stock || 1, // ✅ NUEVO: Cargar stock existente
       })
     }
   }, [vehicle])
@@ -176,6 +190,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         availableDurations: formData.pricing.map((p) => p.duration),
         extraFeatures: formData.extraFeatures || [],
         securityDeposit: formData.securityDeposit || 0,
+        stock: formData.stock || 1, // ✅ NUEVO: Incluir stock
       }
 
       console.log("📤 Sending data:", dataToSend)
@@ -209,7 +224,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     const slots = TIME_SLOTS[formData.category as keyof typeof TIME_SLOTS] || []
     const newPricing = slots.map((slot) => ({
       duration: slot.duration,
-      price: 0,
+      price: slot.defaultPrice || 0,
       label: slot.label,
     }))
 
@@ -351,17 +366,37 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Capacidad (personas)</label>
-                <Input
-                  type="number"
-                  value={formData.capacity}
-                  onChange={(e) => setFormData({ ...formData, capacity: Number.parseInt(e.target.value) })}
-                  min="1"
-                  max="20"
-                  required
-                  className="bg-gray-50 border-gray-200"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Capacidad (personas)</label>
+                  <Input
+                    type="number"
+                    value={formData.capacity}
+                    onChange={(e) => setFormData({ ...formData, capacity: Number.parseInt(e.target.value) })}
+                    min="1"
+                    max="20"
+                    required
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+
+                {/* ✅ NUEVO: Campo de Stock */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Package className="h-4 w-4 inline mr-1" />
+                    Stock disponible
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: Number.parseInt(e.target.value) })}
+                    min="1"
+                    max="100"
+                    required
+                    className="bg-gray-50 border-gray-200"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Número de unidades disponibles de este producto</p>
+                </div>
               </div>
 
               <div>
@@ -445,17 +480,17 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Información sobre restricciones */}
-            {formData.category.includes("no_license") && (
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+            {/* ✅ INFORMACIÓN ACTUALIZADA - SIN RESTRICCIONES */}
+            {formData.type === "boat" && (
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                 <div className="flex items-start">
-                  <AlertCircle className="h-5 w-5 text-orange-600 mr-3 mt-0.5" />
+                  <AlertCircle className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
                   <div>
-                    <h4 className="font-medium text-orange-800 mb-1">Restricciones sin licencia</h4>
-                    <p className="text-sm text-orange-700">
-                      {formData.type === "boat"
-                        ? "Los barcos sin licencia no pueden alquilarse de 14:00 a 16:00 (descanso del personal) y solo están disponibles en franjas de medio día."
-                        : "Las motos sin licencia no pueden alquilarse de 14:00 a 16:00 (descanso del personal) y solo están disponibles en duraciones de 30 minutos y 1 hora."}
+                    <h4 className="font-medium text-green-800 mb-1">Horarios de barcos actualizados</h4>
+                    <p className="text-sm text-green-700">
+                      {formData.requiresLicense
+                        ? "Los barcos con licencia tienen 8 franjas de medio día (4h) + día completo (11h) disponibles."
+                        : "Los barcos sin licencia tienen 8 franjas de medio día (4h) + día completo (11h) disponibles. Ya no hay restricciones de horario."}
                     </p>
                   </div>
                 </div>
@@ -680,5 +715,4 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
   )
 }
 
-// ✅ EXPORTACIÓN CORRECTA - ESTO ERA LO QUE FALTABA
 export default VehicleForm
