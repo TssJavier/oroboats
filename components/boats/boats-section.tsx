@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SimpleDateFilter } from "./simple-date-filter"
 import {
   Ship,
   Zap,
@@ -31,6 +31,7 @@ import {
   Droplets,
   Coffee,
   Package,
+  Filter,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -77,13 +78,12 @@ interface Vehicle {
   available: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  isAvailable?: boolean
 }
 
 interface Translations {
   title: string
   subtitle: string
-  boats: string
-  jetskis: string
   withLicense: string
   withoutLicense: string
   reserve: string
@@ -97,7 +97,6 @@ interface Translations {
   loading: string
   licenseRequired: string
   noLicenseNeeded: string
-  selectCategory: string
   restrictedHours: string
   restrictedInfo: string
   licenseWarningTitle: string
@@ -115,14 +114,12 @@ interface Translations {
   securityDeposit: string
   prices: string
   people: string
-  // ✅ NUEVAS TRADUCCIONES PARA EXTRAS
   photoSession: string
   bluetoothMusic: string
   safetyRing: string
   champagne: string
   snorkelingGear: string
   coolerDrinks: string
-  // ✅ TRADUCCIONES PARA FRANJAS HORARIAS
   halfDayMorning: string
   halfDayAfternoon: string
   halfDayEvening: string
@@ -132,14 +129,20 @@ interface Translations {
   twoHours: string
   fourHours: string
   halfHour: string
+  withLicenseDesc: string
+  withoutLicenseDesc: string
+  searchResults: string
+  showingResults: string
+  noResultsFound: string
+  adjustFilters: string
+  boatsAndJetskis: string
+  availableForDate: string
 }
 
 const translations = {
   es: {
     title: "Nuestra Flota",
     subtitle: "Motos de agua y barcos para experiencias inolvidables",
-    boats: "Barcos",
-    jetskis: "Motos de Agua",
     withLicense: "Con Licencia",
     withoutLicense: "Sin Licencia",
     reserve: "Reservar",
@@ -153,9 +156,8 @@ const translations = {
     loading: "Cargando...",
     licenseRequired: "Licencia requerida",
     noLicenseNeeded: "Sin licencia",
-    selectCategory: "Selecciona una categoría",
     restrictedHours: "Horario restringido",
-    restrictedInfo: "No disponible de 14:00 a 16:00 (descanso del personal)",
+    restrictedInfo: "Motos sin licencia: No disponible de 14:00 a 16:00 (descanso del personal)",
     licenseWarningTitle: "Licencia de Navegación Requerida",
     licenseWarningMessage: "Has seleccionado un vehículo que requiere licencia de navegación.",
     licenseWarningRequirements:
@@ -172,14 +174,12 @@ const translations = {
     securityDeposit: "Fianza",
     prices: "Precios",
     people: "personas",
-    // Extras en español
     photoSession: "Sesión de fotos",
     bluetoothMusic: "Música Bluetooth",
     safetyRing: "Rosco de seguridad",
     champagne: "Champán",
     snorkelingGear: "Equipo de snorkel",
     coolerDrinks: "Nevera con bebidas",
-    // Franjas horarias en español
     halfDayMorning: "Medio día mañana",
     halfDayAfternoon: "Medio día tarde",
     halfDayEvening: "Medio día noche",
@@ -189,12 +189,18 @@ const translations = {
     twoHours: "2 horas",
     fourHours: "4 horas",
     halfHour: "30 minutos",
+    withLicenseDesc: "Barcos y motos que requieren licencia de navegación",
+    withoutLicenseDesc: "Barcos y motos que no requieren licencia",
+    searchResults: "Resultados de búsqueda",
+    showingResults: "Mostrando",
+    noResultsFound: "No se encontraron resultados",
+    adjustFilters: "Intenta seleccionar otra fecha",
+    boatsAndJetskis: "barcos y motos",
+    availableForDate: "disponibles para la fecha seleccionada",
   },
   en: {
     title: "Our Fleet",
     subtitle: "Jet skis and boats for unforgettable experiences",
-    boats: "Boats",
-    jetskis: "Jet Skis",
     withLicense: "With License",
     withoutLicense: "Without License",
     reserve: "Reserve",
@@ -208,9 +214,8 @@ const translations = {
     loading: "Loading...",
     licenseRequired: "License required",
     noLicenseNeeded: "No license needed",
-    selectCategory: "Select a category",
     restrictedHours: "Restricted hours",
-    restrictedInfo: "Not available from 14:00 to 16:00 (staff break)",
+    restrictedInfo: "Jet skis without license: Not available from 14:00 to 16:00 (staff break)",
     licenseWarningTitle: "Navigation License Required",
     licenseWarningMessage: "You have selected a vehicle that requires a navigation license.",
     licenseWarningRequirements:
@@ -227,14 +232,12 @@ const translations = {
     securityDeposit: "Security Deposit",
     prices: "Prices",
     people: "people",
-    // ✅ EXTRAS EN INGLÉS
     photoSession: "Photo session",
     bluetoothMusic: "Bluetooth Music",
     safetyRing: "Safety ring",
     champagne: "Champagne",
     snorkelingGear: "Snorkel equipment",
     coolerDrinks: "Cooler with drinks",
-    // ✅ FRANJAS HORARIAS EN INGLÉS
     halfDayMorning: "Half day morning",
     halfDayAfternoon: "Half day afternoon",
     halfDayEvening: "Half day evening",
@@ -244,6 +247,14 @@ const translations = {
     twoHours: "2 hours",
     fourHours: "4 hours",
     halfHour: "30 minutes",
+    withLicenseDesc: "Boats and jet skis that require navigation license",
+    withoutLicenseDesc: "Boats and jet skis that don't require license",
+    searchResults: "Search results",
+    showingResults: "Showing",
+    noResultsFound: "No results found",
+    adjustFilters: "Try selecting another date",
+    boatsAndJetskis: "boats and jet skis",
+    availableForDate: "available for selected date",
   },
 }
 
@@ -267,23 +278,6 @@ function translateExtraName(extraId: string, t: Translations): string {
   }
 }
 
-// ✅ FUNCIÓN PARA TRADUCIR ETIQUETAS DE TIEMPO
-function translateTimeLabel(label: string, t: Translations): string {
-  if (label.includes("Medio día mañana") || label.includes("Half day morning")) {
-    return `${t.halfDayMorning} (10:00 - 14:00)`
-  }
-  if (label.includes("Medio día tarde") || label.includes("Half day afternoon")) {
-    return `${t.halfDayAfternoon} (16:00 - 20:00)`
-  }
-  if (label.includes("Medio día noche") || label.includes("Half day evening")) {
-    return `${t.halfDayEvening} (17:00 - 21:00)`
-  }
-  if (label.includes("Día completo") || label.includes("Full day")) {
-    return `${t.fullDay} (10:00 - 21:00)`
-  }
-  return label
-}
-
 // ✅ FUNCIÓN MEJORADA CON ICONOS MÁS ESPECÍFICOS
 function getExtraIcon(featureId: string) {
   switch (featureId) {
@@ -298,18 +292,12 @@ function getExtraIcon(featureId: string) {
     case "snorkeling_gear":
       return <Waves className="h-4 w-4 text-cyan-600" />
     case "cooler_drinks":
-      return <Coffee className="h-4 w-4 text-orange-600\" />
-      {
-        /* Icono de bebidas */
-      }
+      return <Coffee className="h-4 w-4 text-orange-600" />
     case "fuel_included":
     case "extra_fuel":
     case "gasoline":
     case "fuel_tank":
-      return <Fuel className="h-4 w-4 text-red-600\" />
-      {
-        /* Icono de combustible */
-      }
+      return <Fuel className="h-4 w-4 text-red-600" />
     case "towels":
       return <Package className="h-4 w-4 text-blue-400" />
     case "water_sports":
@@ -373,7 +361,6 @@ function LicenseWarningModal({
                 <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-yellow-800 text-sm font-medium mb-2">{t.licenseWarningRequirements}</p>
-                  <p className="text-yellow-700 text-sm">{/*{t.licenseWarningNote}*/}</p>
                 </div>
               </div>
             </div>
@@ -500,13 +487,16 @@ export function BoatsSection() {
   const { language } = useApp()
   const t = translations[language]
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState("boats")
-  const [activeLicense, setActiveLicense] = useState("with")
+  const [activeLicense, setActiveLicense] = useState("without")
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showLicenseModal, setShowLicenseModal] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<string>("")
 
   useEffect(() => {
     fetchVehicles()
@@ -523,9 +513,9 @@ export function BoatsSection() {
 
       const data = await response.json()
 
-      // Verificar que la respuesta sea un array
       if (Array.isArray(data)) {
         setVehicles(data)
+        setFilteredVehicles(data)
       } else {
         console.error("API returned non-array data:", data)
         setVehicles([])
@@ -540,13 +530,63 @@ export function BoatsSection() {
     }
   }
 
-  // Filtrar vehículos por categoría
-  const getVehiclesByCategory = (type: string, hasLicense: boolean) => {
-    const category = `${type}_${hasLicense ? "with_license" : "no_license"}`
-    return vehicles.filter((v) => v.category === category)
+  // ✅ NUEVA FUNCIÓN PARA FILTRAR POR LICENCIA (BARCOS Y MOTOS JUNTOS)
+  const getVehiclesByLicense = (hasLicense: boolean) => {
+    const targetCategories = hasLicense
+      ? ["boat_with_license", "jetski_with_license"]
+      : ["boat_no_license", "jetski_no_license"]
+
+    return filteredVehicles.filter((v) => targetCategories.includes(v.category))
   }
 
-  const currentVehicles = getVehiclesByCategory(activeTab === "boats" ? "boat" : "jetski", activeLicense === "with")
+  // ✅ FUNCIÓN PARA BUSCAR POR FECHA MEJORADA
+  const handleDateSelect = async (date: string) => {
+    setSelectedDate(date)
+    setSearchLoading(true)
+    setHasSearched(true)
+
+    try {
+      console.log("🔍 Searching for date:", date)
+
+      // Buscar disponibilidad para la fecha seleccionada
+      const response = await fetch("/api/vehicles/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: date,
+          vehicleIds: vehicles.map((v) => v.id),
+        }),
+      })
+
+      if (response.ok) {
+        const availabilityData = await response.json()
+        console.log("📊 Availability data:", availabilityData)
+
+        // Actualizar vehículos con información de disponibilidad
+        const updatedVehicles = availabilityData.map((item: any) => ({
+          ...item,
+          isAvailable: item.isAvailable,
+        }))
+
+        // Filtrar solo los que tienen al menos un slot disponible
+        const availableVehicles = updatedVehicles.filter((v: any) => v.isAvailable)
+
+        setFilteredVehicles(availableVehicles)
+      } else {
+        console.warn("Availability API not available, showing all vehicles")
+        // ✅ FALLBACK: Si la API falla, mostrar todos los vehículos
+        setFilteredVehicles(vehicles)
+      }
+    } catch (error) {
+      console.warn("Error searching by date, showing all vehicles:", error)
+      // ✅ FALLBACK: Si hay error, mostrar todos los vehículos
+      setFilteredVehicles(vehicles)
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  const currentVehicles = getVehiclesByLicense(activeLicense === "with")
 
   const handleReserveClick = (vehicle: Vehicle) => {
     if (vehicle.requiresLicense) {
@@ -632,92 +672,94 @@ export function BoatsSection() {
             <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
           </div>
 
-          {/* Selector de Tipo de Vehículo */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
-            <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-2 mb-8 bg-gray-100 border border-gray-200 h-16 p-2">
-              <TabsTrigger
-                value="boats"
-                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
-              >
-                <Ship className="h-5 w-5 mr-3" />
-                {t.boats}
-              </TabsTrigger>
-              <TabsTrigger
-                value="jetskis"
-                className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
-              >
-                <Zap className="h-5 w-5 mr-3" />
-                {t.jetskis}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {/* ✅ FILTRO SIMPLE DE FECHA */}
+          <SimpleDateFilter onDateSelect={handleDateSelect} isLoading={searchLoading} language={language} />
 
-          {/* Selector de Licencia */}
+          {/* ✅ SELECTOR DE LICENCIA MEJORADO */}
           <div className="flex justify-center mb-12">
-            <div className="bg-gray-100 p-2 rounded-lg border border-gray-200">
+            <div className="bg-white border-2 border-gray-200 p-2 rounded-xl shadow-sm">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setActiveLicense("without")}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center ${
+                  className={`px-8 py-4 rounded-lg font-semibold transition-all duration-200 flex flex-col items-center ${
                     activeLicense === "without"
-                      ? "bg-gold text-black shadow-md"
-                      : "text-gray-600 hover:text-black hover:bg-gray-50"
+                      ? "bg-gold text-black shadow-lg border-2 border-gold"
+                      : "text-gray-600 hover:text-black hover:bg-gray-50 border-2 border-transparent"
                   }`}
                 >
-                  {t.withoutLicense}
+                  <div className="flex items-center mb-2">
+                    <div className="bg-green-100 p-2 rounded-full mr-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    </div>
+                    <span className="text-lg">{t.withoutLicense}</span>
+                  </div>
+                  <span className="text-sm opacity-75 text-center">{t.withoutLicenseDesc}</span>
                 </button>
                 <button
                   onClick={() => setActiveLicense("with")}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-all duration-200 flex items-center ${
+                  className={`px-8 py-4 rounded-lg font-semibold transition-all duration-200 flex flex-col items-center ${
                     activeLicense === "with"
-                      ? "bg-gold text-black shadow-md"
-                      : "text-gray-600 hover:text-black hover:bg-gray-50"
+                      ? "bg-gold text-black shadow-lg border-2 border-gold"
+                      : "text-gray-600 hover:text-black hover:bg-gray-50 border-2 border-transparent"
                   }`}
                 >
-                  <Award className="h-4 w-4 mr-2" />
-                  {t.withLicense}
+                  <div className="flex items-center mb-2">
+                    <div className="bg-blue-100 p-2 rounded-full mr-2">
+                      <Award className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <span className="text-lg">{t.withLicense}</span>
+                  </div>
+                  <span className="text-sm opacity-75 text-center">{t.withLicenseDesc}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Información de restricciones para motos sin licencia */}
-          {activeTab === "jetskis" && activeLicense === "without" && (
-            <div className="max-w-4xl mx-auto mb-8">
-              <Card className="bg-orange-50 border border-orange-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center">
-                    <AlertCircle className="h-5 w-5 text-orange-600 mr-3" />
-                    <div>
-                      <h4 className="font-semibold text-orange-800">{t.restrictedHours}</h4>
-                      <p className="text-orange-700 text-sm">{t.restrictedInfo}</p>
-                    </div>
+          {/* ✅ INDICADOR DE RESULTADOS */}
+          {hasSearched && selectedDate && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center">
+                  <Filter className="h-5 w-5 text-blue-600 mr-2" />
+                  <span className="text-blue-800 font-medium">
+                    {t.showingResults} {currentVehicles.length} {t.boatsAndJetskis} {t.availableForDate}
+                  </span>
+                </div>
+                {searchLoading && (
+                  <div className="flex items-center text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Buscando...
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Lista de Vehículos */}
-          <div className="max-w-6xl mx-auto">
+          {/* ✅ LISTA DE VEHÍCULOS */}
+          <div className="max-w-6xl mx-auto" id="products-section">
             {currentVehicles.length > 0 ? (
-              <div
-                className={`grid gap-8 ${
-                  activeTab === "boats" ? "grid-cols-1 lg:grid-cols-2 max-w-6xl mx-auto" : "grid-cols-1 md:grid-cols-2"
-                }`}
-              >
+              <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {currentVehicles.map((vehicle) => (
                   <VehicleCard key={vehicle.id} vehicle={vehicle} t={t} onReserveClick={handleReserveClick} />
                 ))}
               </div>
             ) : (
               <div className="text-center py-12">
-                {activeTab === "boats" ? (
-                  <Ship className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                {hasSearched && selectedDate ? (
+                  <>
+                    <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 text-lg">{t.noResultsFound}</p>
+                    <p className="text-gray-400 text-sm mt-2">{t.adjustFilters}</p>
+                  </>
                 ) : (
-                  <Zap className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <>
+                    <div className="flex justify-center mb-4">
+                      <Ship className="h-8 w-8 text-gray-300 mr-2" />
+                      <Zap className="h-8 w-8 text-gray-300" />
+                    </div>
+                    <p className="text-gray-500 text-lg">{t.noVehicles}</p>
+                  </>
                 )}
-                <p className="text-gray-500 text-lg">{t.noVehicles}</p>
               </div>
             )}
           </div>
@@ -754,25 +796,18 @@ function VehicleCard({
     return Math.min(...vehicle.pricing.map((p) => p.price))
   }
 
-  // Obtener extras habilitados - VERSIÓN MEJORADA
+  // Obtener extras habilitados
   const enabledExtras = (() => {
-    console.log("🔍 Processing extras for vehicle:", vehicle.name, vehicle.extraFeatures)
-
     if (!vehicle.extraFeatures || !Array.isArray(vehicle.extraFeatures)) {
-      console.log("⚠️ No valid extraFeatures found")
       return []
     }
 
-    const filtered = vehicle.extraFeatures.filter((extra) => {
+    return vehicle.extraFeatures.filter((extra) => {
       const isEnabled =
         (typeof extra.enabled === "boolean" && extra.enabled === true) ||
         (typeof extra.enabled === "string" && extra.enabled === "true")
-      console.log(`🔧 Extra ${extra.name}: enabled=${extra.enabled} (${typeof extra.enabled}) -> ${isEnabled}`)
       return isEnabled
     })
-
-    console.log("✅ Enabled extras:", filtered)
-    return filtered
   })()
 
   return (
@@ -790,7 +825,21 @@ function VehicleCard({
             }}
           />
         </div>
-        <Badge className="absolute top-4 right-4 bg-gold text-black font-semibold">{t.available}</Badge>
+
+        {/* ✅ BADGE DE TIPO DE VEHÍCULO */}
+        <Badge className="absolute top-4 right-4 bg-gray-800 text-white font-semibold">
+          {vehicle.type === "jetski" ? (
+            <div className="flex items-center">
+              <Zap className="h-3 w-3 mr-1" />
+              Moto
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <Ship className="h-3 w-3 mr-1" />
+              Barco
+            </div>
+          )}
+        </Badge>
 
         {/* Badge de licencia */}
         <Badge
@@ -801,7 +850,7 @@ function VehicleCard({
           {vehicle.requiresLicense ? t.licenseRequired : t.noLicenseNeeded}
         </Badge>
 
-        {/* ✅ BADGE DE GASOLINA - SIEMPRE VISIBLE */}
+        {/* Badge de gasolina */}
         {vehicle.fuelIncluded ? (
           <Badge className="absolute top-16 left-4 bg-green-500 text-white font-semibold">
             <Fuel className="h-3 w-3 mr-1" />
@@ -841,7 +890,7 @@ function VehicleCard({
             </span>
             <div className="grid grid-cols-2 gap-3">
               {(() => {
-                // ✅ AGRUPAR PRECIOS POR CATEGORÍA EN LUGAR DE MOSTRAR TODOS LOS SLOTS
+                // Agrupar precios por categoría
                 const groupedPricing = new Map()
 
                 vehicle.pricing.forEach((option) => {
@@ -867,7 +916,6 @@ function VehicleCard({
                     category = "4hour"
                     categoryLabel = t.fourHours || "4 horas"
                   } else {
-                    // Para otros casos, usar la etiqueta original
                     category = option.duration
                     categoryLabel = option.label
                   }
@@ -901,7 +949,7 @@ function VehicleCard({
             </div>
           </div>
 
-          {/* ✅ EXTRAS CON ICONOS MEJORADOS Y TRADUCCIONES */}
+          {/* Extras */}
           {enabledExtras.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
               {enabledExtras.map((extra, index) => (
@@ -919,6 +967,7 @@ function VehicleCard({
               ))}
             </div>
           )}
+
           {/* Fianza */}
           {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
