@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { OroLoading } from "@/components/ui/oro-loading"
 import { useRouter } from "next/navigation"
 import { useApp } from "@/components/providers"
-import { ChevronDown, Play } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 const translations = {
   es: {
@@ -31,6 +31,13 @@ export function HeroSection() {
   const t = translations[language]
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  // 🎯 CONTROLA EL ZOOM DEL VIDEO AQUÍ
+  // Valores más altos = menos zoom (se ve más contenido)
+  // Valores más bajos = más zoom (se ve menos contenido)
+  // Ejemplo: 1.0 = zoom normal, 1.5 = zoom out, 0.8 = zoom in
+  const VIDEO_ZOOM_SCALE = 1
 
   const handleNavigation = () => {
     setLoading(true)
@@ -39,6 +46,20 @@ export function HeroSection() {
       setTimeout(() => setLoading(false), 500)
     }, 1500)
   }
+
+  // Auto-start video when component mounts
+  useEffect(() => {
+    if (videoRef.current) {
+      // Small delay to ensure the video element is ready
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.play().catch((error) => {
+            console.log("Video autoplay failed:", error)
+          })
+        }
+      }, 500)
+    }
+  }, [])
 
   if (loading) {
     return <OroLoading />
@@ -49,37 +70,30 @@ export function HeroSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
         {/* Mobile layout: stacked video → text → buttons → logos */}
         <div className="flex flex-col lg:hidden items-center text-center">
-          {/* Video Circle */}
-          <div className="relative w-full max-w-xs mb-10 mt-6">
-            <div className="relative aspect-square rounded-full overflow-hidden bg-blue-100">
-              {/* Decorative elements */}
-              <div className="absolute inset-0">
-                <div className="absolute top-1/4 left-1/4 w-1/3 h-1/2 bg-gradient-to-br from-gold to-yellow-400 rounded-full transform -rotate-12 opacity-90"></div>
-                <div className="absolute top-1/3 right-1/4 w-1/4 h-1/3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full transform rotate-45 opacity-80"></div>
-                <div className="absolute bottom-1/4 left-1/3 w-1/3 h-1/4 bg-gradient-to-br from-gold/70 to-yellow-300 rounded-full transform rotate-12 opacity-85"></div>
-              </div>
-
-              {/* Play button */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-black/80 backdrop-blur-sm rounded-full p-4 hover:bg-black/90 transition-all duration-300 cursor-pointer group">
-                  <Play
-                    className="h-8 w-8 text-white ml-1 group-hover:scale-110 transition-transform duration-300"
-                    fill="currentColor"
-                  />
-                </div>
-              </div>
-
-              {/* Video element - uncomment when ready */}
-              {/* 
-              <video 
-                className="w-full h-full object-cover rounded-full"
-                controls
-                poster="/placeholder.svg?height=400&width=400"
+          {/* Video Circle - Made larger */}
+          <div className="relative w-full max-w-sm mb-10 mt-6">
+            <div className="relative aspect-square rounded-full overflow-hidden bg-blue-100 shadow-2xl">
+              {/* Video element - autoplay and loop with controllable zoom */}
+              <video
+                ref={videoRef}
+                className="absolute top-1/2 left-1/2 object-cover rounded-full"
+                style={{
+                  width: `${VIDEO_ZOOM_SCALE * 100}%`,
+                  height: `${VIDEO_ZOOM_SCALE * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
+                muted
+                autoPlay
+                loop
+                playsInline
+                poster="/placeholder.svg?height=500&width=500"
               >
-                <source src="/path-to-your-video.mp4" type="video/mp4" />
+                <source src="/assets/videooroboats.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
-              */}
+
+              {/* Subtle overlay for better text readability if needed */}
+              <div className="absolute inset-0 bg-black/10 rounded-full"></div>
             </div>
           </div>
 
@@ -111,39 +125,32 @@ export function HeroSection() {
 
         {/* Desktop layout: two columns */}
         <div className="hidden lg:grid lg:grid-cols-2 gap-20 items-center min-h-[70vh]">
-          {/* Left Column - Video/Graphic */}
+          {/* Left Column - Video/Graphic - Made much larger */}
           <div className="relative">
-            <div className="relative aspect-square max-w-md">
-              {/* Circular video container */}
-              <div className="relative w-full h-full rounded-full overflow-hidden bg-blue-100">
-                {/* Decorative elements */}
-                <div className="absolute inset-0">
-                  <div className="absolute top-1/4 left-1/4 w-1/3 h-1/2 bg-gradient-to-br from-gold to-yellow-400 rounded-full transform -rotate-12 opacity-90"></div>
-                  <div className="absolute top-1/3 right-1/4 w-1/4 h-1/3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full transform rotate-45 opacity-80"></div>
-                  <div className="absolute bottom-1/4 left-1/3 w-1/3 h-1/4 bg-gradient-to-br from-gold/70 to-yellow-300 rounded-full transform rotate-12 opacity-85"></div>
-                </div>
-
-                {/* Play button */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-black/80 backdrop-blur-sm rounded-full p-4 hover:bg-black/90 transition-all duration-300 cursor-pointer group">
-                    <Play
-                      className="h-8 w-8 text-white ml-1 group-hover:scale-110 transition-transform duration-300"
-                      fill="currentColor"
-                    />
-                  </div>
-                </div>
-
-                {/* Video element - uncomment when ready */}
-                {/* 
-                <video 
-                  className="w-full h-full object-cover rounded-full"
-                  controls
-                  poster="/placeholder.svg?height=400&width=400"
+            <div className="relative aspect-square max-w-lg mx-auto">
+              {/* Circular video container - larger size */}
+              <div className="relative w-full h-full rounded-full overflow-hidden bg-blue-100 shadow-2xl">
+                {/* Video element - autoplay and loop with controllable zoom */}
+                <video
+                  ref={videoRef}
+                  className="absolute top-1/2 left-1/2 object-cover rounded-full"
+                  style={{
+                    width: `${VIDEO_ZOOM_SCALE * 100}%`,
+                    height: `${VIDEO_ZOOM_SCALE * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                  muted
+                  autoPlay
+                  loop
+                  playsInline
+                  poster="/placeholder.svg?height=600&width=600"
                 >
-                  <source src="/path-to-your-video.mp4" type="video/mp4" />
+                  <source src="/assets/videooroboats.mp4" type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
-                */}
+
+                {/* Subtle overlay for better visual appeal */}
+                <div className="absolute inset-0 bg-black/10 rounded-full"></div>
               </div>
             </div>
           </div>
