@@ -9,17 +9,17 @@ import { ChevronDown } from "lucide-react"
 
 const translations = {
   es: {
-    title: "Todo es para",
-    titleHighlight: "navegar más",
-    description: "Descubre la elegancia en cada ola con nuestra flota premium de barcos y motos de agua de lujo.",
+    title: "Atrévete a",
+    titleHighlights: ["navegar cada ola", "visitar nuevas calas", "explorar el horizonte", "vivir la aventura"],
+    description: "Descubre la elegancia en cada ola con nuestra flota de barcos y motos de agua.",
     rentNow: "Alquilar Ahora",
     scroll: "Descubre más",
     loadingRent: "Preparando experiencias de alquiler...",
   },
   en: {
-    title: "Everything is to",
-    titleHighlight: "sail more",
-    description: "Discover elegance in every wave with our premium fleet of luxury boats and jet skis.",
+    title: "Dare to",
+    titleHighlights: ["ride every wave", "discover hidden coves", "explore the horizon", "live the adventure"],
+    description: "Discover elegance in every wave with our fleet of luxury boats and jet skis.",
     rentNow: "Rent Now",
     scroll: "Discover more",
     loadingRent: "Preparing rental experiences...",
@@ -31,12 +31,11 @@ export function HeroSection() {
   const t = translations[language]
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [currentHighlightIndex, setCurrentHighlightIndex] = useState(0)
+  const [isTransitioning, setIsTransitioning] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // 🎯 CONTROLA EL ZOOM DEL VIDEO AQUÍ
-  // Valores más altos = menos zoom (se ve más contenido)
-  // Valores más bajos = más zoom (se ve menos contenido)
-  // Ejemplo: 1.0 = zoom normal, 1.5 = zoom out, 0.8 = zoom in
   const VIDEO_ZOOM_SCALE = 1
 
   const handleNavigation = () => {
@@ -50,7 +49,6 @@ export function HeroSection() {
   // Auto-start video when component mounts
   useEffect(() => {
     if (videoRef.current) {
-      // Small delay to ensure the video element is ready
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.play().catch((error) => {
@@ -61,19 +59,34 @@ export function HeroSection() {
     }
   }, [])
 
+  // Text rotation effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsTransitioning(true)
+
+      setTimeout(() => {
+        setCurrentHighlightIndex((prev) => (prev + 1) % t.titleHighlights.length)
+        setIsTransitioning(false)
+      }, 300) // Half of transition duration
+    }, 3000) // Change every 3 seconds
+
+    return () => clearInterval(interval)
+  }, [t.titleHighlights.length])
+
   if (loading) {
     return <OroLoading />
   }
+
+  const currentHighlight = t.titleHighlights[currentHighlightIndex]
 
   return (
     <section className="relative min-h-screen bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-20">
         {/* Mobile layout: stacked video → text → buttons → logos */}
         <div className="flex flex-col lg:hidden items-center text-center">
-          {/* Video Circle - Made larger */}
+          {/* Video Circle */}
           <div className="relative w-full max-w-sm mb-10 mt-6">
             <div className="relative aspect-square rounded-full overflow-hidden bg-blue-100 shadow-2xl">
-              {/* Video element - autoplay and loop with controllable zoom */}
               <video
                 ref={videoRef}
                 className="absolute top-1/2 left-1/2 object-cover rounded-full"
@@ -91,8 +104,6 @@ export function HeroSection() {
                 <source src="/assets/videooroboats.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
-
-              {/* Subtle overlay for better text readability if needed */}
               <div className="absolute inset-0 bg-black/10 rounded-full"></div>
             </div>
           </div>
@@ -100,7 +111,17 @@ export function HeroSection() {
           {/* Text Content */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1>
-            <h2 className="text-4xl font-bold text-gold mb-6">{t.titleHighlight}</h2>
+            <div className="relative h-16 flex items-center justify-center">
+              <h2
+                className={`text-4xl font-bold text-gold mb-6 transition-all duration-600 ease-in-out ${
+                  isTransitioning
+                    ? "opacity-0 transform translate-y-4 scale-95"
+                    : "opacity-100 transform translate-y-0 scale-100"
+                }`}
+              >
+                {currentHighlight}
+              </h2>
+            </div>
             <p className="text-lg text-gray-600 mb-8">{t.description}</p>
           </div>
 
@@ -125,12 +146,10 @@ export function HeroSection() {
 
         {/* Desktop layout: two columns */}
         <div className="hidden lg:grid lg:grid-cols-2 gap-20 items-center min-h-[70vh]">
-          {/* Left Column - Video/Graphic - Made much larger */}
+          {/* Left Column - Video */}
           <div className="relative">
             <div className="relative aspect-square max-w-lg mx-auto">
-              {/* Circular video container - larger size */}
               <div className="relative w-full h-full rounded-full overflow-hidden bg-blue-100 shadow-2xl">
-                {/* Video element - autoplay and loop with controllable zoom */}
                 <video
                   ref={videoRef}
                   className="absolute top-1/2 left-1/2 object-cover rounded-full"
@@ -148,8 +167,6 @@ export function HeroSection() {
                   <source src="/assets/videooroboats.mp4" type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
-
-                {/* Subtle overlay for better visual appeal */}
                 <div className="absolute inset-0 bg-black/10 rounded-full"></div>
               </div>
             </div>
@@ -158,7 +175,17 @@ export function HeroSection() {
           {/* Right Column - Content */}
           <div className="text-left">
             <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1>
-            <h2 className="text-5xl lg:text-6xl font-bold text-gold mb-6">{t.titleHighlight}</h2>
+            <div className="relative h-20 flex items-center">
+              <h2
+                className={`text-5xl lg:text-6xl font-bold text-gold mb-6 transition-all duration-600 ease-in-out ${
+                  isTransitioning
+                    ? "opacity-0 transform translate-y-6 scale-95"
+                    : "opacity-100 transform translate-y-0 scale-100"
+                }`}
+              >
+                {currentHighlight}
+              </h2>
+            </div>
 
             <p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-lg">{t.description}</p>
 
@@ -184,7 +211,7 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* Scroll indicator - simplified */}
+      {/* Scroll indicator */}
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
         <div className="flex flex-col items-center text-gray-400 cursor-pointer group">
           <ChevronDown className="h-6 w-6 animate-bounce text-gray-400 group-hover:text-blue-500 transition-colors duration-300" />
