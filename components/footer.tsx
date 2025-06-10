@@ -1,8 +1,8 @@
 "use client"
-
-import Link from "next/link"
 import { Facebook, Instagram, Twitter, Youtube, Ship, Mail, Phone } from "lucide-react"
 import { useApp } from "@/components/providers"
+import { OroLoading, useNavigationLoading } from "@/components/ui/oro-loading"
+import { useRouter } from "next/navigation"
 
 const translations = {
   es: {
@@ -40,6 +40,20 @@ const translations = {
 export function Footer() {
   const { language } = useApp()
   const t = translations[language]
+  const router = useRouter()
+  const { isLoading, startLoading, stopLoading } = useNavigationLoading()
+
+  const handleNavigation = (path: string) => {
+    startLoading()
+    setTimeout(() => {
+      router.push(path)
+      setTimeout(() => stopLoading(), 500)
+    }, 1500)
+  }
+
+  if (isLoading) {
+    return <OroLoading />
+  }
 
   return (
     <footer className="bg-black text-white">
@@ -60,7 +74,7 @@ export function Footer() {
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="h-5 w-5 text-gold" />
-                <span className="text-gray-300">+34 643 44 23 64</span>
+                <span className="text-gray-300">+34 655 52 79 88</span>
               </div>
             </div>
           </div>
@@ -69,24 +83,36 @@ export function Footer() {
             <h4 className="text-lg font-bold mb-6 text-white">{t.company}</h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/about" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/about")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.about}
-                </Link>
+                </button>
               </li>
               <li>
-                <Link href="/contact" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/contact")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.contact}
-                </Link>
+                </button>
               </li>
               <li>
-                <Link href="/privacy" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/privacy")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.privacy}
-                </Link>
+                </button>
               </li>
               <li>
-                <Link href="/terms" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/terms")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.terms}
-                </Link>
+                </button>
               </li>
             </ul>
           </div>
@@ -95,27 +121,36 @@ export function Footer() {
             <h4 className="text-lg font-bold mb-6 text-white">{t.services}</h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/boats?type=boats" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/boats?type=boats")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.boats}
-                </Link>
+                </button>
               </li>
               <li>
-                <Link
-                  href="/boats?type=jetskis"
-                  className="text-gray-400 hover:text-gold transition-colors duration-300"
+                <button
+                  onClick={() => handleNavigation("/boats?type=jetskis")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
                 >
                   {t.jetskis}
-                </Link>
+                </button>
               </li>
               <li>
-                <Link href="/fiestas" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/fiestas")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.parties}
-                </Link>
+                </button>
               </li>
               <li>
-                <Link href="/boats" className="text-gray-400 hover:text-gold transition-colors duration-300">
+                <button
+                  onClick={() => handleNavigation("/boats")}
+                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                >
                   {t.booking}
-                </Link>
+                </button>
               </li>
             </ul>
           </div>
@@ -129,18 +164,18 @@ export function Footer() {
 
             <div className="flex items-center space-x-6">
               <span className="text-gray-400 font-medium mr-4">{t.follow}</span>
-              <a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
+              <a href="https://www.facebook.com/oroboats/" className="text-gray-400 hover:text-gold transition-colors duration-300">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
+              <a href="https://www.instagram.com/oroboats" className="text-gray-400 hover:text-gold transition-colors duration-300">
                 <Instagram className="h-5 w-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
+              {/*<a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
                 <Twitter className="h-5 w-5" />
               </a>
               <a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
                 <Youtube className="h-5 w-5" />
-              </a>
+              </a>*/}
             </div>
           </div>
         </div>
