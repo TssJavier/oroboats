@@ -85,7 +85,7 @@ export function HeroSection() {
         {/* Mobile layout: stacked video → text → buttons → logos */}
         <div className="flex flex-col lg:hidden items-center text-center">
           {/* Video Circle */}
-          <div className="relative w-full max-w-sm mb-10 mt-6">
+          <div className="relative w-full max-w-sm mb-10 mt-10">
             <div className="relative aspect-square rounded-full overflow-hidden bg-blue-100 shadow-2xl">
               <video
                 ref={videoRef}
@@ -101,7 +101,7 @@ export function HeroSection() {
                 playsInline
                 poster="/placeholder.svg?height=500&width=500"
               >
-                <source src="/assets/videooroboats.mp4" type="video/mp4" />
+                <source src="/assets/videooroboats2.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
               <div className="absolute inset-0 bg-black/10 rounded-full"></div>
@@ -164,7 +164,7 @@ export function HeroSection() {
                   playsInline
                   poster="/placeholder.svg?height=600&width=600"
                 >
-                  <source src="/assets/videooroboats.mp4" type="video/mp4" />
+                  <source src="/assets/videooroboats2.mp4" type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
                 <div className="absolute inset-0 bg-black/10 rounded-full"></div>
