@@ -1,5 +1,21 @@
 // ✅ FUNCIONES HELPER PARA ENVIAR EMAILS VIA API
-// No necesitamos Resend aquí porque todo se maneja en la API route
+import { Resend } from "resend"
+import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "./email-templates"
+
+// Variables para configuración
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "javitricking@hotmail.com"
+
+// Función para obtener una instancia de Resend con validación
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY
+
+  if (!apiKey) {
+    console.error("❌ RESEND_API_KEY no está configurada en las variables de entorno")
+    throw new Error("RESEND_API_KEY is required")
+  }
+
+  return new Resend(apiKey)
+}
 
 interface BookingEmailData {
   bookingId: number
@@ -24,29 +40,31 @@ interface ContactEmailData {
   message: string
 }
 
-// ✅ EMAIL AL ADMIN CUANDO HAY NUEVA RESERVA
+// ✅ EMAIL AL ADMIN CUANDO HAY NUEVA RESERVA - VERSIÓN DIRECTA
 export async function sendAdminNotification(booking: BookingEmailData) {
   try {
     console.log("📧 Sending admin notification for booking:", booking.bookingId)
 
-    const response = await fetch("/api/send-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "booking-admin-notification",
-        data: booking,
-      }),
+    // Obtener cliente Resend
+    const resend = getResendClient()
+
+    // Renderizar el HTML del email
+    const emailHtml = renderAdminBookingNotification(booking)
+
+    // Enviar email directamente con Resend
+    const { data, error } = await resend.emails.send({
+      from: "OroBoats Granada <onboarding@resend.dev>",
+      to: [ADMIN_EMAIL],
+      subject: `Nueva reserva #${booking.bookingId} - ${booking.vehicleName}`,
+      html: emailHtml,
     })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to send admin notification")
+    if (error) {
+      console.error("❌ Resend API error:", error)
+      return false
     }
 
-    const result = await response.json()
-    console.log("✅ Admin notification sent:", result)
+    console.log("✅ Admin notification sent:", data)
     return true
   } catch (error) {
     console.error("❌ Error sending admin notification:", error)
@@ -54,29 +72,31 @@ export async function sendAdminNotification(booking: BookingEmailData) {
   }
 }
 
-// ✅ EMAIL DE CONFIRMACIÓN AL CLIENTE
+// ✅ EMAIL DE CONFIRMACIÓN AL CLIENTE - VERSIÓN DIRECTA
 export async function sendCustomerConfirmation(booking: BookingEmailData) {
   try {
     console.log("📧 Sending customer confirmation for booking:", booking.bookingId)
 
-    const response = await fetch("/api/send-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "booking-customer-confirmation",
-        data: booking,
-      }),
+    // Obtener cliente Resend
+    const resend = getResendClient()
+
+    // Renderizar el HTML del email
+    const emailHtml = renderCustomerBookingConfirmation(booking)
+
+    // Enviar email directamente con Resend
+    const { data, error } = await resend.emails.send({
+      from: "OroBoats Granada <onboarding@resend.dev>",
+      to: [booking.customerEmail],
+      subject: `Confirmación de reserva #${booking.bookingId} - Oro Boats`,
+      html: emailHtml,
     })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to send customer confirmation")
+    if (error) {
+      console.error("❌ Resend API error:", error)
+      return false
     }
 
-    const result = await response.json()
-    console.log("✅ Customer confirmation sent:", result)
+    console.log("✅ Customer confirmation sent:", data)
     return true
   } catch (error) {
     console.error("❌ Error sending customer confirmation:", error)
@@ -84,33 +104,19 @@ export async function sendCustomerConfirmation(booking: BookingEmailData) {
   }
 }
 
-// ✅ NUEVA FUNCIÓN: ENVIAR AMBOS EMAILS DE RESERVA
+// ✅ NUEVA FUNCIÓN: ENVIAR AMBOS EMAILS DE RESERVA - VERSIÓN DIRECTA
 export async function sendBookingEmails(booking: BookingEmailData) {
   try {
     console.log("📧 Sending complete booking emails for:", booking.bookingId)
 
-    const response = await fetch("/api/send-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "booking-complete",
-        data: booking,
-      }),
-    })
+    // Enviar ambos emails
+    const adminResult = await sendAdminNotification(booking)
+    const customerResult = await sendCustomerConfirmation(booking)
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || "Failed to send booking emails")
-    }
-
-    const result = await response.json()
-    console.log("✅ Booking emails sent:", result)
     return {
-      success: result.success,
-      adminSent: result.adminSent,
-      customerSent: result.customerSent,
+      success: adminResult || customerResult,
+      adminSent: adminResult,
+      customerSent: customerResult,
     }
   } catch (error) {
     console.error("❌ Error sending booking emails:", error)
@@ -122,7 +128,10 @@ export async function sendBookingEmails(booking: BookingEmailData) {
   }
 }
 
-// ✅ FUNCIÓN HELPER PARA ENVIAR EMAILS DE CONTACTO
+// ✅ FUNCIONES PARA EL CLIENTE (BROWSER)
+// Estas funciones usan fetch y son para llamadas desde el navegador
+
+// Función helper para enviar emails de contacto desde el cliente
 export async function sendContactEmails(data: ContactEmailData) {
   try {
     console.log("📧 Sending contact email via API...")
@@ -159,7 +168,7 @@ export async function sendContactEmails(data: ContactEmailData) {
   }
 }
 
-// ✅ FUNCIÓN INDIVIDUAL PARA NOTIFICACIÓN AL ADMIN
+// Función individual para notificación al admin desde el cliente
 export async function sendContactNotification(contactData: ContactEmailData) {
   try {
     const response = await fetch("/api/send-email", {
@@ -185,7 +194,7 @@ export async function sendContactNotification(contactData: ContactEmailData) {
   }
 }
 
-// ✅ FUNCIÓN INDIVIDUAL PARA CONFIRMACIÓN AL CLIENTE
+// Función individual para confirmación al cliente desde el cliente
 export async function sendContactConfirmation(contactData: ContactEmailData) {
   try {
     const response = await fetch("/api/send-email", {

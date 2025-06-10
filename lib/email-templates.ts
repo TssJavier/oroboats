@@ -1,3 +1,5 @@
+// ✅ TEMPLATES DE EMAIL PARA OROBOATS
+
 export const contactEmailTemplate = (data: {
   name: string
   email: string
@@ -213,4 +215,103 @@ export const adminNotificationTemplate = (data: {
     </body>
     </html>
   `
+}
+
+// ✅ FUNCIONES WRAPPER CON LOS NOMBRES ESPERADOS POR LAS IMPORTACIONES
+
+export const renderContactNotification = (data: {
+  name: string
+  email: string
+  phone?: string
+  message: string
+}) => {
+  return contactEmailTemplate(data)
+}
+
+export const renderContactConfirmation = (data: {
+  name: string
+  email: string
+  phone?: string
+  message: string
+}) => {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Mensaje recibido - OroBoats</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #D4AF37 0%, #F4E4BC 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="color: #000; margin: 0; font-size: 28px; font-weight: bold;">OroBoats</h1>
+        <p style="color: #333; margin: 10px 0 0 0; font-size: 16px;">¡Mensaje recibido!</p>
+      </div>
+      
+      <div style="background: #fff; padding: 30px; border: 1px solid #ddd; border-top: none;">
+        <h2 style="color: #D4AF37; margin-top: 0;">Hola ${data.name},</h2>
+        <p>¡Gracias por contactar con nosotros! Hemos recibido tu mensaje y te responderemos lo antes posible.</p>
+        
+        <div style="background: #f0f8ff; padding: 20px; border-radius: 8px; border-left: 4px solid #D4AF37; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #333;">Tu mensaje:</h3>
+          <p style="margin: 0; white-space: pre-wrap;">${data.message}</p>
+        </div>
+        
+        <div style="background: #d4edda; padding: 15px; border-radius: 8px; border: 1px solid #c3e6cb; margin: 20px 0;">
+          <h4 style="margin-top: 0; color: #155724;">Tiempo de respuesta:</h4>
+          <p style="margin: 0; color: #155724;">Normalmente respondemos en menos de 24 horas. Si tu consulta es urgente, puedes llamarnos directamente.</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <p style="color: #666;">¿Necesitas una respuesta inmediata?</p>
+          <p style="margin: 10px 0;">
+            <strong>Teléfono:</strong> +34 655 52 79 88<br>
+            <strong>WhatsApp:</strong> +34 643 44 23 64<br>
+            <strong>Email:</strong> info@oroboats.com
+          </p>
+        </div>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center;">
+          <p style="color: #666; font-size: 14px; margin: 0;">
+            ¡Gracias por elegir OroBoats!
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+export const renderAdminBookingNotification = (data: {
+  bookingId: number
+  customerName: string
+  customerEmail: string
+  customerPhone: string
+  vehicleName: string
+  bookingDate: string
+  startTime: string
+  endTime: string
+  totalPrice: number
+  securityDeposit?: number
+  discountAmount?: number
+  originalPrice?: number
+  discountCode?: string
+}) => {
+  return adminNotificationTemplate(data)
+}
+
+export const renderCustomerBookingConfirmation = (data: {
+  bookingId: number
+  customerName: string
+  vehicleName: string
+  bookingDate: string
+  startTime: string
+  endTime: string
+  totalPrice: number
+  securityDeposit?: number
+  discountAmount?: number
+  originalPrice?: number
+  discountCode?: string
+}) => {
+  return bookingConfirmationTemplate(data)
 }
