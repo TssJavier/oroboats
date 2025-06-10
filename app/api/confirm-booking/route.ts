@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       console.error("⚠️ Error fetching vehicle data:", error)
     }
 
-    // Enviar emails de confirmación
+    // ✅ PREPARAR DATOS PARA EMAILS
     const emailData = {
       bookingId: Number(booking[0].id),
       customerName: bookingData.customerName,
@@ -133,17 +133,27 @@ export async function POST(request: NextRequest) {
       securityDeposit: bookingData.securityDeposit || 0,
     }
 
-    // Enviar emails (no bloquear si fallan)
+    console.log("📧 Preparing to send booking emails with data:", {
+      bookingId: emailData.bookingId,
+      customerEmail: emailData.customerEmail,
+      vehicleName: emailData.vehicleName,
+    })
+
+    // ✅ ENVIAR EMAILS DE RESERVA (NO BLOQUEAR SI FALLAN)
     try {
-      await sendAdminNotification(emailData)
+      console.log("📧 Sending admin notification...")
+      const adminResult = await sendAdminNotification(emailData)
+      console.log("📧 Admin notification result:", adminResult)
     } catch (error) {
-      console.error("Error sending admin notification:", error)
+      console.error("❌ Error sending admin notification:", error)
     }
 
     try {
-      await sendCustomerConfirmation(emailData)
+      console.log("📧 Sending customer confirmation...")
+      const customerResult = await sendCustomerConfirmation(emailData)
+      console.log("📧 Customer confirmation result:", customerResult)
     } catch (error) {
-      console.error("Error sending customer confirmation:", error)
+      console.error("❌ Error sending customer confirmation:", error)
     }
 
     return NextResponse.json({

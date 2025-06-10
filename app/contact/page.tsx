@@ -91,17 +91,42 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setSubmitStatus("idle")
 
-    // Simular envío del formulario
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "contact",
+          data: formData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to send email")
+      }
+
       setSubmitStatus("success")
       setFormData({ name: "", email: "", phone: "", message: "" })
 
+      // Limpiar mensaje de éxito después de 5 segundos
       setTimeout(() => {
         setSubmitStatus("idle")
-      }, 3000)
-    }, 1000)
+      }, 5000)
+    } catch (error) {
+      console.error("Error sending contact email:", error)
+      setSubmitStatus("error")
+
+      // Limpiar mensaje de error después de 5 segundos
+      setTimeout(() => {
+        setSubmitStatus("idle")
+      }, 5000)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

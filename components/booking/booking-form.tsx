@@ -420,7 +420,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                       customerName={bookingData.customerName}
                       customerEmail={bookingData.customerEmail}
                       onWaiverSigned={handleWaiverSigned}
-                      onBack={handlePrevStep}
                     />
                   )}
 
