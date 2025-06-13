@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       salesPerson,
       vehicleName,
       vehicleType,
-      liabilityWaiverId, // 🆕 NUEVO: ID del documento de exención firmado
+      liabilityWaiverId,
       paymentMethod, // ✅ NUEVO: Método de pago (cash o card)
     } = body
 
@@ -177,6 +177,10 @@ export async function POST(request: NextRequest) {
     console.log("💾 Creating booking in database...")
 
     try {
+      // ✅ CORREGIDO: Usar texto literal para el método de pago
+      const paymentMethodValue = paymentMethod === "card" ? "card" : "cash"
+
+      // ✅ CORREGIDO: Usar el método correcto para insertar el valor como texto
       const insertResult = await db.execute(sql`
         INSERT INTO bookings (
           vehicle_id,
@@ -199,7 +203,7 @@ export async function POST(request: NextRequest) {
           vehicle_name,
           vehicle_type,
           liability_waiver_id,
-          payment_method, /* ✅ NUEVO: Campo para método de pago */
+          payment_method,
           created_at,
           updated_at
         ) VALUES (
@@ -223,7 +227,7 @@ export async function POST(request: NextRequest) {
           ${vehicleName || vehicle.name},
           ${vehicleType || vehicle.type},
           ${liabilityWaiverId || null},
-          ${paymentMethod}, /* ✅ NUEVO: Guardar método de pago */
+          ${paymentMethodValue}, /* ✅ CORREGIDO: Usar el valor como string */
           NOW(),
           NOW()
         )
@@ -272,7 +276,7 @@ export async function POST(request: NextRequest) {
           totalPrice: Number(totalPrice),
           securityDeposit: Number(securityDeposit),
           paymentType: "full_payment", // Las reservas manuales son siempre de pago completo
-          paymentMethod: String(paymentMethod),
+          paymentMethod: paymentMethodValue, // ✅ NUEVO: Incluir método de pago
         }
 
         // 1. Email al administrador
@@ -287,7 +291,7 @@ export async function POST(request: NextRequest) {
         console.log("📧 Admin email result:", adminEmailResult.error ? "❌ Error" : "✅ Sent")
 
         // 2. Email al cliente (solo si tiene email válido)
-        let customerEmailResult: Awaited<ReturnType<typeof resend.emails.send>> | null = null
+        let customerEmailResult = null
         if (finalEmail && !finalEmail.includes("@manual.booking")) {
           const customerHtml = renderCustomerBookingConfirmation(emailData)
           customerEmailResult = await resend.emails.send({
@@ -321,7 +325,7 @@ export async function POST(request: NextRequest) {
       console.log(`   - Time: ${timeSlot}`)
       console.log(`   - Duration: ${finalDuration} (${durationMinutes} min)`)
       console.log(`   - Price: €${totalPrice}`)
-      console.log(`   - Payment Method: ${paymentMethod}`) // ✅ NUEVO: Loguear método de pago
+      console.log(`   - Payment Method: ${paymentMethodValue}`) // ✅ NUEVO: Loguear método de pago
       console.log(`   - Liability Waiver: ${liabilityWaiverId ? `ID ${liabilityWaiverId}` : "None"}`)
       console.log(`   - Remaining stock: ${vehicleStock - bookingsCount - 1}`)
 
@@ -339,7 +343,7 @@ export async function POST(request: NextRequest) {
           duration: finalDuration,
           durationMinutes,
           totalPrice,
-          paymentMethod, // ✅ NUEVO: Incluir método de pago en la respuesta
+          paymentMethod: paymentMethodValue, // ✅ NUEVO: Incluir método de pago en la respuesta
           availableStock: vehicleStock - bookingsCount - 1,
           totalStock: vehicleStock,
           liabilityWaiverId: liabilityWaiverId || null, // 🆕 NUEVO: Incluir en la respuesta

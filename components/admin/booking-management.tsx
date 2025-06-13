@@ -101,6 +101,20 @@ export function BookingManagement() {
       const data = await response.json()
       console.log("🔍 Frontend: Bookings data received:", data)
 
+      // ✅ NUEVO: Debug específico para métodos de pago
+      if (Array.isArray(data) && data.length > 0) {
+        console.log("🔍 MÉTODOS DE PAGO DETECTADOS:")
+        const paymentMethods = data
+          .map((b) => ({
+            id: b.booking.id,
+            name: b.booking.customerName,
+            method: b.booking.paymentMethod,
+            isManual: b.booking.isManualBooking,
+          }))
+          .filter((b) => b.isManual)
+        console.table(paymentMethods)
+      }
+
       // Añadir este log para inspeccionar la estructura exacta de los primeros registros
       if (Array.isArray(data) && data.length > 0) {
         console.log("🔎 INSPECCIÓN DETALLADA DE DATOS:")
@@ -278,24 +292,33 @@ export function BookingManagement() {
     }
   }
 
-  // ✅ NUEVA FUNCIÓN: Obtener información del método de pago
-  const getPaymentMethodDisplay = (booking: Booking) => {
-    if (!booking.booking.isManualBooking) return null
+  // ✅ FUNCIÓN CORREGIDA: Obtener información del método de pago
+const getPaymentMethodDisplay = (booking: Booking) => {
+  if (!booking.booking.isManualBooking) return null
 
-    if (booking.booking.paymentMethod === "card") {
-      return {
-        label: "Tarjeta",
-        icon: CreditCard,
-        color: "text-blue-600",
-      }
-    } else {
-      return {
-        label: "Efectivo",
-        icon: Banknote,
-        color: "text-green-600",
-      }
+  // Añadir logs para depuración más detallada
+  console.log(`🔍 Checking payment method for booking ${booking.booking.id}:`, {
+    paymentMethod: booking.booking.paymentMethod,
+    rawBooking: booking.booking,
+    type: typeof booking.booking.paymentMethod,
+  })
+
+  // Verificar si el método de pago es "card" (comparación estricta)
+  if (booking.booking.paymentMethod === "card") {
+    return {
+      label: "Tarjeta",
+      icon: CreditCard,
+      color: "text-blue-600",
+    }
+  } else {
+    // Por defecto o si es "cash"
+    return {
+      label: "Efectivo",
+      icon: Banknote,
+      color: "text-green-600",
     }
   }
+}
 
   // Función para filtrar reservas por fecha o tipo
   const getFilteredBookings = () => {

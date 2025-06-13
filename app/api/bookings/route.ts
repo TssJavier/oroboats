@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
         b.amount_paid,            /* ✅ AÑADIDO: Campo amount_paid */
         b.amount_pending,         /* ✅ AÑADIDO: Campo amount_pending */
         b.payment_location,       /* ✅ AÑADIDO: Campo payment_location */
+        b.payment_method,         /* ✅ AÑADIDO: Campo payment_method */
         v.name as vehicle_current_name,
         v.type as vehicle_current_type
       FROM bookings b
@@ -45,6 +46,22 @@ export async function GET(request: NextRequest) {
     `)
 
     console.log(`✅ API: Found ${bookingsResult.length} bookings`)
+
+    // ✅ AÑADIDO: Debug específico para métodos de pago
+    const paymentMethods = bookingsResult
+      .filter((row) => row.is_manual_booking)
+      .map((row) => ({
+        id: row.id,
+        name: row.customer_name,
+        method: row.payment_method,
+        rawValue: `"${row.payment_method}"`,
+        type: typeof row.payment_method,
+      }))
+
+    if (paymentMethods.length > 0) {
+      console.log("🔍 API: Payment methods in manual bookings:")
+      console.table(paymentMethods)
+    }
 
     // Transformar los datos al formato esperado por el frontend
     const transformedBookings = bookingsResult.map((row) => ({
@@ -78,6 +95,7 @@ export async function GET(request: NextRequest) {
         amountPaid: row.amount_paid?.toString() || null,
         amountPending: row.amount_pending?.toString() || null,
         paymentLocation: row.payment_location,
+        paymentMethod: row.payment_method /* ✅ AÑADIDO: Campo para método de pago */,
       },
       vehicle: row.vehicle_current_name
         ? {

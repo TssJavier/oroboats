@@ -130,11 +130,17 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
   }
 
   const handleInputChange = (field: string, value: string) => {
+    console.log(`Setting ${field} to "${value}"`)
     setFormData((prev) => ({ ...prev, [field]: value }))
 
     // Limpiar slot seleccionado si cambia la fecha
     if (field === "bookingDate") {
       setSelectedSlot(null)
+    }
+
+    // Log específico para el método de pago
+    if (field === "paymentMethod") {
+      console.log(`🔍 Payment method selected: "${value}"`)
     }
   }
 
@@ -153,6 +159,9 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!vehicle || !selectedSlot) return
+
+    // Añadir log para verificar el método de pago antes de enviar
+    console.log(`📤 Submitting form with payment method: "${formData.paymentMethod}"`)
 
     // Validaciones
     if (!formData.customerName.trim()) {
@@ -415,7 +424,10 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
 
               <RadioGroup
                 value={formData.paymentMethod}
-                onValueChange={(value: string) => handleInputChange("paymentMethod", value)}
+                onValueChange={(value) => {
+                  console.log(`RadioGroup value changed to: "${value}"`)
+                  handleInputChange("paymentMethod", value)
+                }}
                 className="flex flex-col space-y-3"
               >
                 <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
