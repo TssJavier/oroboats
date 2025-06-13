@@ -5,6 +5,7 @@ import "./globals.css"
 import { Providers } from "@/components/providers"
 import { Toaster } from "@/components/ui/toaster"
 import { SimpleTracker } from "@/components/analytics/simple-tracker"
+import { CookieConsent } from "@/components/cookie-consent"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" })
@@ -232,6 +233,8 @@ export default function RootLayout({
           <Toaster />
           {/* ✅ TRACKER SIMPLE - SOLO ESTA LÍNEA AÑADIDA */}
           <SimpleTracker />
+          {/* ✅ NUEVO: Banner de consentimiento de cookies */}
+          <CookieConsent />
         </Providers>
       </body>
     </html>
