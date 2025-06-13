@@ -44,7 +44,7 @@ export async function GET(request: Request) {
         SUM(CASE WHEN booking_date = CURRENT_DATE THEN 1 ELSE 0 END) as today_bookings,
         SUM(CASE WHEN is_manual_booking = true THEN 1 ELSE 0 END) as manual_bookings,
         SUM(CASE WHEN (is_manual_booking IS NULL OR is_manual_booking = false) THEN 1 ELSE 0 END) as online_bookings,
-        COALESCE(SUM(CASE WHEN status IN ('confirmed', 'completed') THEN total_price::numeric ELSE 0 END), 0) as total_revenue
+        COALESCE(SUM(CASE WHEN status IN ('confirmed', 'completed') THEN (total_price::numeric - COALESCE(security_deposit::numeric, 0)) ELSE 0 END), 0) as total_revenue
       FROM bookings
       WHERE ${whereClause}
     `
