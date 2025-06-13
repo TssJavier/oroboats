@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, User, AlertTriangle, FileText, Loader2, UserCheck } from "lucide-react"
+import { Calendar, Clock, User, AlertTriangle, FileText, Loader2, UserCheck, CreditCard, Banknote } from "lucide-react"
 import { toast } from "sonner"
 import { ManualWaiverModal } from "./manual-waiver-modal"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface Vehicle {
   id: number
@@ -61,6 +62,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     bookingDate: "",
     notes: "",
     salesPerson: "",
+    paymentMethod: "cash", // ✅ NUEVO: Método de pago por defecto (efectivo)
   })
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
@@ -178,6 +180,12 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
       return
     }
 
+    // ✅ NUEVO: Validar método de pago
+    if (!formData.paymentMethod) {
+      toast.error("Debes seleccionar un método de pago")
+      return
+    }
+
     // 🆕 VALIDAR QUE ESTÉ FIRMADO EL DOCUMENTO
     if (!liabilityWaiverId) {
       toast.error("El cliente debe firmar el documento de exención de responsabilidad")
@@ -237,6 +245,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
           vehicleName: vehicle.name,
           vehicleType: vehicle.type,
           liabilityWaiverId: liabilityWaiverId, // 🆕 INCLUIR ID DEL DOCUMENTO FIRMADO
+          paymentMethod: formData.paymentMethod, // ✅ NUEVO: Incluir método de pago
         }),
       })
 
@@ -258,6 +267,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
         bookingDate: "",
         notes: "",
         salesPerson: "",
+        paymentMethod: "cash", // ✅ NUEVO: Resetear método de pago
       })
       setSelectedSlot(null)
       setAvailableSlots([])
@@ -394,6 +404,41 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* ✅ NUEVO: Selección de método de pago */}
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Método de Pago
+              </h3>
+
+              <RadioGroup
+                value={formData.paymentMethod}
+                onValueChange={(value: string) => handleInputChange("paymentMethod", value)}
+                className="flex flex-col space-y-3"
+              >
+                <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                  <RadioGroupItem value="cash" id="payment-cash" />
+                  <Label htmlFor="payment-cash" className="flex items-center cursor-pointer">
+                    <Banknote className="h-5 w-5 mr-2 text-green-600" />
+                    <div>
+                      <span className="font-medium">Efectivo</span>
+                      <p className="text-xs text-gray-500">El cliente ha pagado en efectivo</p>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                  <RadioGroupItem value="card" id="payment-card" />
+                  <Label htmlFor="payment-card" className="flex items-center cursor-pointer">
+                    <CreditCard className="h-5 w-5 mr-2 text-blue-600" />
+                    <div>
+                      <span className="font-medium">Tarjeta</span>
+                      <p className="text-xs text-gray-500">El cliente ha pagado con tarjeta</p>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
 
             {/* Selección de fecha */}

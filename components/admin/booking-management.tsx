@@ -61,6 +61,8 @@ interface Booking {
     amountPending?: string
     paymentLocation?: string
     payment_type?: string
+    // ✅ NUEVO: Campo para método de pago
+    paymentMethod?: "cash" | "card"
   }
   vehicle: {
     name: string
@@ -108,6 +110,7 @@ export function BookingManagement() {
           paymentType: data[0].booking.paymentType,
           amountPaid: data[0].booking.amountPaid,
           amountPending: data[0].booking.amountPending,
+          paymentMethod: data[0].booking.paymentMethod,
         })
       }
 
@@ -138,6 +141,7 @@ export function BookingManagement() {
               amountPaid: booking.booking.amountPaid,
               amountPending: booking.booking.amountPending,
               isPartialPayment: booking.booking.payment_type === "partial_payment",
+              paymentMethod: booking.booking.paymentMethod,
             })
           }
         })
@@ -270,6 +274,25 @@ export function BookingManagement() {
         description: "Todo pagado online",
         color: "bg-green-600 text-white",
         icon: CreditCard,
+      }
+    }
+  }
+
+  // ✅ NUEVA FUNCIÓN: Obtener información del método de pago
+  const getPaymentMethodDisplay = (booking: Booking) => {
+    if (!booking.booking.isManualBooking) return null
+
+    if (booking.booking.paymentMethod === "card") {
+      return {
+        label: "Tarjeta",
+        icon: CreditCard,
+        color: "text-blue-600",
+      }
+    } else {
+      return {
+        label: "Efectivo",
+        icon: Banknote,
+        color: "text-green-600",
       }
     }
   }
@@ -747,6 +770,8 @@ export function BookingManagement() {
               booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
             const salesPersonName = getSalesPersonName(booking.booking.salesPerson)
             const paymentTypeInfo = getPaymentTypeDisplay(booking)
+            // ✅ NUEVO: Obtener información del método de pago
+            const paymentMethodInfo = getPaymentMethodDisplay(booking)
 
             return (
               <Card
@@ -786,6 +811,13 @@ export function BookingManagement() {
                           <paymentTypeInfo.icon className="h-3 w-3 mr-1" />
                           {paymentTypeInfo.label}
                         </Badge>
+                        {/* ✅ NUEVO: Badge para método de pago en reservas manuales */}
+                        {isManual && paymentMethodInfo && (
+                          <Badge className="ml-2 bg-gray-600 text-white">
+                            <paymentMethodInfo.icon className={`h-3 w-3 mr-1 ${paymentMethodInfo.color}`} />
+                            {paymentMethodInfo.label}
+                          </Badge>
+                        )}
                       </CardTitle>
                       <CardDescription className="flex items-center mt-1">
                         <Ship className="h-4 w-4 mr-1" />
@@ -884,6 +916,16 @@ export function BookingManagement() {
                               COBRAR EN SITIO: €{booking.booking.amountPending}
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* ✅ NUEVO: Mostrar método de pago para reservas manuales */}
+                      {isManual && paymentMethodInfo && (
+                        <div className="mt-2 text-sm">
+                          <div className={`flex items-center font-medium ${paymentMethodInfo.color}`}>
+                            <paymentMethodInfo.icon className="h-3 w-3 inline mr-1" />
+                            Pagado con: {paymentMethodInfo.label}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1000,6 +1042,12 @@ export function BookingManagement() {
                     {isManual && salesPersonName && <span className="ml-2">• Comercial: {salesPersonName}</span>}
                     {isPartialPayment && (
                       <span className="ml-2 font-medium text-orange-600">• {paymentTypeInfo.description}</span>
+                    )}
+                    {/* ✅ NUEVO: Mostrar método de pago en el footer */}
+                    {isManual && paymentMethodInfo && (
+                      <span className={`ml-2 font-medium ${paymentMethodInfo.color}`}>
+                        • Pagado con {paymentMethodInfo.label.toLowerCase()}
+                      </span>
                     )}
                   </div>
                 </CardContent>

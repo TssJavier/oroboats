@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       vehicleName,
       vehicleType,
       liabilityWaiverId, // 🆕 NUEVO: ID del documento de exención firmado
+      paymentMethod, // ✅ NUEVO: Método de pago (cash o card)
     } = body
 
     // Validaciones básicas
@@ -55,6 +56,11 @@ export async function POST(request: NextRequest) {
 
     if (!startTime || !endTime) {
       return NextResponse.json({ error: "Faltan horarios de inicio y fin" }, { status: 400 })
+    }
+
+    // ✅ NUEVO: Validar método de pago
+    if (!paymentMethod || (paymentMethod !== "cash" && paymentMethod !== "card")) {
+      return NextResponse.json({ error: "Método de pago inválido" }, { status: 400 })
     }
 
     // 🆕 NUEVO: Validar que el documento de exención esté firmado (opcional pero recomendado)
@@ -177,6 +183,7 @@ export async function POST(request: NextRequest) {
           vehicle_name,
           vehicle_type,
           liability_waiver_id,
+          payment_method, /* ✅ NUEVO: Campo para método de pago */
           created_at,
           updated_at
         ) VALUES (
@@ -200,6 +207,7 @@ export async function POST(request: NextRequest) {
           ${vehicleName || vehicle.name},
           ${vehicleType || vehicle.type},
           ${liabilityWaiverId || null},
+          ${paymentMethod}, /* ✅ NUEVO: Guardar método de pago */
           NOW(),
           NOW()
         )
@@ -236,6 +244,7 @@ export async function POST(request: NextRequest) {
       console.log(`   - Time: ${timeSlot}`)
       console.log(`   - Duration: ${finalDuration} (${durationMinutes} min)`)
       console.log(`   - Price: €${totalPrice}`)
+      console.log(`   - Payment Method: ${paymentMethod}`) // ✅ NUEVO: Loguear método de pago
       console.log(`   - Liability Waiver: ${liabilityWaiverId ? `ID ${liabilityWaiverId}` : "None"}`)
       console.log(`   - Remaining stock: ${vehicleStock - bookingsCount - 1}`)
 
@@ -253,6 +262,7 @@ export async function POST(request: NextRequest) {
           duration: finalDuration,
           durationMinutes,
           totalPrice,
+          paymentMethod, // ✅ NUEVO: Incluir método de pago en la respuesta
           availableStock: vehicleStock - bookingsCount - 1,
           totalStock: vehicleStock,
           liabilityWaiverId: liabilityWaiverId || null, // 🆕 NUEVO: Incluir en la respuesta
