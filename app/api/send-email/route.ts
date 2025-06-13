@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ Validar API key antes de inicializar Resend
     const RESEND_API_KEY = process.env.RESEND_API_KEY
-    const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "javitricking@hotmail.com"
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@feribu.com"
 
     console.log("🔍 Checking environment variables...")
     console.log("🔍 RESEND_API_KEY:", RESEND_API_KEY ? "✅ Found" : "❌ Missing")

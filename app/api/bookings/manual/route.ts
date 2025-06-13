@@ -6,7 +6,7 @@ import { resend } from "@/lib/resend"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "@/lib/email-templates"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "javitricking@hotmail.com"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@feribu.com"
 
 // Función auxiliar para formatear fechas en español
 function formatDate(dateString: string): string {
