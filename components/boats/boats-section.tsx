@@ -36,6 +36,7 @@ import {
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import { useRouter } from "next/navigation"
+import { OroLoading, useNavigationLoading } from "@/components/ui/oro-loading" // ✅ NUEVO: Importar OroLoading
 
 // Función para validar URLs de imágenes
 function isValidImageUrl(url: string): boolean {
@@ -498,6 +499,9 @@ export function BoatsSection() {
   const [hasSearched, setHasSearched] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>("")
 
+  // ✅ NUEVO: Hook para manejar el estado de carga durante la navegación
+  const { isLoading: navigationLoading, startLoading, stopLoading } = useNavigationLoading()
+
   useEffect(() => {
     fetchVehicles()
   }, [])
@@ -588,26 +592,46 @@ export function BoatsSection() {
 
   const currentVehicles = getVehiclesByLicense(activeLicense === "with")
 
+  // ✅ MODIFICADO: Actualizar handleReserveClick para mostrar el loading durante la navegación
   const handleReserveClick = (vehicle: Vehicle) => {
     if (vehicle.requiresLicense) {
       setSelectedVehicle(vehicle)
       setShowLicenseModal(true)
     } else {
+      // Iniciar el loading antes de navegar
+      startLoading()
+
+      // Navegar a la página del producto
       router.push(`/reservar/${vehicle.id}`)
+
+      // Nota: No necesitamos stopLoading() aquí porque la página se recargará completamente
     }
   }
 
+  // ✅ MODIFICADO: Actualizar handleLicenseModalContinue para mostrar el loading durante la navegación
   const handleLicenseModalContinue = () => {
     if (selectedVehicle) {
       setShowLicenseModal(false)
+
+      // Iniciar el loading antes de navegar
+      startLoading()
+
+      // Navegar a la página del producto
       router.push(`/reservar/${selectedVehicle.id}`)
       setSelectedVehicle(null)
+
+      // Nota: No necesitamos stopLoading() aquí porque la página se recargará completamente
     }
   }
 
   const handleLicenseModalClose = () => {
     setShowLicenseModal(false)
     setSelectedVehicle(null)
+  }
+
+  // ✅ NUEVO: Mostrar OroLoading durante la carga inicial o la navegación
+  if (loading) {
+    return <OroLoading />
   }
 
   if (error) {
@@ -635,36 +659,11 @@ export function BoatsSection() {
     )
   }
 
-  if (loading) {
-    return (
-      <>
-        <section className="py-24 bg-white min-h-screen">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
-              <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.loading}</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[...Array(3)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <div className="h-72 bg-gray-200"></div>
-                  <CardHeader>
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </CardHeader>
-                  <CardContent></CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-        <FloatingContactWidget t={t} />
-      </>
-    )
-  }
-
   return (
     <>
+      {/* ✅ NUEVO: Mostrar OroLoading durante la navegación */}
+      {navigationLoading && <OroLoading />}
+
       <section className="py-24 bg-white min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -810,8 +809,16 @@ function VehicleCard({
     })
   })()
 
+  // Función para manejar el clic en toda la tarjeta
+  const handleCardClick = () => {
+    onReserveClick(vehicle)
+  }
+
   return (
-    <Card className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden flex flex-col h-full">
+    <Card
+      className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden flex flex-col h-full cursor-pointer"
+      onClick={handleCardClick} // ✅ NUEVO: Hacer toda la tarjeta clickable
+    >
       <div className="relative">
         <div className="w-full h-72 bg-gray-50 flex items-center justify-center overflow-hidden">
           <Image
@@ -930,7 +937,16 @@ function VehicleCard({
                 })
 
                 return Array.from(groupedPricing.values()).map((option, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                  <div
+                    key={index}
+                    className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200 hover:bg-gold/10 hover:border-gold cursor-pointer transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation() // Evitar que se propague al padre
+                      onReserveClick(vehicle)
+                    }}
+                    role="button"
+                    aria-label={`Reservar ${vehicle.name} por ${option.label}`}
+                  >
                     <div className="text-lg font-bold text-gold">€{option.price}</div>
                     <div className="text-xs text-gray-600 font-medium">{option.label}</div>
                   </div>
@@ -991,7 +1007,10 @@ function VehicleCard({
           </div>
 
           <Button
-            onClick={() => onReserveClick(vehicle)}
+            onClick={(e) => {
+              e.stopPropagation() // Evitar que se propague al padre
+              onReserveClick(vehicle)
+            }}
             className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 font-medium text-lg py-3 h-12"
           >
             <Calendar className="h-5 w-5 mr-2" />
