@@ -2,8 +2,23 @@ import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { sql } from "drizzle-orm"
 import { jwtVerify } from "jose"
+import { resend } from "@/lib/resend"
+import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "@/lib/email-templates"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "javitricking@hotmail.com"
+
+// Función auxiliar para formatear fechas en español
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  const options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }
+  return date.toLocaleDateString("es-ES", options)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,7 +102,7 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Checking vehicle ${vehicleId}...`)
 
     const vehicleResult = await db.execute(sql`
-      SELECT id, name, type, stock FROM vehicles WHERE id = ${vehicleId}
+      SELECT id, name, type, stock, security_deposit FROM vehicles WHERE id = ${vehicleId}
     `)
 
     if (!vehicleResult || vehicleResult.length === 0) {
@@ -96,6 +111,7 @@ export async function POST(request: NextRequest) {
 
     const vehicle = vehicleResult[0]
     const vehicleStock = typeof vehicle.stock === "number" ? vehicle.stock : 1
+    const securityDeposit = vehicle.security_deposit || 0
 
     console.log(`📊 Vehicle ${vehicleId} (${vehicle.name}) has stock: ${vehicleStock}`)
 
@@ -233,6 +249,67 @@ export async function POST(request: NextRequest) {
           console.error("⚠️ Warning: Could not update waiver with booking ID:", waiverUpdateError)
           // No fallar la reserva por esto, solo logear el warning
         }
+      }
+
+      // ✅✅ NUEVO: ENVIAR EMAILS DE CONFIRMACIÓN
+      try {
+        console.log("📧 Sending confirmation emails for manual booking...")
+
+        // Formatear la fecha para mostrar en el email
+        const formattedDate = formatDate(bookingDate)
+        const finalEmail = customerEmail || `${customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`
+
+        // Datos para los emails
+        const emailData = {
+          bookingId: Number(bookingId),
+          customerName: String(customerName),
+          customerEmail: String(finalEmail),
+          customerPhone: String(customerPhone),
+          vehicleName: String(vehicleName || vehicle.name),
+          bookingDate: String(formattedDate),
+          startTime: String(startTime),
+          endTime: String(endTime),
+          totalPrice: Number(totalPrice),
+          securityDeposit: Number(securityDeposit),
+          paymentType: "full_payment", // Las reservas manuales son siempre de pago completo
+          paymentMethod: String(paymentMethod),
+        }
+
+        // 1. Email al administrador
+        const adminHtml = renderAdminBookingNotification(emailData)
+        const adminEmailResult = await resend.emails.send({
+          from: "OroBoats Granada <onboarding@resend.dev>",
+          to: [ADMIN_EMAIL],
+          subject: `Nueva reserva manual #${bookingId} - ${vehicleName || vehicle.name}`,
+          html: adminHtml,
+        })
+
+        console.log("📧 Admin email result:", adminEmailResult.error ? "❌ Error" : "✅ Sent")
+
+        // 2. Email al cliente (solo si tiene email válido)
+        let customerEmailResult: Awaited<ReturnType<typeof resend.emails.send>> | null = null
+        if (finalEmail && !finalEmail.includes("@manual.booking")) {
+          const customerHtml = renderCustomerBookingConfirmation(emailData)
+          customerEmailResult = await resend.emails.send({
+            from: "OroBoats Granada <onboarding@resend.dev>",
+            to: [finalEmail],
+            subject: `Confirmación de reserva #${bookingId} - OroBoats`,
+            html: customerHtml,
+          })
+
+          console.log("📧 Customer email result:", customerEmailResult.error ? "❌ Error" : "✅ Sent")
+        } else {
+          console.log("📧 No valid customer email, skipping customer notification")
+        }
+
+        // Registrar resultados de envío de emails
+        console.log("📧 Email sending complete:", {
+          adminSent: !adminEmailResult.error,
+          customerSent: customerEmailResult ? !customerEmailResult.error : false,
+        })
+      } catch (emailError) {
+        console.error("❌ Error sending confirmation emails:", emailError)
+        // No fallamos la creación de la reserva si fallan los emails
       }
 
       console.log("✅ Manual booking created successfully!")
