@@ -46,6 +46,7 @@ export function ManualWaiverModal({
             customerName={customerName}
             customerEmail={customerEmail}
             onWaiverSigned={handleWaiverSigned}
+            onBack={handleBack}
           />
         </div>
       </DialogContent>
