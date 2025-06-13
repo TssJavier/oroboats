@@ -9,15 +9,17 @@ interface OroLoadingProps {
 }
 
 export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProps) {
+  // Aseguramos que el componente ocupe toda la pantalla y tenga la máxima prioridad de z-index
   const containerClasses = fullScreen
-    ? "fixed inset-0 bg-white bg-opacity-95 backdrop-blur-sm z-50 flex items-center justify-center"
+    ? "fixed inset-0 bg-white bg-opacity-95 backdrop-blur-sm z-[99999] flex items-center justify-center"
     : "flex items-center justify-center p-8"
 
   return (
     <div className={`${containerClasses} ${className}`}>
-      <div className="text-center">
-        {/* Contenedor principal */}
-        <div className="relative w-72 h-72 mx-auto">
+      {/* Contenedor centrado con tamaño fijo */}
+      <div className="flex items-center justify-center w-full max-w-[300px]">
+        {/* Contenedor del logo con tamaño fijo */}
+        <div className="relative w-48 h-48 flex items-center justify-center">
           {/* Barra de progreso circular */}
           <svg className="absolute inset-0 w-full h-full animate-spin-slow" viewBox="0 0 100 100">
             {/* Círculo base (gris claro) */}
@@ -54,7 +56,7 @@ export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProp
             />
           </svg>
 
-          {/* Partículas doradas flotantes FUERA del círculo */}
+          {/* Partículas doradas flotantes */}
           <div className="absolute inset-0">
             <div className="absolute -top-3 left-1/2 w-2 h-2 bg-gold rounded-full animate-float-particle-1 opacity-70"></div>
             <div className="absolute top-1/2 -right-3 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-float-particle-2 opacity-60"></div>
@@ -62,9 +64,9 @@ export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProp
             <div className="absolute top-1/4 -left-3 w-1 h-1 bg-yellow-300 rounded-full animate-float-particle-4 opacity-50"></div>
           </div>
 
-          {/* Logo real de la empresa */}
+          {/* Logo real de la empresa - Tamaño y centrado optimizado */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative w-60 h-60 animate-float-logo">
+            <div className="relative w-32 h-32 animate-float-logo">
               <Image
                 src="/assets/negro.png"
                 alt="OroBoats Logo"

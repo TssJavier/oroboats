@@ -35,7 +35,7 @@ interface BookingData {
   totalPrice: number
   notes: string
   securityDeposit?: number
-  liabilityWaiverId?: number // ✅ Añadido: ID del documento firmado
+  liabilityWaiverId?: number
 }
 
 const translations = {
@@ -44,9 +44,9 @@ const translations = {
     subtitle: "Completa tu reserva",
     step1: "Selecciona fecha y hora",
     step2: "Datos del cliente",
-    step3: "Exención de responsabilidad", // ✅ Nuevo paso
+    step3: "Exención de responsabilidad",
     step4: "Confirmar",
-    step5: "Pago", // ✅ Actualizado
+    step5: "Pago",
     selectDate: "Selecciona una fecha",
     selectTime: "Selecciona horario",
     customerInfo: "Información del cliente",
@@ -73,9 +73,9 @@ const translations = {
     subtitle: "Complete your booking",
     step1: "Select date and time",
     step2: "Customer details",
-    step3: "Liability waiver", // ✅ Nuevo paso
+    step3: "Liability waiver",
     step4: "Confirm",
-    step5: "Payment", // ✅ Actualizado
+    step5: "Payment",
     selectDate: "Select a date",
     selectTime: "Select time",
     customerInfo: "Customer information",
@@ -104,7 +104,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const t = translations[language]
   const router = useRouter()
 
-  // ✅ Obtener la fianza del vehículo
+  // Obtener la fianza del vehículo
   const securityDeposit = Number(vehicle.securityDeposit) || 0
 
   const [currentStep, setCurrentStep] = useState(1)
@@ -128,13 +128,14 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     totalPrice: 0,
     notes: "",
     securityDeposit: securityDeposit,
-    liabilityWaiverId: undefined, // ✅ Añadido: ID del documento firmado
+    liabilityWaiverId: undefined,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [navigationLoading, setNavigationLoading] = useState(false)
 
-  // ✅ Ref para el botón "Siguiente" para scroll automático
+  // Referencias para el scroll automático - Ahora apuntando al título del paso actual
+  const stepTitleRef = useRef<HTMLDivElement>(null)
   const nextButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -153,6 +154,18 @@ export function BookingForm({ vehicle }: BookingFormProps) {
       }))
     }
   }, [selectedDate, selectedTime, securityDeposit])
+
+  // Efecto para hacer scroll al cambiar de paso - Ahora al título del paso
+  useEffect(() => {
+    // Pequeño retraso para asegurar que el DOM se ha actualizado
+    const scrollTimer = setTimeout(() => {
+      if (stepTitleRef.current) {
+        stepTitleRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    }, 100)
+
+    return () => clearTimeout(scrollTimer)
+  }, [currentStep])
 
   const handleNextStep = () => {
     setError("")
@@ -188,17 +201,16 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     }, 1500)
   }
 
-  // ✅ Nuevo: Manejar firma del documento
   const handleWaiverSigned = (waiverId: number) => {
     setBookingData((prev) => ({
       ...prev,
       liabilityWaiverId: waiverId,
     }))
-    setCurrentStep(4) // Ir al paso de confirmación
+    setCurrentStep(4)
   }
 
   const handleBooking = () => {
-    setCurrentStep(5) // ✅ Actualizado: Ahora es el paso 5
+    setCurrentStep(5)
   }
 
   return (
@@ -228,7 +240,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
             </div>
           </div>
 
-          {/* Progress Steps - ✅ Actualizado para 5 pasos */}
+          {/* Progress Steps */}
           <div className="flex items-center justify-center mb-12">
             <div className="flex items-center space-x-4">
               {[1, 2, 3, 4, 5].map((step) => (
@@ -309,20 +321,23 @@ export function BookingForm({ vehicle }: BookingFormProps) {
             {/* Booking Form */}
             <div className="lg:col-span-2">
               <Card className="bg-white border border-gray-200">
-                <CardHeader>
-                  <CardTitle className="text-2xl font-bold text-black flex items-center">
-                    {currentStep === 1 && <Calendar className="h-6 w-6 text-gold mr-3" />}
-                    {currentStep === 2 && <Users className="h-6 w-6 text-gold mr-3" />}
-                    {currentStep === 3 && <FileText className="h-6 w-6 text-gold mr-3" />}
-                    {currentStep === 4 && <CreditCard className="h-6 w-6 text-gold mr-3" />}
-                    {currentStep === 5 && <CreditCard className="h-6 w-6 text-gold mr-3" />}
-                    {currentStep === 1 && t.step1}
-                    {currentStep === 2 && t.step2}
-                    {currentStep === 3 && t.step3}
-                    {currentStep === 4 && t.step4}
-                    {currentStep === 5 && t.step5}
-                  </CardTitle>
-                </CardHeader>
+                {/* Título del paso con referencia para scroll */}
+                <div ref={stepTitleRef} id="step-title">
+                  <CardHeader>
+                    <CardTitle className="text-2xl font-bold text-black flex items-center">
+                      {currentStep === 1 && <Calendar className="h-6 w-6 text-gold mr-3" />}
+                      {currentStep === 2 && <Users className="h-6 w-6 text-gold mr-3" />}
+                      {currentStep === 3 && <FileText className="h-6 w-6 text-gold mr-3" />}
+                      {currentStep === 4 && <CreditCard className="h-6 w-6 text-gold mr-3" />}
+                      {currentStep === 5 && <CreditCard className="h-6 w-6 text-gold mr-3" />}
+                      {currentStep === 1 && t.step1}
+                      {currentStep === 2 && t.step2}
+                      {currentStep === 3 && t.step3}
+                      {currentStep === 4 && t.step4}
+                      {currentStep === 5 && t.step5}
+                    </CardTitle>
+                  </CardHeader>
+                </div>
 
                 <CardContent className="space-y-8">
                   {error && (
@@ -414,7 +429,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* ✅ Step 3: Liability Waiver */}
+                  {/* Step 3: Liability Waiver */}
                   {currentStep === 3 && (
                     <LiabilityWaiver
                       customerName={bookingData.customerName}
@@ -424,14 +439,14 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     />
                   )}
 
-                  {/* Step 4: Summary and Payment - ✅ Actualizado */}
+                  {/* Step 4: Summary and Payment */}
                   {currentStep === 4 && (
                     <div className="space-y-6">
                       <BookingSummary vehicle={vehicle} bookingData={bookingData} />
                     </div>
                   )}
 
-                  {/* Step 5: Payment - ✅ Actualizado */}
+                  {/* Step 5: Payment */}
                   {currentStep === 5 && (
                     <div className="space-y-6">
                       <div className="text-center">
@@ -474,7 +489,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Navigation Buttons - ✅ Actualizado para manejar el nuevo paso */}
+                  {/* Navigation Buttons */}
                   <div className="pt-6 border-t border-gray-200">
                     {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
                       // Two buttons layout - Skip step 3 because it has its own navigation

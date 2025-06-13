@@ -109,7 +109,7 @@ function PaymentFormWithElements({
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         console.log("✅ Payment succeeded:", paymentIntent.id)
 
-        // ✅ CORREGIDO: Calcular montos correctamente
+        // Calcular montos correctamente
         const amountPaidOnline =
           paymentOption.type === "partial_payment"
             ? paymentOption.onlineAmount // Solo 50€ o 100€
@@ -117,7 +117,7 @@ function PaymentFormWithElements({
 
         const amountPendingOnSite = paymentOption.remainingAmount // Resto + fianza si es parcial
 
-        // ✅ MOSTRAR CLARAMENTE LOS DATOS QUE SE ENVÍAN
+        // MOSTRAR CLARAMENTE LOS DATOS QUE SE ENVÍAN
         console.log("💰 Sending payment confirmation with:", {
           paymentIntentId: paymentIntent.id,
           paymentType: paymentOption.type,
@@ -158,17 +158,23 @@ function PaymentFormWithElements({
 
   return (
     <>
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
+      {/* ✅ CORREGIDO: Ajustado el Card para mejor visualización en móviles */}
+      <Card className="w-full mx-auto">
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle>Pago Seguro</CardTitle>
           <p className="text-sm text-gray-600">Acepta tarjetas, PayPal y más</p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+            {/* ✅ CORREGIDO: Contenedor con altura mínima para evitar saltos */}
+            <div className="p-3 sm:p-4 border border-gray-200 rounded-lg bg-gray-50 min-h-[280px]">
               <PaymentElement
                 options={{
-                  layout: "tabs",
+                  layout: {
+                    type: "tabs",
+                    defaultCollapsed: false,
+                    spacedAccordionItems: false,
+                  },
                   wallets: {
                     applePay: "auto",
                     googlePay: "auto",
@@ -199,7 +205,7 @@ function PaymentFormWithElements({
         </CardContent>
       </Card>
 
-      {/* Modal de éxito */}
+      {/* ✅ CORREGIDO: Asegurar que el modal de éxito tenga prioridad sobre Stripe */}
       <SuccessModal
         isOpen={showSuccessModal}
         onClose={() => {
@@ -220,7 +226,7 @@ function PaymentFormWithElements({
         }}
       />
 
-      {/* Indicador de carga durante el procesamiento del pago */}
+      {/* ✅ CORREGIDO: Asegurar que el indicador de carga tenga prioridad sobre todo */}
       {paymentProcessing && <OroLoading />}
     </>
   )
@@ -243,10 +249,10 @@ function PaymentForm({
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
 
-  // ✅ NUEVO: Estado simple para el tipo de pago seleccionado
+  // Estado simple para el tipo de pago seleccionado
   const [selectedPaymentType, setSelectedPaymentType] = useState<"full_payment" | "partial_payment">("full_payment")
 
-  // ✅ CORREGIDO: Detectar tipo de vehículo correctamente
+  // Detectar tipo de vehículo correctamente
   const isJetski =
     bookingData.vehicleType === "jetski" ||
     bookingData.vehicleCategory?.toLowerCase().includes("jetski") ||
@@ -256,7 +262,7 @@ function PaymentForm({
   const vehicleType = isJetski ? "jetski" : "boat"
   const partialPaymentAmount = vehicleType === "jetski" ? 50 : 100
 
-  // ✅ NUEVO: Calcular la opción de pago actual basada en el tipo seleccionado
+  // Calcular la opción de pago actual basada en el tipo seleccionado
   const currentPaymentOption: PaymentOption = React.useMemo(() => {
     if (selectedPaymentType === "full_payment") {
       return {
@@ -281,7 +287,7 @@ function PaymentForm({
     }
   }, [selectedPaymentType, finalAmount, securityDeposit, partialPaymentAmount])
 
-  // ✅ NUEVO: Usar ref para evitar re-renders innecesarios
+  // Usar ref para evitar re-renders innecesarios
   const lastCreatedAmountRef = useRef<number>(0)
   const isCreatingPaymentIntentRef = useRef<boolean>(false)
 
@@ -299,7 +305,7 @@ function PaymentForm({
     isCreating: isCreatingPaymentIntentRef.current,
   })
 
-  // ✅ CORREGIDO: Solo crear payment intent cuando realmente es necesario
+  // Solo crear payment intent cuando realmente es necesario
   React.useEffect(() => {
     if (
       !isFreeBooking &&
@@ -327,7 +333,7 @@ function PaymentForm({
       console.log("🔄 Creating payment intent for amount:", onlineAmount)
       console.log("🔄 Payment type:", selectedPaymentType)
 
-      // ✅ PREPARAR DATOS PARA EL PAYMENT INTENT
+      // PREPARAR DATOS PARA EL PAYMENT INTENT
       const paymentData = {
         amount: onlineAmount,
         paymentType: currentPaymentOption.type,
@@ -340,7 +346,7 @@ function PaymentForm({
           discountCode: discountData?.code,
           discountAmount: discountData?.discountAmount,
           originalPrice: discountData ? amount : undefined,
-          // ✅ CRÍTICO: Incluir información de pago parcial en bookingData
+          // CRÍTICO: Incluir información de pago parcial en bookingData
           paymentType: currentPaymentOption.type,
           amountPaid: currentPaymentOption.type === "partial_payment" ? currentPaymentOption.onlineAmount : finalAmount,
           amountPending: currentPaymentOption.remainingAmount,
@@ -389,7 +395,7 @@ function PaymentForm({
     setFinalAmount(newAmount)
   }
 
-  // ✅ NUEVO: Función simplificada para cambio de tipo de pago
+  // Función simplificada para cambio de tipo de pago
   const handlePaymentTypeChange = (option: PaymentOption) => {
     console.log("🔄 Payment type changed to:", option.type, "Amount:", option.onlineAmount)
     setSelectedPaymentType(option.type)
@@ -441,8 +447,9 @@ function PaymentForm({
     return (
       <div className="space-y-6">
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
-        <Card className="w-full max-w-md mx-auto">
-          <CardContent className="p-6 text-center">
+        {/* ✅ CORREGIDO: Ajustado el Card para mejor visualización en móviles */}
+        <Card className="w-full mx-auto">
+          <CardContent className="p-4 sm:p-6 text-center">
             <div className="text-red-600 mb-4">
               <p className="font-semibold">Error de configuración</p>
               <p className="text-sm">{error}</p>
@@ -462,8 +469,9 @@ function PaymentForm({
     return (
       <div className="space-y-6">
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
-        <Card className="w-full max-w-md mx-auto">
-          <CardContent className="p-6 text-center">
+        {/* ✅ CORREGIDO: Ajustado el Card para mejor visualización en móviles */}
+        <Card className="w-full mx-auto">
+          <CardContent className="p-4 sm:p-6 text-center">
             <p className="mb-2">Preparando pago...</p>
             {environment && <p className="text-xs mt-2 text-gray-500">Entorno: {environment}</p>}
           </CardContent>
@@ -474,6 +482,7 @@ function PaymentForm({
 
   return (
     <>
+      {/* ✅ CORREGIDO: Eliminado padding horizontal para evitar desbordamiento */}
       <div className="space-y-6">
         {/* Indicador de entorno */}
         {environment === "test" && (
@@ -489,7 +498,7 @@ function PaymentForm({
         {/* Código de descuento */}
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
 
-        {/* ✅ Selector de tipo de pago */}
+        {/* Selector de tipo de pago */}
         {!isFreeBooking && (
           <PaymentTypeSelector
             totalPrice={finalAmount}
@@ -499,19 +508,19 @@ function PaymentForm({
               category: bookingData.vehicleCategory,
             }}
             securityDeposit={securityDeposit}
-            selectedType={selectedPaymentType} // ✅ NUEVO: Pasar el tipo seleccionado
+            selectedType={selectedPaymentType}
             onPaymentTypeChange={handlePaymentTypeChange}
           />
         )}
 
         {/* Formulario de pago o confirmación gratuita */}
         {isFreeBooking ? (
-          <Card className="w-full max-w-md mx-auto">
-            <CardHeader>
+          <Card className="w-full mx-auto">
+            <CardHeader className="px-4 sm:px-6">
               <CardTitle>Reserva Gratuita</CardTitle>
               <p className="text-sm text-gray-600">¡Tu reserva es completamente gratuita!</p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 sm:px-6">
               <div className="p-4 border border-green-200 rounded-lg bg-green-50 text-center mb-6">
                 <p className="text-green-800 font-medium">¡Reserva 100% gratuita!</p>
                 <p className="text-green-600 text-sm">No se requiere pago</p>
@@ -526,7 +535,7 @@ function PaymentForm({
             </CardContent>
           </Card>
         ) : (
-          // Renderizar el formulario de pago con Elements
+          // ✅ CORREGIDO: Ajustado Elements para mejor visualización en móviles
           <Elements
             stripe={stripePromise}
             options={{
@@ -535,8 +544,21 @@ function PaymentForm({
                 theme: "stripe" as const,
                 variables: {
                   colorPrimary: "#D4AF37",
+                  // ✅ CORREGIDO: Ajustar espaciado para móviles
+                  spacingUnit: "4px",
+                  borderRadius: "8px",
+                },
+                rules: {
+                  ".Tab": {
+                    padding: "8px",
+                  },
+                  ".Input": {
+                    padding: "10px",
+                  },
                 },
               },
+              // ✅ CORREGIDO: Asegurar que Stripe se muestre correctamente en móviles
+              loader: "auto",
             }}
           >
             <PaymentFormWithElements
@@ -575,7 +597,7 @@ function PaymentForm({
         }}
       />
 
-      {/* Indicador de carga durante el procesamiento del pago */}
+      {/* ✅ CORREGIDO: Asegurar que el indicador de carga tenga prioridad sobre todo */}
       {paymentProcessing && <OroLoading />}
     </>
   )
@@ -584,8 +606,8 @@ function PaymentForm({
 export function StripePayment(props: StripePaymentProps): ReactElement {
   if (!stripePromise) {
     return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardContent className="p-6 text-center">
+      <Card className="w-full mx-auto">
+        <CardContent className="p-4 sm:p-6 text-center">
           <div className="text-red-600">
             <p className="font-semibold">Error de configuración</p>
             <p className="text-sm">Stripe no está configurado correctamente</p>

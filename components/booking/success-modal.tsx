@@ -17,7 +17,7 @@ interface SuccessModalProps {
     vehicleName?: string
     totalPrice: number
     securityDeposit?: number
-    // ✅ NUEVO: Campos para pago parcial
+    // Campos para pago parcial
     paymentType?: "full_payment" | "partial_payment"
     amountPaid?: number
     amountPending?: number
@@ -61,12 +61,18 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
     return time.substring(0, 5) // Remove seconds if present
   }
 
-  // ✅ NUEVO: Determinar si es pago parcial
+  // Determinar si es pago parcial
   const isPartialPayment = bookingData.paymentType === "partial_payment"
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Modal con z-index máximo y centrado perfecto */}
+      <div
+        className="fixed inset-0 z-[99999] flex items-center justify-center p-0"
+        style={{
+          touchAction: "none", // Prevenir scroll en dispositivos táctiles
+        }}
+      >
         {/* Overlay */}
         <div
           className={`absolute inset-0 bg-black transition-opacity duration-300 ${
@@ -75,15 +81,16 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
           onClick={handleClose}
         />
 
-        {/* Modal */}
+        {/* Modal con ancho optimizado y centrado */}
         <Card
-          className={`relative w-full max-w-md mx-auto transform transition-all duration-300 ${
+          className={`relative w-[98%] max-w-[400px] transform transition-all duration-300 ${
             isVisible ? "scale-100 opacity-100" : "scale-95 opacity-0"
-          }`}
+          } max-h-[90vh] overflow-y-auto ml-[10px] mr-[90px] `}
         >
+          {/* Para moverlo horizontalmente: cambia el valor de `mx-auto` por márgenes específicos como `ml-[valor]` o `mr-[valor]` */}
           <CardContent className="p-0">
             {/* Header */}
-            <div className="bg-gold p-6 text-center rounded-t-lg">
+            <div className="bg-gold p-5 text-center rounded-t-lg">
               <Button
                 variant="ghost"
                 size="sm"
@@ -92,85 +99,102 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
               >
                 ✕
               </Button>
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white">
                 <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-black mb-2">¡Reserva Confirmada!</h2>
-              <p className="text-black/80">Tu reserva ha sido procesada exitosamente</p>
+              <h2 className="text-xl font-bold text-black mb-1">¡Reserva Confirmada!</h2>
+              <p className="text-black/80 text-sm">Tu reserva ha sido procesada exitosamente</p>
             </div>
 
-            {/* Content */}
-            <div className="p-6 space-y-4">
-              {/* Booking details */}
+            {/* Contenido con padding optimizado */}
+            <div className="p-5 space-y-4">
+              {/* Booking details - Estructura más compacta */}
               <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="font-medium">Fecha:</span>
-                  <span>{formatDate(bookingData.bookingDate)}</span>
+                <div className="flex items-start gap-2">
+                  <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
+                  <div>
+                    <span className="font-medium text-sm">Fecha:</span>
+                    <div className="text-gray-800 text-sm">{formatDate(bookingData.bookingDate)}</div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-sm">
-                  <Clock className="h-4 w-4 text-gray-500" />
-                  <span className="font-medium">Horario:</span>
-                  <span>
-                    {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
-                  </span>
+                <div className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
+                  <div>
+                    <span className="font-medium text-sm">Horario:</span>
+                    <div className="text-gray-800 text-sm">
+                      {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+                    </div>
+                  </div>
                 </div>
 
                 {bookingData.vehicleName && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="font-medium">Vehículo:</span>
-                    <span>{bookingData.vehicleName}</span>
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 flex-shrink-0" /> {/* Espacio para alineación */}
+                    <div>
+                      <span className="font-medium text-sm">Vehículo:</span>
+                      <div className="text-gray-800 text-sm">{bookingData.vehicleName}</div>
+                    </div>
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 text-sm">
-                  <CreditCard className="h-4 w-4 text-gray-500" />
-                  <span className="font-medium">Precio del alquiler:</span>
-                  <span className="font-semibold">€{bookingData.totalPrice}</span>
+                <div className="flex items-start gap-2">
+                  <CreditCard className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
+                  <div>
+                    <span className="font-medium text-sm">Precio del alquiler:</span>
+                    <div className="text-gray-800 font-semibold text-sm">€{bookingData.totalPrice}</div>
+                  </div>
                 </div>
 
-                {/* ✅ NUEVO: Mostrar información de pago parcial */}
+                {/* Información de pago parcial */}
                 {isPartialPayment && typeof bookingData.amountPaid === "number" && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <CreditCard className="h-4 w-4 text-green-500" />
-                    <span className="font-medium">Pagado ahora:</span>
-                    <span className="font-semibold text-green-600">€{bookingData.amountPaid}</span>
+                  <div className="flex items-start gap-2">
+                    <CreditCard className="h-4 w-4 text-green-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <span className="font-medium text-sm">Pagado ahora:</span>
+                      <div className="text-green-600 font-semibold text-sm">€{bookingData.amountPaid}</div>
+                    </div>
                   </div>
                 )}
 
-                {/* ✅ NUEVO: Mostrar monto pendiente */}
+                {/* Monto pendiente */}
                 {isPartialPayment && typeof bookingData.amountPending === "number" && bookingData.amountPending > 0 && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <MapPin className="h-4 w-4 text-orange-500" />
-                    <span className="font-medium">A pagar en sitio:</span>
-                    <span className="font-semibold text-orange-600">€{bookingData.amountPending}</span>
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-orange-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <span className="font-medium text-sm">A pagar en sitio:</span>
+                      <div className="text-orange-600 font-semibold text-sm">€{bookingData.amountPending}</div>
+                    </div>
                   </div>
                 )}
 
                 {/* Security deposit info */}
                 {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Shield className="h-4 w-4 text-blue-500" />
-                    <span className="font-medium">Fianza (reembolsable):</span>
-                    <span className="font-semibold text-blue-600">€{bookingData.securityDeposit}</span>
+                  <div className="flex items-start gap-2">
+                    <Shield className="h-4 w-4 text-blue-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <span className="font-medium text-sm">Fianza (reembolsable):</span>
+                      <div className="text-blue-600 font-semibold text-sm">€{bookingData.securityDeposit}</div>
+                    </div>
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 text-sm">
-                  <Mail className="h-4 w-4 text-gray-500" />
-                  <span className="font-medium">Confirmación enviada a:</span>
-                  <span className="break-all">{bookingData.customerEmail}</span>
+                <div className="flex items-start gap-2">
+                  <Mail className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
+                  <div>
+                    <span className="font-medium text-sm">Confirmación enviada a:</span>
+                    <div className="text-gray-800 break-words text-sm">{bookingData.customerEmail}</div>
+                  </div>
                 </div>
               </div>
 
-              {/* ✅ NUEVO: Información de pago parcial */}
+              {/* Información de pago parcial */}
               {isPartialPayment && typeof bookingData.amountPending === "number" && bookingData.amountPending > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-orange-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-orange-800 mb-1">Pago pendiente en sitio</p>
+                    <MapPin className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs">
+                      <p className="font-medium text-orange-800">Pago pendiente en sitio</p>
                       <p className="text-orange-700">
                         Recuerda que deberás pagar €{bookingData.amountPending} al recoger el vehículo. Puedes pagar con
                         tarjeta o efectivo.
@@ -184,9 +208,9 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
               {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium text-blue-800 mb-1">Información sobre la fianza</p>
+                    <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs">
+                      <p className="font-medium text-blue-800">Información sobre la fianza</p>
                       <p className="text-blue-700">
                         La fianza de €{bookingData.securityDeposit} se devolverá al finalizar la reserva, siempre que no
                         haya daños por uso irresponsable.
@@ -198,7 +222,7 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
 
               {/* Additional information */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-sm text-gray-700">
+                <p className="text-xs text-gray-700">
                   <span className="font-medium">Importante:</span> Revisa tu email para obtener todos los detalles de tu
                   reserva. Si tienes alguna pregunta, no dudes en contactarnos.
                 </p>
