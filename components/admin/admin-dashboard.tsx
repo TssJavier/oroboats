@@ -58,7 +58,7 @@ export function AdminDashboard() {
   const tabOptions = [
     { value: "stats", label: "Estadísticas", icon: BarChart3 },
     { value: "vehicles", label: "Productos", icon: Ship },
-    { value: "pricing", label: "Precios", icon: DollarSign },
+    // { value: "pricing", label: "Precios", icon: DollarSign }, // Comentado por no estar implementado
     { value: "bookings", label: "Reservas", icon: Calendar },
     { value: "settings", label: "Configuración", icon: Settings },
   ]
@@ -153,13 +153,13 @@ export function AdminDashboard() {
               <Ship className="h-5 w-5 mr-3" />
               Productos
             </TabsTrigger>
-            <TabsTrigger
+            {/*<TabsTrigger
               value="pricing"
               className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
             >
               <DollarSign className="h-5 w-5 mr-3" />
               Precios
-            </TabsTrigger>
+            </TabsTrigger>*/}
             <TabsTrigger
               value="bookings"
               className="data-[state=active]:bg-black data-[state=active]:text-white text-gray-600 hover:text-black transition-colors text-lg font-semibold h-12 rounded-lg"
