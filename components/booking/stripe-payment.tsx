@@ -1,16 +1,15 @@
 "use client"
 
 import React from "react"
-
 import type { ReactElement } from "react"
-
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { loadStripe } from "@stripe/stripe-js"
 import { Elements, useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SuccessModal } from "./success-modal"
 import { DiscountInput } from "./discount-input"
+import { PaymentTypeSelector } from "./payment-type-selector"
 import { OroLoading } from "@/components/ui/oro-loading"
 
 // 🔍 DETECTAR ENTORNO Y CONFIGURAR STRIPE
@@ -27,9 +26,19 @@ console.log("🌍 Stripe client environment:", {
 
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null
 
+interface PaymentOption {
+  type: "full_payment" | "partial_payment"
+  label: string
+  description: string
+  onlineAmount: number
+  remainingAmount: number
+  totalAmount: number
+  securityDepositLocation: "online" | "on_site"
+}
+
 interface StripePaymentProps {
   amount: number
-  securityDeposit?: number // ✅ Añadido: Fianza
+  securityDeposit?: number
   bookingData: any
   onSuccess: () => void
   onError: (error: string) => void
@@ -38,26 +47,25 @@ interface StripePaymentProps {
 // Componente interno que maneja el pago con Elements
 function PaymentFormWithElements({
   amount,
-  securityDeposit = 0, // ✅ Añadido: Fianza con valor por defecto
+  securityDeposit = 0,
   bookingData,
   onSuccess,
   onError,
   clientSecret,
   environment,
   onRetry,
+  paymentOption,
 }: StripePaymentProps & {
   clientSecret: string
   environment: string
   onRetry: () => void
+  paymentOption: PaymentOption
 }): ReactElement {
   const stripe = useStripe()
   const elements = useElements()
   const [loading, setLoading] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
-
-  // ✅ Añadido: Calcular total con fianza
-  const totalAmount = amount + securityDeposit
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -83,6 +91,7 @@ function PaymentFormWithElements({
 
     try {
       console.log("🔄 Confirming payment with clientSecret:", clientSecret.substring(0, 20) + "...")
+      console.log("🔄 Payment option:", paymentOption)
 
       // Confirmar pago con Stripe
       const { error, paymentIntent } = await stripe.confirmPayment({
@@ -100,15 +109,36 @@ function PaymentFormWithElements({
       } else if (paymentIntent && paymentIntent.status === "succeeded") {
         console.log("✅ Payment succeeded:", paymentIntent.id)
 
-        // Confirmar reserva en backend
+        // ✅ CORREGIDO: Calcular montos correctamente
+        const amountPaidOnline =
+          paymentOption.type === "partial_payment"
+            ? paymentOption.onlineAmount // Solo 50€ o 100€
+            : amount // Precio completo del alquiler
+
+        const amountPendingOnSite = paymentOption.remainingAmount // Resto + fianza si es parcial
+
+        // ✅ MOSTRAR CLARAMENTE LOS DATOS QUE SE ENVÍAN
+        console.log("💰 Sending payment confirmation with:", {
+          paymentIntentId: paymentIntent.id,
+          paymentType: paymentOption.type,
+          amountPaid: amountPaidOnline,
+          amountPending: amountPendingOnSite,
+        })
+
+        // Confirmar reserva en backend con información de pago parcial
         const confirmResponse = await fetch("/api/confirm-booking", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
+          body: JSON.stringify({
+            paymentIntentId: paymentIntent.id,
+            paymentType: paymentOption.type,
+            amountPaid: amountPaidOnline,
+            amountPending: amountPendingOnSite,
+          }),
         })
 
         if (confirmResponse.ok) {
-          // Mostrar modal de éxito en lugar de alert
+          // Mostrar modal de éxito
           setShowSuccessModal(true)
           setPaymentProcessing(false)
         } else {
@@ -149,14 +179,22 @@ function PaymentFormWithElements({
 
             <div className="flex items-center justify-center text-sm text-gray-500">Pago seguro con cifrado SSL</div>
 
-            {/* ✅ Modificado: Mostrar total con fianza */}
             <Button
               type="submit"
               disabled={!stripe || loading}
               className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
             >
-              {loading ? "Procesando..." : `Pagar €${totalAmount}`}
+              {loading ? "Procesando..." : `Pagar €${paymentOption.onlineAmount}`}
             </Button>
+
+            {paymentOption.type === "partial_payment" && (
+              <div className="text-center p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-700 font-medium">
+                  ⚠️ Recuerda: Deberás pagar €{paymentOption.remainingAmount} al llegar al sitio
+                </p>
+                <p className="text-xs text-orange-600 mt-1">(Incluye resto del alquiler + fianza)</p>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
@@ -175,7 +213,10 @@ function PaymentFormWithElements({
           endTime: bookingData.endTime,
           vehicleName: bookingData.vehicleName,
           totalPrice: amount,
-          securityDeposit: securityDeposit, // ✅ Añadido: Pasar la fianza al modal
+          securityDeposit: securityDeposit,
+          paymentType: paymentOption.type,
+          amountPaid: paymentOption.type === "partial_payment" ? paymentOption.onlineAmount : amount,
+          amountPending: paymentOption.remainingAmount,
         }}
       />
 
@@ -195,7 +236,6 @@ function PaymentForm({
 }: StripePaymentProps): ReactElement {
   const [loading, setLoading] = useState(false)
   const [clientSecret, setClientSecret] = useState<string>("")
-  const [paymentIntentId, setPaymentIntentId] = useState<string>("")
   const [finalAmount, setFinalAmount] = useState(amount)
   const [discountData, setDiscountData] = useState<any>(null)
   const [error, setError] = useState<string>("")
@@ -203,60 +243,117 @@ function PaymentForm({
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
 
-  // ✅ Añadido: Calcular total con fianza (no se aplica descuento a la fianza)
-  const totalWithDeposit = finalAmount + securityDeposit
+  // ✅ NUEVO: Estado simple para el tipo de pago seleccionado
+  const [selectedPaymentType, setSelectedPaymentType] = useState<"full_payment" | "partial_payment">("full_payment")
+
+  // ✅ CORREGIDO: Detectar tipo de vehículo correctamente
+  const isJetski =
+    bookingData.vehicleType === "jetski" ||
+    bookingData.vehicleCategory?.toLowerCase().includes("jetski") ||
+    bookingData.vehicleName?.toLowerCase().includes("jetski") ||
+    bookingData.vehicleName?.toLowerCase().includes("moto")
+
+  const vehicleType = isJetski ? "jetski" : "boat"
+  const partialPaymentAmount = vehicleType === "jetski" ? 50 : 100
+
+  // ✅ NUEVO: Calcular la opción de pago actual basada en el tipo seleccionado
+  const currentPaymentOption: PaymentOption = React.useMemo(() => {
+    if (selectedPaymentType === "full_payment") {
+      return {
+        type: "full_payment",
+        label: "Pago completo",
+        description: "Paga todo ahora y olvídate de problemas",
+        onlineAmount: finalAmount + securityDeposit,
+        remainingAmount: 0,
+        totalAmount: finalAmount,
+        securityDepositLocation: "online",
+      }
+    } else {
+      return {
+        type: "partial_payment",
+        label: `Pago parcial (${partialPaymentAmount}€ ahora)`,
+        description: "No olvides traer efectivo exacto o tarjeta de crédito",
+        onlineAmount: partialPaymentAmount,
+        remainingAmount: finalAmount - partialPaymentAmount + securityDeposit,
+        totalAmount: finalAmount,
+        securityDepositLocation: "on_site",
+      }
+    }
+  }, [selectedPaymentType, finalAmount, securityDeposit, partialPaymentAmount])
+
+  // ✅ NUEVO: Usar ref para evitar re-renders innecesarios
+  const lastCreatedAmountRef = useRef<number>(0)
+  const isCreatingPaymentIntentRef = useRef<boolean>(false)
 
   // Verificar si es reserva gratuita (100% descuento)
   const isFreeBooking = finalAmount <= 0
 
-  // Crear Payment Intent cuando se monta el componente (solo si no es gratis)
-  React.useEffect(() => {
-    if (!isFreeBooking) {
-      createPaymentIntent(finalAmount)
-    }
-  }, [finalAmount, isFreeBooking])
+  console.log("🔍 Payment form state:", {
+    vehicleName: bookingData.vehicleName,
+    detectedType: vehicleType,
+    partialAmount: partialPaymentAmount,
+    selectedType: selectedPaymentType,
+    currentAmount: currentPaymentOption.onlineAmount,
+    finalAmount,
+    isFreeBooking,
+    isCreating: isCreatingPaymentIntentRef.current,
+  })
 
-  const createPaymentIntent = async (payAmount: number) => {
+  // ✅ CORREGIDO: Solo crear payment intent cuando realmente es necesario
+  React.useEffect(() => {
+    if (
+      !isFreeBooking &&
+      currentPaymentOption.onlineAmount !== lastCreatedAmountRef.current &&
+      !isCreatingPaymentIntentRef.current
+    ) {
+      console.log("💳 Creating payment intent for amount:", currentPaymentOption.onlineAmount)
+      lastCreatedAmountRef.current = currentPaymentOption.onlineAmount
+      createPaymentIntent(currentPaymentOption.onlineAmount)
+    }
+  }, [currentPaymentOption.onlineAmount, isFreeBooking])
+
+  const createPaymentIntent = async (onlineAmount: number) => {
+    if (isCreatingPaymentIntentRef.current) {
+      console.log("⏳ Payment intent creation already in progress, skipping...")
+      return
+    }
+
     try {
+      isCreatingPaymentIntentRef.current = true
       setError("")
-      setClientSecret("") // Limpiar clientSecret anterior
+      setClientSecret("")
       setLoading(true)
 
-      // ✅ Modificado: Incluir fianza en el monto total
-      const totalAmount = payAmount + securityDeposit
-      console.log(
-        "🔄 Creating payment intent for amount:",
-        totalAmount,
-        "(Alquiler:",
-        payAmount,
-        "+ Fianza:",
-        securityDeposit,
-        ")",
-      )
+      console.log("🔄 Creating payment intent for amount:", onlineAmount)
+      console.log("🔄 Payment type:", selectedPaymentType)
+
+      // ✅ PREPARAR DATOS PARA EL PAYMENT INTENT
+      const paymentData = {
+        amount: onlineAmount,
+        paymentType: currentPaymentOption.type,
+        amountPaid: currentPaymentOption.type === "partial_payment" ? currentPaymentOption.onlineAmount : finalAmount,
+        amountPending: currentPaymentOption.remainingAmount,
+        bookingData: {
+          ...bookingData,
+          finalAmount: finalAmount,
+          securityDeposit: securityDeposit,
+          discountCode: discountData?.code,
+          discountAmount: discountData?.discountAmount,
+          originalPrice: discountData ? amount : undefined,
+          // ✅ CRÍTICO: Incluir información de pago parcial en bookingData
+          paymentType: currentPaymentOption.type,
+          amountPaid: currentPaymentOption.type === "partial_payment" ? currentPaymentOption.onlineAmount : finalAmount,
+          amountPending: currentPaymentOption.remainingAmount,
+        },
+      }
+
+      console.log("💳 Payment data:", paymentData)
 
       const response = await fetch("/api/create-payment-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: totalAmount, // ✅ Modificado: Monto total con fianza
-          bookingData: {
-            ...bookingData,
-            finalAmount: payAmount,
-            securityDeposit: securityDeposit, // ✅ Añadido: Incluir fianza
-            discountCode: discountData?.code,
-            discountAmount: discountData?.discountAmount,
-            originalPrice: discountData ? amount : undefined,
-          },
-          metadata: {
-            customerEmail: bookingData.customerEmail,
-            vehicleId: bookingData.vehicleId,
-            rentalAmount: payAmount, // ✅ Añadido: Monto del alquiler
-            securityDeposit: securityDeposit, // ✅ Añadido: Monto de la fianza
-          },
-        }),
+        body: JSON.stringify(paymentData),
       })
-
-      console.log("📡 Response status:", response.status)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -274,7 +371,6 @@ function PaymentForm({
       console.log("✅ Payment intent created successfully:", { piId, hasClientSecret: !!cs })
 
       setClientSecret(cs)
-      setPaymentIntentId(piId)
       setEnvironment(env)
     } catch (error) {
       console.error("❌ Error creating payment intent:", error)
@@ -283,16 +379,20 @@ function PaymentForm({
       onError(errorMessage)
     } finally {
       setLoading(false)
+      isCreatingPaymentIntentRef.current = false
     }
   }
 
   const handleDiscountApplied = (discount: any) => {
     setDiscountData(discount)
-    if (discount) {
-      setFinalAmount(discount.finalAmount)
-    } else {
-      setFinalAmount(amount)
-    }
+    const newAmount = discount ? discount.finalAmount : amount
+    setFinalAmount(newAmount)
+  }
+
+  // ✅ NUEVO: Función simplificada para cambio de tipo de pago
+  const handlePaymentTypeChange = (option: PaymentOption) => {
+    console.log("🔄 Payment type changed to:", option.type, "Amount:", option.onlineAmount)
+    setSelectedPaymentType(option.type)
   }
 
   // Manejar reserva gratuita (sin Stripe)
@@ -309,11 +409,14 @@ function PaymentForm({
         body: JSON.stringify({
           ...bookingData,
           finalAmount: 0,
-          securityDeposit: securityDeposit, // ✅ Añadido: Incluir fianza
+          securityDeposit: securityDeposit,
           discountCode: discountData?.code,
           discountAmount: discountData?.discountAmount,
           originalPrice: amount,
           paymentStatus: "free_booking",
+          paymentType: "full_payment",
+          amountPaid: 0,
+          amountPending: 0,
         }),
       })
 
@@ -345,7 +448,7 @@ function PaymentForm({
               <p className="text-sm">{error}</p>
               {environment && <p className="text-xs mt-2 text-gray-500">Entorno: {environment}</p>}
             </div>
-            <Button onClick={() => createPaymentIntent(finalAmount)} variant="outline">
+            <Button onClick={() => createPaymentIntent(currentPaymentOption.onlineAmount)} variant="outline">
               Reintentar
             </Button>
           </CardContent>
@@ -386,54 +489,20 @@ function PaymentForm({
         {/* Código de descuento */}
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
 
-        {/* Resumen de precio */}
-        <Card className="bg-gray-50">
-          <CardContent className="p-4">
-            <div className="space-y-2">
-              {discountData && (
-                <>
-                  <div className="flex justify-between text-sm">
-                    <span>Precio original:</span>
-                    <span>€{amount}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Descuento ({discountData.code}):</span>
-                    <span>-€{discountData.discountAmount}</span>
-                  </div>
-                  <hr className="my-2" />
-                </>
-              )}
-
-              {/* ✅ Modificado: Mostrar desglose con fianza */}
-              <div className="flex justify-between">
-                <span>Precio del alquiler:</span>
-                <span className="font-medium">€{finalAmount}</span>
-              </div>
-
-              {securityDeposit > 0 && (
-                <div className="flex justify-between text-blue-600">
-                  <span>Fianza (reembolsable):</span>
-                  <span className="font-medium">€{securityDeposit}</span>
-                </div>
-              )}
-
-              <hr className="my-2" />
-
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total a pagar:</span>
-                <span className={isFreeBooking ? "text-green-600" : ""}>
-                  {isFreeBooking ? "¡GRATIS!" : `€${totalWithDeposit}`}
-                </span>
-              </div>
-
-              {securityDeposit > 0 && (
-                <p className="text-xs text-blue-600 mt-1">
-                  *La fianza se devolverá al finalizar la reserva, siempre que no haya daños por uso irresponsable.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* ✅ Selector de tipo de pago */}
+        {!isFreeBooking && (
+          <PaymentTypeSelector
+            totalPrice={finalAmount}
+            vehicle={{
+              name: bookingData.vehicleName,
+              type: bookingData.vehicleType,
+              category: bookingData.vehicleCategory,
+            }}
+            securityDeposit={securityDeposit}
+            selectedType={selectedPaymentType} // ✅ NUEVO: Pasar el tipo seleccionado
+            onPaymentTypeChange={handlePaymentTypeChange}
+          />
+        )}
 
         {/* Formulario de pago o confirmación gratuita */}
         {isFreeBooking ? (
@@ -472,13 +541,14 @@ function PaymentForm({
           >
             <PaymentFormWithElements
               amount={finalAmount}
-              securityDeposit={securityDeposit} // ✅ Añadido: Pasar la fianza
+              securityDeposit={securityDeposit}
               bookingData={bookingData}
               onSuccess={onSuccess}
               onError={onError}
               clientSecret={clientSecret}
               environment={environment}
-              onRetry={() => createPaymentIntent(finalAmount)}
+              onRetry={() => createPaymentIntent(currentPaymentOption.onlineAmount)}
+              paymentOption={currentPaymentOption}
             />
           </Elements>
         )}
@@ -498,7 +568,10 @@ function PaymentForm({
           endTime: bookingData.endTime,
           vehicleName: bookingData.vehicleName,
           totalPrice: finalAmount,
-          securityDeposit: securityDeposit, // ✅ Añadido: Pasar la fianza al modal
+          securityDeposit: securityDeposit,
+          paymentType: "full_payment",
+          amountPaid: 0,
+          amountPending: 0,
         }}
       />
 

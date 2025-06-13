@@ -80,6 +80,11 @@ export const bookings = pgTable("bookings", {
   damageCost: decimal("damage_cost", { precision: 10, scale: 2 }).default("0"),
   liabilityWaiverId: integer("liability_waiver_id"), // Referencia sin foreign key para evitar circular
   isTestBooking: boolean("is_test_booking").default(false), // ✅ AÑADIDO: Indicador de reserva de prueba
+  // ✅ NUEVOS CAMPOS PARA PAGO PARCIAL
+  paymentType: varchar("payment_type", { length: 20 }).default("full_payment"), // 'full_payment' | 'partial_payment'
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }),
+  amountPending: decimal("amount_pending", { precision: 10, scale: 2 }).default("0"),
+  paymentLocation: varchar("payment_location", { length: 20 }).default("online"), // 'online' | 'on_site' | 'mixed'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })

@@ -420,6 +420,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                       customerName={bookingData.customerName}
                       customerEmail={bookingData.customerEmail}
                       onWaiverSigned={handleWaiverSigned}
+                      onBack={handlePrevStep}
                     />
                   )}
 
@@ -456,7 +457,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                       <StripePayment
                         amount={bookingData.totalPrice}
                         securityDeposit={securityDeposit}
-                        bookingData={bookingData}
+                        bookingData={{
+                          ...bookingData,
+                          vehicleName: vehicle.name,
+                          vehicleType: vehicle.type,
+                          vehicleCategory: vehicle.category,
+                        }}
                         onSuccess={() => {
                           router.push("/")
                         }}

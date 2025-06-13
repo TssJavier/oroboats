@@ -158,6 +158,11 @@ export async function getBookings() {
         damageCost: row.damage_cost || "0",
         liabilityWaiverId: row.liability_waiver_id, // ✅ AÑADIDO: Campo crucial
         isTestBooking: row.is_test_booking === true, // ✅ AÑADIDO: Campo crucial
+        // ✅ AÑADIDO: Campos de pago parcial
+        paymentType: row.payment_type || "full_payment",
+        amountPaid: row.amount_paid || row.total_price,
+        amountPending: row.amount_pending || "0",
+        paymentLocation: row.payment_location || "online",
       },
       vehicle: row.vehicle_name
         ? {
@@ -204,14 +209,29 @@ export async function createBooking(bookingData: any) {
 
     console.log("🔍 DB: timeSlot value:", bookingData.timeSlot)
 
-    // ✅ USAR DRIZZLE SQL TEMPLATE
+    // ✅ VERIFICAR CAMPOS DE PAGO PARCIAL - NORMALIZAR NOMBRES
+    const paymentType = bookingData.payment_type || bookingData.paymentType || "full_payment"
+    const amountPaid = bookingData.amount_paid || bookingData.amountPaid || bookingData.totalPrice
+    const amountPending = bookingData.amount_pending || bookingData.amountPending || "0"
+    const paymentLocation = bookingData.payment_location || bookingData.paymentLocation || "online"
+
+    console.log("💰 Payment details for DB:", {
+      paymentType,
+      amountPaid,
+      amountPending,
+      paymentLocation,
+    })
+
+    // ✅ USAR DIRECT SQL PARA MÁXIMO CONTROL
     const result = await db.execute(sql`
       INSERT INTO bookings (
         vehicle_id, customer_name, customer_email, customer_phone,
         booking_date, time_slot, start_time, end_time, duration,
         total_price, status, payment_status, notes,
         discount_code, discount_amount, original_price, security_deposit,
-        created_at, updated_at
+        created_at, updated_at,
+        payment_type, amount_paid, amount_pending, payment_location,
+        liability_waiver_id, is_test_booking
       ) VALUES (
         ${Number(bookingData.vehicleId)},
         ${bookingData.customerName},
@@ -231,12 +251,26 @@ export async function createBooking(bookingData: any) {
         ${String(bookingData.originalPrice || bookingData.totalPrice)},
         ${String(bookingData.securityDeposit || 0)},
         NOW(),
-        NOW()
+        NOW(),
+        ${paymentType},
+        ${String(amountPaid)},
+        ${String(amountPending)},
+        ${paymentLocation},
+        ${bookingData.liability_waiver_id || bookingData.liabilityWaiverId || null},
+        ${bookingData.isTestBooking || false}
       ) RETURNING *;
     `)
 
-    console.log("✅ DB: Booking created successfully:", result)
-    return [result[0]] // ✅ CORREGIDO: Acceder directamente al primer elemento del array
+    console.log("✅ DB: Booking created successfully")
+
+    // ✅ VERIFICAR QUE SE GUARDÓ CORRECTAMENTE
+    if (result && result.length > 0) {
+      console.log("✅ DB: Payment type saved as:", result[0].payment_type)
+      console.log("✅ DB: Amount paid saved as:", result[0].amount_paid)
+      console.log("✅ DB: Amount pending saved as:", result[0].amount_pending)
+    }
+
+    return result // ✅ CORREGIDO: Devolver las filas del resultado
   } catch (error) {
     console.error("❌ DB Error creating booking:", error)
     console.error("❌ Original data:", bookingData)

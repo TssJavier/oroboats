@@ -33,6 +33,10 @@ export async function GET(request: NextRequest) {
         b.sales_person,
         b.vehicle_name,
         b.vehicle_type,
+        b.payment_type,           /* ✅ AÑADIDO: Campo payment_type */
+        b.amount_paid,            /* ✅ AÑADIDO: Campo amount_paid */
+        b.amount_pending,         /* ✅ AÑADIDO: Campo amount_pending */
+        b.payment_location,       /* ✅ AÑADIDO: Campo payment_location */
         v.name as vehicle_current_name,
         v.type as vehicle_current_type
       FROM bookings b
@@ -64,9 +68,16 @@ export async function GET(request: NextRequest) {
         liabilityWaiverId: row.liability_waiver_id,
         isTestBooking: row.is_test_booking || false,
         isManualBooking: row.is_manual_booking || false,
-        salesPerson: row.sales_person, // ✅ IMPORTANTE: Incluir el campo salesPerson
+        salesPerson: row.sales_person,
         vehicleName: row.vehicle_name || row.vehicle_current_name,
         vehicleType: row.vehicle_type || row.vehicle_current_type,
+
+        /* ✅ AÑADIDO: Campos de pago parcial */
+        payment_type: row.payment_type,
+        paymentType: row.payment_type, // Duplicado para compatibilidad
+        amountPaid: row.amount_paid?.toString() || null,
+        amountPending: row.amount_pending?.toString() || null,
+        paymentLocation: row.payment_location,
       },
       vehicle: row.vehicle_current_name
         ? {
@@ -83,8 +94,19 @@ export async function GET(request: NextRequest) {
       console.log(`   - Booking ${b.booking.id}: sales_person = ${b.booking.salesPerson || "no sales person"}`)
     })
 
+    // ✅ AÑADIDO: Debug para verificar pagos parciales
+    const partialPayments = transformedBookings.filter((b) => b.booking.payment_type === "partial_payment")
+    console.log(`🔍 API: Partial payments found: ${partialPayments.length}`)
+    partialPayments.forEach((b) => {
+      console.log(
+        `   - Booking ${b.booking.id}: payment_type = ${b.booking.payment_type}, amountPaid = ${b.booking.amountPaid}, amountPending = ${b.booking.amountPending}`,
+      )
+    })
+
     const withWaivers = transformedBookings.filter((b) => b.booking.liabilityWaiverId).length
-    console.log(`✅ API: Returning ${transformedBookings.length} bookings, ${withWaivers} with liability waivers`)
+    console.log(
+      `✅ API: Returning ${transformedBookings.length} bookings, ${withWaivers} with liability waivers, ${partialPayments.length} with partial payments`,
+    )
 
     return NextResponse.json(transformedBookings)
   } catch (error) {

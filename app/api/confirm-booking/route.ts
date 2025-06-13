@@ -8,23 +8,49 @@ import { eq, sql } from "drizzle-orm"
 
 export async function POST(request: NextRequest) {
   try {
-    const { paymentIntentId } = await request.json()
-    console.log("🔍 Confirming booking for payment:", paymentIntentId)
+    const { paymentIntentId, paymentType = "full_payment", amountPaid, amountPending } = await request.json()
+    console.log("🔍 Confirming booking for payment:", paymentIntentId, { paymentType, amountPaid, amountPending })
 
     // Verificar el pago en Stripe
     if (!stripe) {
       return NextResponse.json({ error: "Stripe configuration error" }, { status: 500 })
     }
+
+    // ✅ CORREGIDO: No intentar expandir metadata, no es un campo expandible
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
 
     if (paymentIntent.status !== "succeeded") {
       return NextResponse.json({ error: "Payment not completed" }, { status: 400 })
     }
 
+    // ✅ MOSTRAR TODOS LOS METADATOS PARA DEBUGGING
+    console.log("🔍 Payment intent metadata:", paymentIntent.metadata)
+
     // Extraer datos de reserva del metadata
-    const bookingData = JSON.parse(paymentIntent.metadata.bookingData)
+    const bookingData = JSON.parse(paymentIntent.metadata.bookingData || "{}")
     console.log("📅 Creating booking with confirmed payment:", bookingData)
     console.log("🔍 Liability Waiver ID in booking data:", bookingData.liabilityWaiverId)
+
+    // ✅ EXTRAER DATOS DE PAGO PARCIAL DE LOS METADATOS DE STRIPE
+    // Priorizar los metadatos directos sobre los anidados en bookingData
+    const paymentTypeFromMetadata =
+      paymentIntent.metadata.paymentType || bookingData.paymentType || paymentType || "full_payment"
+    const amountPaidFromMetadata =
+      Number.parseFloat(paymentIntent.metadata.amountPaid || "0") ||
+      bookingData.amountPaid ||
+      amountPaid ||
+      bookingData.finalAmount
+    const amountPendingFromMetadata =
+      Number.parseFloat(paymentIntent.metadata.amountPending || "0") || bookingData.amountPending || amountPending || 0
+
+    console.log("💰 Payment details from Stripe metadata:", {
+      paymentType: paymentTypeFromMetadata,
+      amountPaid: amountPaidFromMetadata,
+      amountPending: amountPendingFromMetadata,
+    })
+
+    // ✅ AÑADIR CAMPOS DE PAGO PARCIAL
+    const paymentLocation = amountPendingFromMetadata > 0 ? "mixed" : "online"
 
     // ✅ AÑADIR LIABILITY WAIVER ID DIRECTAMENTE A LOS DATOS DE RESERVA
     const finalBookingData = {
@@ -33,16 +59,35 @@ export async function POST(request: NextRequest) {
       paymentStatus: "completed",
       status: "confirmed",
       liability_waiver_id: bookingData.liabilityWaiverId ? Number(bookingData.liabilityWaiverId) : null,
+      // ✅ CORREGIDO: Usar datos de los metadatos de Stripe y los parámetros de la solicitud
+      payment_type: paymentTypeFromMetadata,
+      amount_paid: amountPaidFromMetadata,
+      amount_pending: amountPendingFromMetadata,
+      payment_location: paymentLocation,
     }
 
     // ✅ MOSTRAR DATOS COMPLETOS PARA DEBUG
     console.log("🔍 DB: Creating booking with data:", JSON.stringify(finalBookingData, null, 2))
     console.log("🔍 DB: timeSlot value:", finalBookingData.timeSlot)
+    console.log("🔍 DB: payment_type value:", finalBookingData.payment_type)
 
     // Crear la reserva en la base de datos
     const booking = await createBooking(finalBookingData)
     console.log("✅ DB: Booking created successfully:", booking)
     console.log("✅ Booking created after payment:", booking[0])
+
+    // ✅ VERIFICAR QUE EL PAYMENT_TYPE SE GUARDÓ CORRECTAMENTE
+    if (booking[0]) {
+      console.log("🔍 Verification: Payment type saved as:", booking[0].payment_type)
+
+      // Double-check con una query directa
+      const verificationQuery = await db.execute(sql`
+        SELECT payment_type, amount_paid, amount_pending 
+        FROM bookings 
+        WHERE id = ${booking[0].id}
+      `)
+      console.log("🔍 Direct DB verification:", verificationQuery[0])
+    }
 
     // ✅ ACTUALIZAR EL LIABILITY_WAIVER_ID EN LA RESERVA
     if (bookingData.liabilityWaiverId && booking[0]) {
@@ -131,12 +176,19 @@ export async function POST(request: NextRequest) {
       originalPrice: bookingData.discountAmount > 0 ? bookingData.originalPrice : undefined,
       discountCode: bookingData.discountCode || undefined,
       securityDeposit: bookingData.securityDeposit || 0,
+      // ✅ CORREGIDO: Usar datos de los metadatos de Stripe
+      paymentType: paymentTypeFromMetadata,
+      amountPaid: amountPaidFromMetadata,
+      amountPending: amountPendingFromMetadata,
     }
 
     console.log("📧 Preparing to send booking emails with data:", {
       bookingId: emailData.bookingId,
       customerEmail: emailData.customerEmail,
       vehicleName: emailData.vehicleName,
+      paymentType: emailData.paymentType,
+      amountPaid: emailData.amountPaid,
+      amountPending: emailData.amountPending,
     })
 
     // ✅ ENVIAR EMAILS DE RESERVA (NO BLOQUEAR SI FALLAN)

@@ -21,10 +21,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    // ✅ VERIFICAR Y NORMALIZAR DATOS DE PAGO PARCIAL
+    const paymentType = body.paymentType || body.bookingData?.paymentType || "full_payment"
+    const amountPaid = body.amountPaid || body.bookingData?.amountPaid || body.amount
+    const amountPending = body.amountPending || body.bookingData?.amountPending || 0
+
     console.log(`💳 Creating payment intent (${stripeEnvironment.environment}):`, {
       amount: body.amount,
       environment: stripeEnvironment.environment,
       hasValidConfig: stripeEnvironment.hasValidConfig,
+      // ✅ DATOS DE PAGO PARCIAL NORMALIZADOS
+      paymentType,
+      amountPaid,
+      amountPending,
     })
 
     const { amount, currency = "eur", metadata = {} } = body
@@ -41,7 +51,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ✅ CREAR PAYMENT INTENT
+    // ✅ PREPARAR DATOS DE BOOKING PARA METADATA
+    const bookingDataWithPaymentInfo = {
+      ...body.bookingData,
+      paymentType,
+      amountPaid,
+      amountPending,
+    }
+
+    // ✅ CREAR PAYMENT INTENT CON DATOS DE PAGO PARCIAL EXPLÍCITOS
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100),
       currency,
@@ -51,12 +69,21 @@ export async function POST(request: NextRequest) {
       metadata: {
         ...metadata,
         environment: stripeEnvironment.environment,
-        bookingData: JSON.stringify(body.bookingData),
-        isTestMode: stripeEnvironment.isDevelopment ? "true" : "false", // ✅ AÑADIDO
+        bookingData: JSON.stringify(bookingDataWithPaymentInfo),
+        isTestMode: stripeEnvironment.isDevelopment ? "true" : "false",
+        // ✅ DATOS DE PAGO PARCIAL EXPLÍCITOS
+        paymentType,
+        amountPaid: String(amountPaid),
+        amountPending: String(amountPending),
       },
     })
 
-    console.log(`✅ Payment Intent created (${stripeEnvironment.environment}):`, paymentIntent.id)
+    console.log(`✅ Payment Intent created (${stripeEnvironment.environment}):`, {
+      id: paymentIntent.id,
+      paymentType,
+      amountPaid,
+      amountPending,
+    })
 
     // ✅ NUEVA FUNCIONALIDAD: Actualizar reserva con paymentId y marcar si es de prueba
     if (body.bookingData?.bookingId) {
@@ -65,7 +92,12 @@ export async function POST(request: NextRequest) {
           .update(bookings)
           .set({
             paymentId: paymentIntent.id,
-            isTestBooking: stripeEnvironment.isDevelopment, // Marcar como prueba si es desarrollo
+            isTestBooking: stripeEnvironment.isDevelopment,
+            // ✅ DATOS DE PAGO PARCIAL
+            paymentType,
+            amountPaid: amountPaid || null,
+            amountPending: amountPending || 0,
+            paymentLocation: amountPending > 0 ? "mixed" : "online",
           })
           .where(eq(bookings.id, body.bookingData.bookingId))
 
@@ -73,6 +105,7 @@ export async function POST(request: NextRequest) {
           bookingId: body.bookingData.bookingId,
           paymentId: paymentIntent.id,
           isTest: stripeEnvironment.isDevelopment,
+          paymentType,
         })
       } catch (dbError) {
         console.error("⚠️ Error updating booking:", dbError)
@@ -88,6 +121,7 @@ export async function POST(request: NextRequest) {
         isProduction: stripeEnvironment.isProduction,
         isDevelopment: stripeEnvironment.isDevelopment,
         hasValidConfig: stripeEnvironment.hasValidConfig,
+        paymentType,
       },
     })
   } catch (error) {

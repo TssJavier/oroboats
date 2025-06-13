@@ -57,7 +57,13 @@ export const bookingConfirmationTemplate = (data: {
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
+  paymentType?: string
+  amountPaid?: number
+  amountPending?: number
 }) => {
+  // ✅ NUEVO: Determinar si es pago parcial
+  const isPartialPayment = data.paymentType === "partial_payment"
+
   return `
     <!DOCTYPE html>
     <html>
@@ -97,13 +103,38 @@ export const bookingConfirmationTemplate = (data: {
           }
           <p style="margin: 5px 0;"><strong>Precio del alquiler: €${data.totalPrice}</strong></p>
           ${
-            data.securityDeposit
+            data.securityDeposit && !isPartialPayment
               ? `
             <p style="margin: 5px 0; color: #007bff;">Fianza (reembolsable): €${data.securityDeposit}</p>
             <hr style="margin: 10px 0;">
             <p style="margin: 5px 0; font-size: 18px;"><strong>Total pagado: €${data.totalPrice + data.securityDeposit}</strong></p>
           `
               : ""
+          }
+          
+          ${
+            isPartialPayment
+              ? `
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 1px solid #ffeaa7; margin: 15px 0;">
+              <h4 style="margin-top: 0; color: #856404; text-align: center;">PAGO PARCIAL</h4>
+              <p style="margin: 5px 0;"><strong>Pagado online:</strong> €${data.amountPaid}</p>
+              <p style="margin: 5px 0;"><strong>Pendiente de pago:</strong> €${data.amountPending}</p>
+              <p style="margin: 10px 0 5px 0; color: #856404; font-weight: bold;">
+                IMPORTANTE: Deberás pagar €${data.amountPending} al llegar (incluye resto del alquiler + fianza).
+              </p>
+              <p style="margin: 5px 0; color: #856404;">
+                Puedes pagar con tarjeta o efectivo en nuestras instalaciones.
+              </p>
+            </div>
+          `
+              : `
+            <div style="background: #d4edda; padding: 15px; border-radius: 8px; border: 1px solid #c3e6cb; margin: 15px 0;">
+              <h4 style="margin-top: 0; color: #155724; text-align: center;">PAGO COMPLETO</h4>
+              <p style="margin: 5px 0; color: #155724;">
+                Has pagado el importe total online. Solo necesitas presentarte con tu identificación.
+              </p>
+            </div>
+          `
           }
         </div>
         
@@ -113,7 +144,8 @@ export const bookingConfirmationTemplate = (data: {
             <li>Llega 15 minutos antes de tu horario reservado</li>
             <li>Trae tu DNI o documento de identidad</li>
             <li>Se requiere licencia de navegación para algunos vehículos</li>
-            ${data.securityDeposit ? "<li>La fianza se devolverá al finalizar la reserva si no hay daños</li>" : ""}
+            ${isPartialPayment ? "<li><strong>Trae el importe pendiente en efectivo o tarjeta</strong></li>" : ""}
+            ${!isPartialPayment && data.securityDeposit ? "<li>La fianza se devolverá al finalizar la reserva si no hay daños</li>" : ""}
           </ul>
         </div>
         
@@ -151,7 +183,13 @@ export const adminNotificationTemplate = (data: {
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
+  paymentType?: string
+  amountPaid?: number
+  amountPending?: number
 }) => {
+  // ✅ NUEVO: Determinar si es pago parcial
+  const isPartialPayment = data.paymentType === "partial_payment"
+
   return `
     <!DOCTYPE html>
     <html>
@@ -169,6 +207,19 @@ export const adminNotificationTemplate = (data: {
       <div style="background: #fff; padding: 30px; border: 1px solid #ddd; border-top: none;">
         <h2 style="color: #D4AF37; margin-top: 0;">Nueva reserva #${data.bookingId}</h2>
         
+        ${
+          isPartialPayment
+            ? `
+          <div style="background: #f8d7da; padding: 15px; border-radius: 8px; border: 1px solid #f5c6cb; margin: 15px 0; text-align: center;">
+            <h3 style="margin-top: 0; color: #721c24; font-size: 18px;">⚠️ PAGO PARCIAL - COBRAR EN SITIO ⚠️</h3>
+            <p style="margin: 5px 0; color: #721c24; font-weight: bold;">
+              Cliente ha pagado €${data.amountPaid} online. Debes cobrar €${data.amountPending} al llegar.
+            </p>
+          </div>
+        `
+            : ""
+        }
+        
         <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #333;">Datos del cliente</h3>
           <p style="margin: 5px 0;"><strong>Nombre:</strong> ${data.customerName}</p>
@@ -183,7 +234,7 @@ export const adminNotificationTemplate = (data: {
           <p style="margin: 5px 0;"><strong>Horario:</strong> ${data.startTime} - ${data.endTime}</p>
         </div>
         
-        <div style="background: #d4edda; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745;">
+        <div style="background: ${isPartialPayment ? "#fff3cd" : "#d4edda"}; padding: 20px; border-radius: 8px; border-left: 4px solid ${isPartialPayment ? "#ffc107" : "#28a745"};">
           <h3 style="margin-top: 0; color: #333;">Resumen financiero</h3>
           ${
             data.originalPrice && data.discountAmount
@@ -195,20 +246,37 @@ export const adminNotificationTemplate = (data: {
               : ""
           }
           <p style="margin: 5px 0;"><strong>Precio del alquiler: €${data.totalPrice}</strong></p>
+          
           ${
-            data.securityDeposit
+            isPartialPayment
               ? `
-            <p style="margin: 5px 0;">Fianza cobrada: €${data.securityDeposit}</p>
-            <hr style="margin: 10px 0;">
-            <p style="margin: 5px 0; font-size: 18px;"><strong>Total cobrado: €${data.totalPrice + data.securityDeposit}</strong></p>
+            <div style="margin: 15px 0; padding: 10px; background: #f8d7da; border-radius: 5px; border: 1px solid #f5c6cb;">
+              <p style="margin: 5px 0;"><strong>Pagado online:</strong> €${data.amountPaid}</p>
+              <p style="margin: 5px 0;"><strong style="color: #721c24;">PENDIENTE DE COBRO:</strong> <span style="color: #721c24; font-weight: bold; font-size: 16px;">€${data.amountPending}</span></p>
+            </div>
           `
-              : ""
+              : `
+            ${
+              data.securityDeposit
+                ? `
+              <p style="margin: 5px 0;">Fianza cobrada: €${data.securityDeposit}</p>
+              <hr style="margin: 10px 0;">
+              <p style="margin: 5px 0; font-size: 18px;"><strong>Total cobrado: €${data.totalPrice + data.securityDeposit}</strong></p>
+            `
+                : ""
+            }
+          `
           }
         </div>
         
         <div style="text-align: center; margin: 30px 0; padding: 20px; background: #fff3cd; border-radius: 8px;">
           <p style="margin: 0; color: #856404;">
-            <strong>Acción requerida:</strong> Preparar el vehículo para la fecha y hora indicada
+            <strong>Acción requerida:</strong> 
+            ${
+              isPartialPayment
+                ? `Cobrar €${data.amountPending} al cliente antes de entregar el vehículo`
+                : "Preparar el vehículo para la fecha y hora indicada"
+            }
           </p>
         </div>
       </div>
@@ -296,6 +364,9 @@ export const renderAdminBookingNotification = (data: {
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
+  paymentType?: string
+  amountPaid?: number
+  amountPending?: number
 }) => {
   return adminNotificationTemplate(data)
 }
@@ -312,6 +383,9 @@ export const renderCustomerBookingConfirmation = (data: {
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
+  paymentType?: string
+  amountPaid?: number
+  amountPending?: number
 }) => {
   return bookingConfirmationTemplate(data)
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Calendar, Clock, Mail, CreditCard, Shield } from "lucide-react"
+import { CheckCircle, Calendar, Clock, Mail, CreditCard, Shield, MapPin } from "lucide-react"
 import { OroLoading } from "@/components/ui/oro-loading"
 
 interface SuccessModalProps {
@@ -17,6 +17,10 @@ interface SuccessModalProps {
     vehicleName?: string
     totalPrice: number
     securityDeposit?: number
+    // ✅ NUEVO: Campos para pago parcial
+    paymentType?: "full_payment" | "partial_payment"
+    amountPaid?: number
+    amountPending?: number
   }
 }
 
@@ -56,6 +60,9 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
   const formatTime = (time: string) => {
     return time.substring(0, 5) // Remove seconds if present
   }
+
+  // ✅ NUEVO: Determinar si es pago parcial
+  const isPartialPayment = bookingData.paymentType === "partial_payment"
 
   return (
     <>
@@ -123,6 +130,24 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
                   <span className="font-semibold">€{bookingData.totalPrice}</span>
                 </div>
 
+                {/* ✅ NUEVO: Mostrar información de pago parcial */}
+                {isPartialPayment && typeof bookingData.amountPaid === "number" && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <CreditCard className="h-4 w-4 text-green-500" />
+                    <span className="font-medium">Pagado ahora:</span>
+                    <span className="font-semibold text-green-600">€{bookingData.amountPaid}</span>
+                  </div>
+                )}
+
+                {/* ✅ NUEVO: Mostrar monto pendiente */}
+                {isPartialPayment && typeof bookingData.amountPending === "number" && bookingData.amountPending > 0 && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <MapPin className="h-4 w-4 text-orange-500" />
+                    <span className="font-medium">A pagar en sitio:</span>
+                    <span className="font-semibold text-orange-600">€{bookingData.amountPending}</span>
+                  </div>
+                )}
+
                 {/* Security deposit info */}
                 {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
                   <div className="flex items-center gap-3 text-sm">
@@ -138,6 +163,22 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
                   <span className="break-all">{bookingData.customerEmail}</span>
                 </div>
               </div>
+
+              {/* ✅ NUEVO: Información de pago parcial */}
+              {isPartialPayment && typeof bookingData.amountPending === "number" && bookingData.amountPending > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-orange-600 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-orange-800 mb-1">Pago pendiente en sitio</p>
+                      <p className="text-orange-700">
+                        Recuerda que deberás pagar €{bookingData.amountPending} al recoger el vehículo. Puedes pagar con
+                        tarjeta o efectivo.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Security deposit information */}
               {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (

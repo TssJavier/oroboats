@@ -12,6 +12,7 @@ interface LiabilityWaiverProps {
   customerEmail: string
   onWaiverSigned: (waiverId: number) => void
   className?: string
+  onBack: () => void
 }
 
 export function LiabilityWaiver({ customerName, customerEmail, onWaiverSigned, className = "" }: LiabilityWaiverProps) {

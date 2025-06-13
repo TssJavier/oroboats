@@ -27,6 +27,8 @@ import {
   ExternalLink,
   UserCheck,
   Settings,
+  CreditCard,
+  Banknote,
 } from "lucide-react"
 
 interface Booking {
@@ -53,6 +55,12 @@ interface Booking {
     salesPerson?: string
     vehicleName?: string
     vehicleType?: string
+    // ✅ NUEVO: Campos para pago parcial
+    paymentType?: string
+    amountPaid?: string
+    amountPending?: string
+    paymentLocation?: string
+    payment_type?: string
   }
   vehicle: {
     name: string
@@ -60,7 +68,7 @@ interface Booking {
   } | null
 }
 
-type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual"
+type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual" | "partial"
 
 export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -91,6 +99,18 @@ export function BookingManagement() {
       const data = await response.json()
       console.log("🔍 Frontend: Bookings data received:", data)
 
+      // Añadir este log para inspeccionar la estructura exacta de los primeros registros
+      if (Array.isArray(data) && data.length > 0) {
+        console.log("🔎 INSPECCIÓN DETALLADA DE DATOS:")
+        console.log("Primer registro completo:", JSON.stringify(data[0], null, 2))
+        console.log("Campos de pago:", {
+          payment_type: data[0].booking.payment_type,
+          paymentType: data[0].booking.paymentType,
+          amountPaid: data[0].booking.amountPaid,
+          amountPending: data[0].booking.amountPending,
+        })
+      }
+
       if (Array.isArray(data)) {
         // Ordenar por fecha de creación, más recientes primero
         const sortedBookings = data.sort(
@@ -106,10 +126,29 @@ export function BookingManagement() {
           return hasWaiver
         }).length
 
+        // ✅ NUEVO: Contar reservas con pago parcial
+        const withPartialPayment = sortedBookings.filter((b) => b.booking.payment_type === "partial_payment").length
+
+        // ✅ DEBUG: Verificar detección de pagos parciales
+        sortedBookings.forEach((booking, index) => {
+          if (index < 5) {
+            // Solo los primeros 5 para no saturar el log
+            console.log(`🔍 Booking ${booking.booking.id}:`, {
+              paymentType: booking.booking.payment_type,
+              amountPaid: booking.booking.amountPaid,
+              amountPending: booking.booking.amountPending,
+              isPartialPayment: booking.booking.payment_type === "partial_payment",
+            })
+          }
+        })
+
         console.log(`✅ Frontend: Found ${withWaivers} bookings with signed liability waivers`)
+        console.log(`✅ Frontend: Found ${withPartialPayment} bookings with partial payment`)
+
         setDebug({
           totalBookings: sortedBookings.length,
           withWaivers,
+          withPartialPayment,
           sampleWaiverIds: sortedBookings
             .filter((b) => b.booking.liabilityWaiverId)
             .map((b) => b.booking.liabilityWaiverId)
@@ -129,6 +168,52 @@ export function BookingManagement() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const completeAllBookings = async () => {
+    if (
+      !confirm(
+        `¿Estás seguro de que deseas marcar como completadas todas las reservas mostradas (${filteredBookings.length})?`,
+      )
+    ) {
+      return
+    }
+
+    setLoading(true)
+    let successCount = 0
+    let errorCount = 0
+
+    // Crear una copia para evitar problemas con el estado durante el procesamiento
+    const bookingsToProcess = [...filteredBookings]
+
+    for (const booking of bookingsToProcess) {
+      // Solo procesar reservas que no estén ya completadas o canceladas
+      if (booking.booking.status !== "completed" && booking.booking.status !== "cancelled") {
+        try {
+          const response = await fetch(`/api/bookings/${booking.booking.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "completed" }),
+          })
+
+          if (response.ok) {
+            successCount++
+          } else {
+            errorCount++
+            console.error(`Error al completar la reserva ${booking.booking.id}`)
+          }
+        } catch (err) {
+          errorCount++
+          console.error(`Error al completar la reserva ${booking.booking.id}:`, err)
+        }
+      }
+    }
+
+    // Mostrar resultado
+    alert(`Proceso completado:\n- ${successCount} reservas completadas exitosamente\n- ${errorCount} errores`)
+
+    // Recargar los datos
+    fetchBookings()
   }
 
   // ✅ FUNCIÓN CORREGIDA: Abrir documento como HTML en nueva pestaña
@@ -158,6 +243,37 @@ export function BookingManagement() {
     return salesPerson || id
   }
 
+  // ✅ NUEVA FUNCIÓN: Determinar el tipo de pago para mostrar
+  const getPaymentTypeDisplay = (booking: Booking) => {
+    // Verificar ambas propiedades para mayor seguridad
+    const isPartial =
+      booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
+
+    console.log(`🔍 Booking ${booking.booking.id} payment check:`, {
+      payment_type: booking.booking.payment_type,
+      paymentType: booking.booking.paymentType,
+      isPartial,
+    })
+
+    if (isPartial) {
+      return {
+        type: "partial",
+        label: "Pago Parcial",
+        description: `€${booking.booking.amountPaid} pagado / €${booking.booking.amountPending} pendiente`,
+        color: "bg-orange-600 text-white",
+        icon: Banknote,
+      }
+    } else {
+      return {
+        type: "full",
+        label: "Pago Completo",
+        description: "Todo pagado online",
+        color: "bg-green-600 text-white",
+        icon: CreditCard,
+      }
+    }
+  }
+
   // Función para filtrar reservas por fecha o tipo
   const getFilteredBookings = () => {
     if (dateFilter === "test") {
@@ -166,6 +282,13 @@ export function BookingManagement() {
 
     if (dateFilter === "manual") {
       return bookings.filter((booking) => booking.booking.isManualBooking === true)
+    }
+
+    if (dateFilter === "partial") {
+      return bookings.filter(
+        (booking) =>
+          booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment",
+      )
     }
 
     if (dateFilter === "all") return bookings
@@ -367,6 +490,7 @@ export function BookingManagement() {
   const testBookingsCount = bookings.filter((b) => b.booking.isTestBooking === true).length
   const manualBookingsCount = bookings.filter((b) => b.booking.isManualBooking === true).length
   const withWaiversCount = bookings.filter((b) => b.booking.liabilityWaiverId).length
+  const partialPaymentBookingsCount = bookings.filter((b) => b.booking.payment_type === "partial_payment").length
 
   return (
     <div className="space-y-8">
@@ -374,6 +498,81 @@ export function BookingManagement() {
         <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
+
+      {/* ✅ NUEVA: Leyenda de Estados */}
+      <Card className="bg-gray-50 border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center text-gray-800">
+            <AlertTriangle className="h-5 w-5 mr-2" />
+            Leyenda de Estados y Badges
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-3">Estados de Reserva</h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-yellow-600 text-white">pending</Badge>
+                  <span className="text-sm">Pendiente de confirmación</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-green-600 text-white">confirmed</Badge>
+                  <span className="text-sm">Confirmada y lista</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-blue-600 text-white">completed</Badge>
+                  <span className="text-sm">Completada exitosamente</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-red-600 text-white">cancelled</Badge>
+                  <span className="text-sm">Cancelada</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-3">Estados de Pago</h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-green-600 text-white">completed</Badge>
+                  <span className="text-sm">Pago completado</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-yellow-600 text-white">pending</Badge>
+                  <span className="text-sm">Pago pendiente</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-orange-600 text-white">manual</Badge>
+                  <span className="text-sm">Pago manual/efectivo</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-red-600 text-white">failed</Badge>
+                  <span className="text-sm">Pago fallido</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-3">Estados de Fianza</h4>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-yellow-600 text-white">pending</Badge>
+                  <span className="text-sm">Pendiente inspección</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-green-600 text-white">approved</Badge>
+                  <span className="text-sm">Fianza devuelta</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-red-600 text-white">damaged</Badge>
+                  <span className="text-sm">Daños encontrados</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filtros de fecha */}
       <Card className="bg-white border border-gray-200">
@@ -446,6 +645,14 @@ export function BookingManagement() {
               <Beaker className="h-4 w-4 mr-2" />
               Pruebas ({testBookingsCount})
             </Button>
+            <Button
+              variant={dateFilter === "partial" ? "default" : "outline"}
+              onClick={() => setDateFilter("partial")}
+              className={dateFilter === "partial" ? "bg-orange-600 text-white hover:bg-orange-700" : ""}
+            >
+              <Banknote className="h-4 w-4 mr-2" />
+              Pago Parcial ({partialPaymentBookingsCount})
+            </Button>
           </div>
           {dateFilter !== "all" && (
             <div className="mt-3 text-sm text-gray-600">
@@ -458,11 +665,30 @@ export function BookingManagement() {
                     ? " de prueba"
                     : dateFilter === "manual"
                       ? " manuales"
-                      : ""}
+                      : dateFilter === "partial"
+                        ? " con pago parcial"
+                        : ""}
+            </div>
+          )}
+          {filteredBookings.length > 0 && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-semibold text-blue-800">Acciones masivas</h4>
+                  <p className="text-sm text-blue-600">
+                    Estas acciones se aplicarán a las {filteredBookings.length} reservas mostradas actualmente
+                  </p>
+                </div>
+                <Button onClick={completeAllBookings} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Completar todas las reservas
+                </Button>
+              </div>
             </div>
           )}
           <div className="mt-2 text-xs text-gray-500">
-            {withWaiversCount} reserva(s) con documento de exención firmado
+            {withWaiversCount} reserva(s) con documento de exención firmado • {partialPaymentBookingsCount} con pago
+            parcial
           </div>
         </CardContent>
       </Card>
@@ -472,45 +698,38 @@ export function BookingManagement() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center text-blue-800">
             <AlertTriangle className="h-5 w-5 mr-2" />
-            Información para Clientes
+            Información sobre Tipos de Pago
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h4 className="font-semibold text-blue-800 mb-2">Estados de Reserva:</h4>
-              <ul className="space-y-1 text-blue-700">
-                <li>
-                  <Badge className="bg-green-600 text-white mr-2">confirmed</Badge>Reserva confirmada automáticamente
-                </li>
-                <li>
-                  <Badge className="bg-blue-600 text-white mr-2">completed</Badge>Servicio completado
-                </li>
-                <li>
-                  <Badge className="bg-red-600 text-white mr-2">cancelled</Badge>Reserva cancelada
-                </li>
-              </ul>
+              <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Pago Completo
+              </h4>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-green-800 text-sm">
+                  <strong>✅ Todo pagado online</strong>
+                  <br />
+                  Cliente pagó alquiler + fianza. Solo entregar vehículo y devolver fianza al final.
+                </p>
+              </div>
             </div>
             <div>
-              <h4 className="font-semibold text-blue-800 mb-2">Estados de Fianza:</h4>
-              <ul className="space-y-1 text-blue-700">
-                <li>
-                  <Badge className="bg-yellow-600 text-white mr-2">pending</Badge>Pendiente de inspección
-                </li>
-                <li>
-                  <Badge className="bg-green-600 text-white mr-2">approved</Badge>Fianza devuelta
-                </li>
-                <li>
-                  <Badge className="bg-red-600 text-white mr-2">damaged</Badge>Daños encontrados
-                </li>
-              </ul>
+              <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
+                <Banknote className="h-4 w-4 mr-2" />
+                Pago Parcial
+              </h4>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <p className="text-orange-800 text-sm">
+                  <strong>⚠️ Cobrar en sitio</strong>
+                  <br />
+                  Cliente pagó 50€/100€ online.{" "}
+                  <strong>Debes cobrar el resto + fianza antes de entregar el vehículo.</strong>
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="mt-4 p-3 bg-blue-100 rounded-lg">
-            <p className="text-blue-800 text-sm">
-              <strong>💡 Flujo actual:</strong> Las reservas se confirman automáticamente al pagar. Si hay fianza, debes
-              inspeccionarla antes de completar la reserva. Las fianzas se procesan automáticamente después de 7 días.
-            </p>
           </div>
         </CardContent>
       </Card>
@@ -521,17 +740,27 @@ export function BookingManagement() {
             // Debug específico para cada reserva
             const hasWaiver = booking.booking.liabilityWaiverId && booking.booking.liabilityWaiverId !== null
             const isManual = booking.booking.isManualBooking === true
+            // Buscar esta línea:
+            // const isPartialPayment = booking.booking.paymentType === "partial_payment"
+            // Y cambiarla por:
+            const isPartialPayment =
+              booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
             const salesPersonName = getSalesPersonName(booking.booking.salesPerson)
+            const paymentTypeInfo = getPaymentTypeDisplay(booking)
 
             return (
               <Card
                 key={booking.booking.id}
-                className={`bg-white border border-gray-200 hover:shadow-lg transition-all ${
+                className={`border border-gray-200 hover:shadow-lg transition-all ${
+                  booking.booking.status === "completed" ? "bg-green-50 border-green-200" : "bg-white"
+                } ${
                   booking.booking.isTestBooking
                     ? "border-l-4 border-l-purple-500"
                     : isManual
                       ? "border-l-4 border-l-orange-500"
-                      : ""
+                      : isPartialPayment
+                        ? "border-l-4 border-l-orange-500"
+                        : "border-l-4 border-l-green-500"
                 }`}
               >
                 <CardHeader>
@@ -552,10 +781,14 @@ export function BookingManagement() {
                             Manual
                           </Badge>
                         )}
+                        {/* ✅ NUEVO: Badge mejorado para tipo de pago */}
+                        <Badge className={`ml-2 ${paymentTypeInfo.color}`}>
+                          <paymentTypeInfo.icon className="h-3 w-3 mr-1" />
+                          {paymentTypeInfo.label}
+                        </Badge>
                       </CardTitle>
                       <CardDescription className="flex items-center mt-1">
                         <Ship className="h-4 w-4 mr-1" />
-                        {/* ✅ MEJORADO: Mostrar información del vehículo */}
                         {booking.booking.vehicleName || booking.vehicle?.name || "Producto eliminado"}
                         {(booking.booking.vehicleType || booking.vehicle?.type) && (
                           <span className="text-gray-500 ml-1">
@@ -574,7 +807,6 @@ export function BookingManagement() {
                           Fianza: {booking.booking.inspectionStatus}
                         </Badge>
                       )}
-                      {/* Badge para documento firmado */}
                       {hasWaiver && (
                         <Badge className="bg-purple-600 text-white">
                           <FileText className="h-3 w-3 mr-1" />
@@ -601,7 +833,6 @@ export function BookingManagement() {
                           <Phone className="h-3 w-3 mr-2" />
                           {booking.booking.customerPhone}
                         </div>
-                        {/* ✅ NUEVO: Mostrar comercial si es reserva manual */}
                         {salesPersonName && (
                           <div className="flex items-center text-gray-600">
                             <UserCheck className="h-3 w-3 mr-2" />
@@ -631,7 +862,7 @@ export function BookingManagement() {
                     <div className="space-y-2">
                       <h4 className="font-semibold text-gray-700 flex items-center">
                         <Euro className="h-4 w-4 mr-1" />
-                        Precio
+                        Información de Pago
                       </h4>
                       <div className="text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
                       {Number(booking.booking.securityDeposit) > 0 && (
@@ -640,12 +871,26 @@ export function BookingManagement() {
                           Fianza: €{booking.booking.securityDeposit}
                         </div>
                       )}
+                      {/* ✅ MEJORADO: Información clara de pago parcial */}
+                      {isPartialPayment && (
+                        <div className="space-y-1">
+                          <div className="text-sm text-green-600 font-medium">
+                            <CheckCircle className="h-3 w-3 inline mr-1" />
+                            Pagado online: €{booking.booking.amountPaid}
+                          </div>
+                          {Number(booking.booking.amountPending) > 0 && (
+                            <div className="text-sm text-red-600 font-bold bg-red-50 p-2 rounded border border-red-200">
+                              <AlertTriangle className="h-3 w-3 inline mr-1" />
+                              COBRAR EN SITIO: €{booking.booking.amountPending}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
                       <h4 className="font-semibold text-gray-700">Acciones</h4>
                       <div className="flex flex-col gap-2">
-                        {/* ✅ BOTÓN CORREGIDO: Ver documento como HTML */}
                         {hasWaiver && (
                           <Button
                             size="sm"
@@ -657,7 +902,18 @@ export function BookingManagement() {
                           </Button>
                         )}
 
-                        {/* Lógica de estados automática */}
+                        {/* ✅ MEJORADO: Alerta más prominente para pagos pendientes */}
+                        {isPartialPayment && Number(booking.booking.amountPending) > 0 && (
+                          <div className="p-3 bg-red-50 border-2 border-red-300 rounded-lg">
+                            <div className="text-center">
+                              <AlertTriangle className="h-5 w-5 text-red-600 mx-auto mb-1" />
+                              <p className="text-xs font-bold text-red-800">COBRAR ANTES DE ENTREGAR</p>
+                              <p className="text-lg font-bold text-red-600">€{booking.booking.amountPending}</p>
+                              <p className="text-xs text-red-600">(Resto + Fianza)</p>
+                            </div>
+                          </div>
+                        )}
+
                         {booking.booking.status === "pending" && (
                           <Button
                             size="sm"
@@ -669,7 +925,6 @@ export function BookingManagement() {
                           </Button>
                         )}
 
-                        {/* Gestión de fianzas */}
                         {booking.booking.status === "confirmed" &&
                           Number(booking.booking.securityDeposit) > 0 &&
                           booking.booking.inspectionStatus === "pending" && (
@@ -693,14 +948,13 @@ export function BookingManagement() {
                             </>
                           )}
 
-                        {/* Completar reserva normal */}
                         {booking.booking.status === "confirmed" &&
                           (Number(booking.booking.securityDeposit) === 0 ||
                             booking.booking.inspectionStatus === "approved") && (
                             <Button
                               size="sm"
                               onClick={() => updateBookingStatus(booking.booking.id, "completed")}
-                              className="bg-blue-600 text-white hover:blue-700"
+                              className="bg-blue-600 text-white hover:bg-blue-700"
                             >
                               Completar Reserva
                             </Button>
@@ -744,6 +998,9 @@ export function BookingManagement() {
                   <div className="mt-4 text-xs text-gray-500">
                     Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
                     {isManual && salesPersonName && <span className="ml-2">• Comercial: {salesPersonName}</span>}
+                    {isPartialPayment && (
+                      <span className="ml-2 font-medium text-orange-600">• {paymentTypeInfo.description}</span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -761,7 +1018,9 @@ export function BookingManagement() {
                   ? "No hay reservas de prueba"
                   : dateFilter === "manual"
                     ? "No hay reservas manuales"
-                    : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
+                    : dateFilter === "partial"
+                      ? "No hay reservas con pago parcial"
+                      : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
             </h3>
             <p className="text-gray-500">
               {dateFilter === "all"
