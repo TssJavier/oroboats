@@ -6,13 +6,15 @@ import { neon } from "@neondatabase/serverless"
 
 const sql = neon(process.env.DATABASE_URL!)
 
+// ✅ CORREGIDO: Cambiar la interfaz para Next.js 15
 interface RouteParams {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-// ✅ MÉTODO GET EXISTENTE - Para obtener disponibilidad de un vehículo específico
+// ✅ MÉTODO GET CORREGIDO - Para obtener disponibilidad de un vehículo específico
 export async function GET(request: NextRequest, context: RouteParams) {
   try {
+    // ✅ CORREGIDO: Await params ya que ahora es una Promise
     const { id } = await context.params
     const vehicleId = Number.parseInt(id)
     const { searchParams } = new URL(request.url)
@@ -212,9 +214,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ MÉTODO PUT NUEVO - Para actualizar disponibilidad de un vehículo
+// ✅ MÉTODO PUT CORREGIDO - Para actualizar disponibilidad de un vehículo
 export async function PUT(request: NextRequest, context: RouteParams) {
   try {
+    // ✅ CORREGIDO: Await params ya que ahora es una Promise
     const { id } = await context.params
     const vehicleId = Number.parseInt(id)
     const { dayOfWeek, startTime, endTime, isAvailable } = await request.json()
@@ -283,9 +286,10 @@ export async function PUT(request: NextRequest, context: RouteParams) {
   }
 }
 
-// ✅ MÉTODO DELETE NUEVO - Para eliminar disponibilidad
+// ✅ MÉTODO DELETE CORREGIDO - Para eliminar disponibilidad
 export async function DELETE(request: NextRequest, context: RouteParams) {
   try {
+    // ✅ CORREGIDO: Await params ya que ahora es una Promise
     const { id } = await context.params
     const vehicleId = Number.parseInt(id)
     const { searchParams } = new URL(request.url)

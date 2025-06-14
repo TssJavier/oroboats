@@ -3,7 +3,7 @@ import { Resend } from "resend"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "./email-templates"
 
 // Variables para configuración
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@feribu.com"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "fergsaenz@gmail.com"
 
 // Función para obtener una instancia de Resend con validación
 function getResendClient() {
