@@ -2,11 +2,21 @@ import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { sql } from "drizzle-orm"
 import { jwtVerify } from "jose"
-import { resend } from "@/lib/resend"
+// ❌ REMOVIDO: import { resend } from "@/lib/resend"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "@/lib/email-templates"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "fergsaenz@gmail.com"
+
+// ✅ NUEVO: Función para obtener Resend solo cuando se necesite
+function getResend() {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is not configured")
+  }
+
+  const { Resend } = require("resend")
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 // Función auxiliar para formatear fechas en español
 function formatDate(dateString: string): string {
@@ -258,6 +268,9 @@ export async function POST(request: NextRequest) {
       // ✅✅ NUEVO: ENVIAR EMAILS DE CONFIRMACIÓN
       try {
         console.log("📧 Sending confirmation emails for manual booking...")
+
+        // ✅ CAMBIO: Usar getResend() en lugar del import directo
+        const resend = getResend()
 
         // Formatear la fecha para mostrar en el email
         const formattedDate = formatDate(bookingDate)
