@@ -4,13 +4,26 @@ import { bookings } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 import Stripe from "stripe"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-05-28.basil",
-})
+// ❌ NO hagas esto (se ejecuta durante el build):
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+//   apiVersion: "2025-05-28.basil",
+// })
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+// ✅ Función para obtener Stripe solo cuando se necesite:
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not configured")
+  }
+
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-05-28.basil",
+  })
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const bookingId = Number.parseInt(params.id)
+    const { id } = await params
+    const bookingId = Number.parseInt(id)
 
     if (isNaN(bookingId)) {
       return NextResponse.json({ error: "ID de reserva inválido" }, { status: 400 })
@@ -51,8 +64,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 })
     }
 
-    // TODO: Aquí se podría añadir lógica para procesar la devolución de la fianza
-    // a través de Stripe si el estado es "approved"
+    // ✅ Ahora inicializa Stripe solo cuando se necesite:
+    if (inspectionStatus === "approved") {
+      try {
+        const stripe = getStripe()
+        // TODO: Lógica para procesar devolución de fianza
+        console.log("Stripe initialized for refund processing")
+      } catch (error) {
+        console.error("Stripe initialization failed:", error)
+        // No fallar la request por esto
+      }
+    }
 
     return NextResponse.json(result[0])
   } catch (error) {
