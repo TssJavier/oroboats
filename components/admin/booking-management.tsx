@@ -70,7 +70,7 @@ interface Booking {
   } | null
 }
 
-type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual" | "partial"
+type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual" | "partial" | "salesperson"
 
 export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -83,6 +83,7 @@ export function BookingManagement() {
   const [damageCost, setDamageCost] = useState("")
   const [damageImages, setDamageImages] = useState<File[]>([])
   const [dateFilter, setDateFilter] = useState<DateFilter>("all")
+  const [selectedSalesperson, setSelectedSalesperson] = useState<string>("")
   const [debug, setDebug] = useState<any>(null)
 
   useEffect(() => {
@@ -293,32 +294,27 @@ export function BookingManagement() {
   }
 
   // ✅ FUNCIÓN CORREGIDA: Obtener información del método de pago
-const getPaymentMethodDisplay = (booking: Booking) => {
-  if (!booking.booking.isManualBooking) return null
+  const getPaymentMethodDisplay = (booking: Booking) => {
+    if (!booking.booking.isManualBooking) return null
 
-  // Añadir logs para depuración más detallada
-  console.log(`🔍 Checking payment method for booking ${booking.booking.id}:`, {
-    paymentMethod: booking.booking.paymentMethod,
-    rawBooking: booking.booking,
-    type: typeof booking.booking.paymentMethod,
-  })
+    // ✅ CORREGIDO: Verificar correctamente el método de pago
+    console.log(`🔍 Checking payment method for booking ${booking.booking.id}:`, booking.booking.paymentMethod)
 
-  // Verificar si el método de pago es "card" (comparación estricta)
-  if (booking.booking.paymentMethod === "card") {
-    return {
-      label: "Tarjeta",
-      icon: CreditCard,
-      color: "text-blue-600",
-    }
-  } else {
-    // Por defecto o si es "cash"
-    return {
-      label: "Efectivo",
-      icon: Banknote,
-      color: "text-green-600",
+    if (booking.booking.paymentMethod === "card") {
+      return {
+        label: "Tarjeta",
+        icon: CreditCard,
+        color: "text-blue-600",
+      }
+    } else {
+      // Por defecto o si es "cash"
+      return {
+        label: "Efectivo",
+        icon: Banknote,
+        color: "text-green-600",
+      }
     }
   }
-}
 
   // Función para filtrar reservas por fecha o tipo
   const getFilteredBookings = () => {
@@ -335,6 +331,11 @@ const getPaymentMethodDisplay = (booking: Booking) => {
         (booking) =>
           booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment",
       )
+    }
+
+    // ✅ NUEVO: Filtro por comercial específico
+    if (dateFilter === "salesperson" && selectedSalesperson) {
+      return bookings.filter((booking) => booking.booking.salesPerson === selectedSalesperson)
     }
 
     if (dateFilter === "all") return bookings
@@ -356,6 +357,30 @@ const getPaymentMethodDisplay = (booking: Booking) => {
       }
 
       return true
+    })
+  }
+
+  // ✅ NUEVA FUNCIÓN: Obtener estadísticas de comerciales
+  const getSalespersonStats = () => {
+    const salespeople = ["manuel", "fermin", "javier"]
+    return salespeople.map((id) => {
+      const salesPersonBookings = bookings.filter(
+        (b) => b.booking.salesPerson === id && !b.booking.isTestBooking && b.booking.isManualBooking,
+      )
+
+      const totalRevenue = salesPersonBookings.reduce((sum, b) => {
+        const price = Number(b.booking.totalPrice) || 0
+        const deposit = Number(b.booking.securityDeposit) || 0
+        return sum + (price - deposit) // Restar fianza
+      }, 0)
+
+      return {
+        id,
+        name: getSalesPersonName(id),
+        count: salesPersonBookings.length,
+        revenue: totalRevenue,
+        bookings: salesPersonBookings,
+      }
     })
   }
 
@@ -713,7 +738,9 @@ const getPaymentMethodDisplay = (booking: Booking) => {
                       ? " manuales"
                       : dateFilter === "partial"
                         ? " con pago parcial"
-                        : ""}
+                        : dateFilter === "salesperson"
+                          ? ` de ${getSalesPersonName(selectedSalesperson)}`
+                          : ""}
             </div>
           )}
           {filteredBookings.length > 0 && (
@@ -735,6 +762,97 @@ const getPaymentMethodDisplay = (booking: Booking) => {
           <div className="mt-2 text-xs text-gray-500">
             {withWaiversCount} reserva(s) con documento de exención firmado • {partialPaymentBookingsCount} con pago
             parcial
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ✅ NUEVO: Panel de filtros por comercial */}
+      <Card className="bg-white border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center text-gray-800">
+            <UserCheck className="h-5 w-5 mr-2" />
+            Filtrar por Comercial
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Botones de comerciales */}
+            <div className="flex flex-wrap gap-3">
+              {getSalespersonStats().map((salesperson) => (
+                <Button
+                  key={salesperson.id}
+                  variant={
+                    dateFilter === "salesperson" && selectedSalesperson === salesperson.id ? "default" : "outline"
+                  }
+                  onClick={() => {
+                    setDateFilter("salesperson")
+                    setSelectedSalesperson(salesperson.id)
+                  }}
+                  className={
+                    dateFilter === "salesperson" && selectedSalesperson === salesperson.id
+                      ? "bg-purple-600 text-white hover:bg-purple-700"
+                      : ""
+                  }
+                >
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  {salesperson.name} ({salesperson.count})
+                </Button>
+              ))}
+
+              {/* Botón para limpiar filtro */}
+              {dateFilter === "salesperson" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDateFilter("all")
+                    setSelectedSalesperson("")
+                  }}
+                  className="border-gray-300"
+                >
+                  Limpiar filtro
+                </Button>
+              )}
+            </div>
+
+            {/* Estadísticas de comerciales */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {getSalespersonStats().map((salesperson) => (
+                <div
+                  key={salesperson.id}
+                  className={`p-4 rounded-lg border ${
+                    dateFilter === "salesperson" && selectedSalesperson === salesperson.id
+                      ? "bg-purple-50 border-purple-200"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-800">{salesperson.name}</h4>
+                    <Badge className="bg-purple-600 text-white">{salesperson.count} ventas</Badge>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-600">€{salesperson.revenue.toFixed(2)}</div>
+                  <div className="text-sm text-gray-600">Ingresos netos (sin fianza)</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Información del filtro activo */}
+            {dateFilter === "salesperson" && selectedSalesperson && (
+              <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="text-sm text-purple-800">
+                  <strong>Mostrando reservas de: {getSalesPersonName(selectedSalesperson)}</strong>
+                  <br />
+                  {filteredBookings.length} reserva(s) • €
+                  {filteredBookings
+                    .reduce((sum, b) => {
+                      const price = Number(b.booking.totalPrice) || 0
+                      const deposit = Number(b.booking.securityDeposit) || 0
+                      return sum + (price - deposit)
+                    }, 0)
+                    .toFixed(2)}{" "}
+                  en ingresos netos
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1091,7 +1209,9 @@ const getPaymentMethodDisplay = (booking: Booking) => {
                     ? "No hay reservas manuales"
                     : dateFilter === "partial"
                       ? "No hay reservas con pago parcial"
-                      : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
+                      : dateFilter === "salesperson"
+                        ? `No hay reservas de ${getSalesPersonName(selectedSalesperson)}`
+                        : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
             </h3>
             <p className="text-gray-500">
               {dateFilter === "all"
