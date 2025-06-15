@@ -2,8 +2,10 @@ import { NextResponse } from "next/server"
 import { sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 import type { NextRequest } from "next/server"
+import { createBooking } from "@/lib/db/queries"
+import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
 
-// Reemplazar la función GET completa para asegurar que se incluye el campo salesPerson
+// ✅ FUNCIÓN GET EXISTENTE (mantener igual)
 export async function GET(request: NextRequest) {
   try {
     console.log("🔍 API: Fetching bookings...")
@@ -33,11 +35,11 @@ export async function GET(request: NextRequest) {
         b.sales_person,
         b.vehicle_name,
         b.vehicle_type,
-        b.payment_type,           /* ✅ AÑADIDO: Campo payment_type */
-        b.amount_paid,            /* ✅ AÑADIDO: Campo amount_paid */
-        b.amount_pending,         /* ✅ AÑADIDO: Campo amount_pending */
-        b.payment_location,       /* ✅ AÑADIDO: Campo payment_location */
-        b.payment_method,         /* ✅ AÑADIDO: Campo payment_method */
+        b.payment_type,
+        b.amount_paid,
+        b.amount_pending,
+        b.payment_location,
+        b.payment_method,
         v.name as vehicle_current_name,
         v.type as vehicle_current_type
       FROM bookings b
@@ -131,6 +133,79 @@ export async function GET(request: NextRequest) {
     console.error("❌ API Error fetching bookings:", error)
     return NextResponse.json(
       { error: "Failed to fetch bookings", details: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    )
+  }
+}
+
+// ✅ AÑADIR FUNCIÓN POST PARA CREAR RESERVAS
+export async function POST(request: NextRequest) {
+  try {
+    console.log("🔄 API: Creating new booking...")
+
+    const bookingData = await request.json()
+    console.log("📝 Received booking data:", {
+      customerName: bookingData.customerName,
+      vehicleName: bookingData.vehicleName,
+      totalPrice: bookingData.totalPrice || bookingData.finalAmount,
+      paymentStatus: bookingData.paymentStatus,
+      paymentType: bookingData.paymentType,
+      hasDiscount: !!bookingData.discountCode,
+    })
+
+    // ✅ CREAR LA RESERVA USANDO LA FUNCIÓN EXISTENTE
+    const booking = await createBooking(bookingData)
+    console.log("✅ Booking created successfully:", booking[0])
+
+    // ✅ ENVIAR EMAILS DE CONFIRMACIÓN (NO BLOQUEAR SI FALLAN)
+    try {
+      // Obtener nombre del vehículo
+      const vehicleName = bookingData.vehicleName || "Vehículo"
+
+      const emailData = {
+        bookingId: Number(booking[0].id),
+        customerName: bookingData.customerName,
+        customerEmail: bookingData.customerEmail,
+        customerPhone: bookingData.customerPhone,
+        vehicleName: vehicleName,
+        bookingDate: bookingData.bookingDate,
+        startTime: bookingData.startTime,
+        endTime: bookingData.endTime,
+        totalPrice: bookingData.totalPrice || bookingData.finalAmount,
+        discountAmount: bookingData.discountAmount > 0 ? bookingData.discountAmount : undefined,
+        originalPrice: bookingData.discountAmount > 0 ? bookingData.originalPrice : undefined,
+        discountCode: bookingData.discountCode || undefined,
+        securityDeposit: bookingData.securityDeposit || 0,
+        paymentType: bookingData.paymentType || "full_payment",
+        amountPaid: bookingData.amountPaid || bookingData.finalAmount || 0,
+        amountPending: bookingData.amountPending || 0,
+      }
+
+      console.log("📧 Sending booking confirmation emails...")
+
+      // Enviar notificación al admin
+      await sendAdminNotification(emailData)
+      console.log("✅ Admin notification sent")
+
+      // Enviar confirmación al cliente
+      await sendCustomerConfirmation(emailData)
+      console.log("✅ Customer confirmation sent")
+    } catch (emailError) {
+      console.error("⚠️ Error sending emails (booking still created):", emailError)
+    }
+
+    return NextResponse.json({
+      success: true,
+      booking: booking[0],
+      message: "Reserva creada exitosamente",
+    })
+  } catch (error) {
+    console.error("❌ Error creating booking:", error)
+    return NextResponse.json(
+      {
+        error: "Failed to create booking",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     )
   }

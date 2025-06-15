@@ -12,31 +12,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // ✅ ENDPOINTS PÚBLICOS - Los clientes necesitan acceso para hacer reservas
-  const publicEndpoints = [
-    "/api/liability-waiver", // 🔓 Los clientes deben poder firmar el waiver
-    "/api/create-payment-intent", // 🔓 Necesario para iniciar pagos
-    "/api/confirm-booking", // 🔓 Necesario para confirmar reservas después del pago
+  // ✅ RUTAS PÚBLICAS PARA CLIENTES (sin autenticación)
+  const publicApiRoutes = [
+    "/api/liability-waiver",
+    "/api/create-payment-intent",
+    "/api/confirm-booking",
+    "/api/discount/validate", // ✅ CORREGIDO: Validar códigos es público
   ]
 
-  // ✅ VERIFICAR SI ES UN ENDPOINT PÚBLICO
-  const isPublicEndpoint = publicEndpoints.some((path) => request.nextUrl.pathname.startsWith(path))
+  const isPublicApi = publicApiRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
 
-  if (isPublicEndpoint) {
-    console.log("✅ Endpoint público permitido:", request.nextUrl.pathname)
+  if (isPublicApi) {
+    console.log("✅ Ruta pública, permitiendo acceso:", request.nextUrl.pathname)
     return NextResponse.next()
   }
 
   // ✅ MANEJO ESPECIAL PARA /api/bookings
   if (request.nextUrl.pathname.startsWith("/api/bookings")) {
-    // 🔓 PERMITIR POST (crear reservas) - público para clientes
     if (request.method === "POST") {
       console.log("✅ POST a /api/bookings permitido (crear reserva)")
       return NextResponse.next()
     }
-    // 🔒 PROTEGER GET/PUT/DELETE (gestionar reservas) - solo admin
+    // GET, PUT, DELETE requieren autenticación (gestión admin)
     console.log("🔒 Método", request.method, "en /api/bookings requiere autenticación")
-    // Continúa con la verificación de token abajo
   }
 
   // ✅ PROTEGER RUTAS ADMIN, DASHBOARD Y APIs SENSIBLES
@@ -44,8 +42,7 @@ export async function middleware(request: NextRequest) {
     "/admin",
     "/dashboard",
     "/test-descuentos",
-    "/api/bookings", // 🔒 GET/PUT/DELETE requieren auth (POST ya se maneja arriba)
-    "/api/discount-codes", // 🔒 PROTEGER CÓDIGOS DESCUENTO
+    "/api/discount-codes", // 🔒 GESTIÓN DE CÓDIGOS (admin only)
     "/api/deposits", // 🔒 PROTEGER FIANZAS
     "/api/analytics", // 🔒 PROTEGER ANALYTICS
     "/api/users", // 🔒 PROTEGER GESTIÓN DE USUARIOS
@@ -55,14 +52,18 @@ export async function middleware(request: NextRequest) {
   const adminOnlyPaths = [
     "/admin/codigos",
     "/test-descuentos",
-    "/api/discount-codes",
+    "/api/discount-codes", // Solo admin puede gestionar códigos
     "/api/users", // Solo admin puede gestionar usuarios
   ]
 
   const isProtectedPath = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
   const isAdminOnlyPath = adminOnlyPaths.some((path) => request.nextUrl.pathname.startsWith(path))
 
-  if (isProtectedPath) {
+  // ✅ PROTEGER /api/bookings para métodos que no sean POST
+  const needsAuth =
+    isProtectedPath || (request.nextUrl.pathname.startsWith("/api/bookings") && request.method !== "POST")
+
+  if (needsAuth) {
     const token = request.cookies.get("admin-token")?.value
     console.log("🔍 Token encontrado:", !!token)
 
@@ -102,13 +103,14 @@ export const config = {
     "/dashboard/:path*",
     "/auth/login",
     "/test-descuentos",
-    "/api/liability-waiver/:path*", // ✅ Incluir para logging, pero permitir acceso público
-    "/api/bookings/:path*", // ✅ POST público, GET/PUT/DELETE protegido
-    "/api/create-payment-intent/:path*", // ✅ Público para pagos
-    "/api/confirm-booking/:path*", // ✅ Público para confirmaciones
-    "/api/discount-codes/:path*", // 🔒 CÓDIGOS
-    "/api/deposits/:path*", // 🔒 FIANZAS
-    "/api/analytics/:path*", // 🔒 ANALYTICS
-    "/api/users/:path*", // 🔒 USUARIOS
+    "/api/liability-waiver/:path*",
+    "/api/bookings/:path*",
+    "/api/discount-codes/:path*", // 🔒 GESTIÓN ADMIN
+    "/api/discount/:path*", // ✅ INCLUIR VALIDACIÓN (pero permitir público)
+    "/api/create-payment-intent/:path*",
+    "/api/confirm-booking/:path*",
+    "/api/deposits/:path*",
+    "/api/analytics/:path*",
+    "/api/users/:path*",
   ],
 }
