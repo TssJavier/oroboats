@@ -43,8 +43,30 @@ export function SignatureCanvas({ onSignatureComplete, className = "" }: Signatu
       }
 
       try {
-        // Obtener la firma como imagen base64
-        const signatureData = sigCanvas.current.toDataURL("image/png")
+        // Obtener la firma como imagen base64 con configuración optimizada
+        const signatureData = sigCanvas.current.toDataURL("image/png", {
+          // Reducir calidad para evitar archivos muy grandes
+          quality: 0.8,
+        })
+
+        // Validar que la firma no esté vacía y tenga formato correcto
+        if (!signatureData || !signatureData.startsWith("data:image/png;base64,")) {
+          throw new Error("Formato de firma inválido")
+        }
+
+        // Verificar tamaño razonable (máximo 1MB)
+        if (signatureData.length > 1024 * 1024) {
+          console.warn("⚠️ Signature is large:", signatureData.length, "characters")
+          // Intentar reducir calidad
+          const reducedSignature = sigCanvas.current.toDataURL("image/png", { quality: 0.5 })
+          if (reducedSignature.length < signatureData.length) {
+            console.log("✅ Reduced signature size to:", reducedSignature.length)
+            onSignatureComplete(reducedSignature)
+            setIsSigned(true)
+            return
+          }
+        }
+
         console.log("✅ Firma capturada correctamente")
         console.log(`📏 Tamaño de la firma: ${signatureData.length} caracteres`)
         console.log(`🔍 Vista previa: ${signatureData.substring(0, 50)}...`)
@@ -74,6 +96,12 @@ export function SignatureCanvas({ onSignatureComplete, className = "" }: Signatu
             },
           }}
           onBegin={() => setIsSigned(true)}
+          // Configuración optimizada para móviles
+          dotSize={2}
+          minWidth={1}
+          maxWidth={3}
+          throttle={16}
+          velocityFilterWeight={0.7}
         />
       </div>
 
