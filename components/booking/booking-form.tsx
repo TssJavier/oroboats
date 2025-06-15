@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -134,9 +136,10 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const [error, setError] = useState("")
   const [navigationLoading, setNavigationLoading] = useState(false)
 
-  // Referencias para el scroll automático - Ahora apuntando al título del paso actual
+  // ✅ REFERENCIAS SIMPLES - Solo las necesarias
   const stepTitleRef = useRef<HTMLDivElement>(null)
   const nextButtonRef = useRef<HTMLButtonElement>(null)
+  const durationSectionRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>
 
   useEffect(() => {
     if (selectedDate && selectedTime) {
@@ -155,9 +158,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     }
   }, [selectedDate, selectedTime, securityDeposit])
 
-  // Efecto para hacer scroll al cambiar de paso - Ahora al título del paso
+  // Efecto para hacer scroll al cambiar de paso
   useEffect(() => {
-    // Pequeño retraso para asegurar que el DOM se ha actualizado
     const scrollTimer = setTimeout(() => {
       if (stepTitleRef.current) {
         stepTitleRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -166,6 +168,19 @@ export function BookingForm({ vehicle }: BookingFormProps) {
 
     return () => clearTimeout(scrollTimer)
   }, [currentStep])
+
+  // ✅ FUNCIÓN SIMPLE PARA SCROLL EN MÓVIL
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>, delay = 500) => {
+    setTimeout(() => {
+      if (ref.current && window.innerWidth <= 768) {
+        ref.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        })
+      }
+    }, delay)
+  }
 
   const handleNextStep = () => {
     setError("")
@@ -240,19 +255,21 @@ export function BookingForm({ vehicle }: BookingFormProps) {
             </div>
           </div>
 
-          {/* Progress Steps */}
-          <div className="flex items-center justify-center mb-12">
-            <div className="flex items-center space-x-4">
+          {/* ✅ PROGRESS STEPS RESPONSIVE MEJORADO */}
+          <div className="flex items-center justify-center mb-8 sm:mb-12 overflow-x-auto px-2">
+            <div className="flex items-center space-x-2 sm:space-x-4 min-w-max">
               {[1, 2, 3, 4, 5].map((step) => (
                 <div key={step} className="flex items-center">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm sm:text-base ${
                       currentStep >= step ? "bg-gold text-black" : "bg-gray-200 text-gray-500"
                     }`}
                   >
                     {step}
                   </div>
-                  {step < 5 && <div className={`w-16 h-1 mx-2 ${currentStep > step ? "bg-gold" : "bg-gray-200"}`} />}
+                  {step < 5 && (
+                    <div className={`w-8 sm:w-16 h-1 mx-1 sm:mx-2 ${currentStep > step ? "bg-gold" : "bg-gray-200"}`} />
+                  )}
                 </div>
               ))}
             </div>
@@ -354,12 +371,16 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                         <CalendarPicker
                           vehicleId={vehicle.id}
                           selectedDate={selectedDate}
-                          onDateSelect={setSelectedDate}
+                          onDateSelect={(date) => {
+                            setSelectedDate(date)
+                            // ✅ SCROLL A DURACIÓN cuando se selecciona fecha
+                            scrollToSection(durationSectionRef, 300)
+                          }}
                         />
                       </div>
 
                       {selectedDate && (
-                        <div>
+                        <div ref={durationSectionRef}>
                           <h3 className="text-lg font-semibold text-black mb-4">{t.selectTime}</h3>
                           <TimePicker
                             vehicleId={vehicle.id}

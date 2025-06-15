@@ -12,7 +12,6 @@ import {
   Clock,
   Calendar,
   Fuel,
-  Award,
   AlertCircle,
   X,
   CheckCircle,
@@ -32,11 +31,12 @@ import {
   Coffee,
   Package,
   Filter,
+  Anchor,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import { useRouter } from "next/navigation"
-import { OroLoading, useNavigationLoading } from "@/components/ui/oro-loading" // ✅ NUEVO: Importar OroLoading
+import { OroLoading, useNavigationLoading } from "@/components/ui/oro-loading"
 
 // Función para validar URLs de imágenes
 function isValidImageUrl(url: string): boolean {
@@ -674,42 +674,102 @@ export function BoatsSection() {
           {/* ✅ FILTRO SIMPLE DE FECHA */}
           <SimpleDateFilter onDateSelect={handleDateSelect} isLoading={searchLoading} language={language} />
 
-          {/* ✅ SELECTOR DE LICENCIA MEJORADO */}
-          <div className="flex justify-center mb-12">
-            <div className="bg-white border-2 border-gray-200 p-2 rounded-xl shadow-sm">
-              <div className="grid grid-cols-2 gap-2">
+          {/* 🎯 SELECTOR DE PESTAÑAS TRADICIONAL */}
+          <div className="flex justify-center mb-12 px-4">
+            <div className="w-full max-w-5xl">
+              <div className="flex rounded-2xl overflow-hidden shadow-lg border-2 border-gray-200">
+                {/* Pestaña Sin Licencia */}
                 <button
                   onClick={() => setActiveLicense("without")}
-                  className={`px-8 py-4 rounded-lg font-semibold transition-all duration-200 flex flex-col items-center ${
+                  className={`flex-1 p-6 transition-all duration-300 relative ${
                     activeLicense === "without"
-                      ? "bg-gold text-black shadow-lg border-2 border-gold"
-                      : "text-gray-600 hover:text-black hover:bg-gray-50 border-2 border-transparent"
+                      ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-r-2 border-gold shadow-xl"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-r border-gray-300"
                   }`}
                 >
-                  <div className="flex items-center mb-2">
-                    <div className="bg-green-100 p-2 rounded-full mr-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div className="flex items-center justify-center">
+                    <div
+                      className={`p-3 rounded-full mr-3 ${
+                        activeLicense === "without"
+                          ? "bg-gradient-to-r from-blue-500 to-cyan-500"
+                          : "bg-white shadow-sm"
+                      }`}
+                    >
+                      <Waves className={`h-5 w-5 ${activeLicense === "without" ? "text-white" : "text-blue-500"}`} />
                     </div>
-                    <span className="text-lg">{t.withoutLicense}</span>
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold">{t.withoutLicense}</h3>
+                      <p className="text-xs opacity-80 mt-1 hidden sm:block">{t.withoutLicenseDesc}</p>
+                    </div>
                   </div>
-                  <span className="text-sm opacity-75 text-center">{t.withoutLicenseDesc}</span>
+
+                  {/* Indicador dorado para pestaña activa */}
+                  {activeLicense === "without" && (
+                    <>
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                      <div className="absolute top-4 right-4 bg-gold p-2 rounded-full">
+                        <CheckCircle className="h-4 w-4 text-black" />
+                      </div>
+                    </>
+                  )}
                 </button>
+
+                {/* Pestaña Con Licencia */}
                 <button
                   onClick={() => setActiveLicense("with")}
-                  className={`px-8 py-4 rounded-lg font-semibold transition-all duration-200 flex flex-col items-center ${
+                  className={`flex-1 p-6 transition-all duration-300 relative ${
                     activeLicense === "with"
-                      ? "bg-gold text-black shadow-lg border-2 border-gold"
-                      : "text-gray-600 hover:text-black hover:bg-gray-50 border-2 border-transparent"
+                      ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-l-2 border-gold shadow-xl"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-l border-gray-300"
                   }`}
                 >
-                  <div className="flex items-center mb-2">
-                    <div className="bg-blue-100 p-2 rounded-full mr-2">
-                      <Award className="h-5 w-5 text-blue-600" />
+                  <div className="flex items-center justify-center">
+                    <div
+                      className={`p-3 rounded-full mr-3 ${
+                        activeLicense === "with" ? "bg-gradient-to-r from-purple-500 to-blue-500" : "bg-white shadow-sm"
+                      }`}
+                    >
+                      <Anchor className={`h-5 w-5 ${activeLicense === "with" ? "text-white" : "text-purple-500"}`} />
                     </div>
-                    <span className="text-lg">{t.withLicense}</span>
+                    <div className="text-left">
+                      <h3 className="text-lg font-bold">{t.withLicense}</h3>
+                      <p className="text-xs opacity-80 mt-1 hidden sm:block">{t.withLicenseDesc}</p>
+                    </div>
                   </div>
-                  <span className="text-sm opacity-75 text-center">{t.withLicenseDesc}</span>
+
+                  {/* Indicador dorado para pestaña activa */}
+                  {activeLicense === "with" && (
+                    <>
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                      <div className="absolute top-4 right-4 bg-gold p-2 rounded-full">
+                        <CheckCircle className="h-4 w-4 text-black" />
+                      </div>
+                    </>
+                  )}
                 </button>
+              </div>
+
+              {/* Indicador adicional móvil */}
+              <div className="mt-4 text-center sm:hidden">
+                <div
+                  className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                    activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
+                  }`}
+                >
+                  {activeLicense === "without" ? (
+                    <>
+                      <Waves className="h-4 w-4 mr-2" />
+                      {t.withoutLicense}
+                    </>
+                  ) : (
+                    <>
+                      <Anchor className="h-4 w-4 mr-2" />
+                      {t.withLicense}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -106,7 +106,7 @@ const translations = {
     halfDay: "Half day",
     halfHour: "30 minutes",
     oneHour: "1 hour",
-    twoHours: "2 hours",
+    twoHours: "2 horas",
     fourHours: "4 hours",
     options: "options",
     quickFun: "Quick fun",
@@ -137,13 +137,8 @@ export function TimePicker({
   const [vehicleCategory, setVehicleCategory] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
 
-  // Log inicial para verificar props
-  useEffect(() => {
-    console.log("🔍 TimePicker Props:")
-    console.log("   - vehicleId:", vehicleId, typeof vehicleId)
-    console.log("   - selectedDate:", selectedDate)
-    console.log("   - vehicle:", vehicle)
-  }, [vehicleId, selectedDate, vehicle])
+  // ✅ REF PARA SCROLL A HORARIOS
+  const timeSlotsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (selectedDate && selectedDurationType) {
@@ -167,24 +162,26 @@ export function TimePicker({
 
       const formattedDate = selectedDate.includes("T") ? selectedDate.split("T")[0] : selectedDate
 
-      console.log(`🔍 Solicitando slots:`)
-      console.log(`   - Vehicle ID: ${vehicleId}`)
-      console.log(`   - Fecha: ${formattedDate}`)
-      console.log(`   - Tipo de duración: ${selectedDurationType}`)
-
       const url = `/api/availability/${vehicleId}/slots?date=${encodeURIComponent(formattedDate)}&durationType=${encodeURIComponent(selectedDurationType)}`
-      console.log(`🌐 URL completa: ${url}`)
 
       const response = await fetch(url)
 
       if (response.ok) {
         const data = await response.json()
-        console.log("📊 Datos recibidos:", data)
         setAvailableSlots(data.slots || [])
         setVehicleCategory(data.vehicleCategory || "")
+
+        // ✅ SCROLL A HORARIOS cuando se cargan los slots
+        setTimeout(() => {
+          if (timeSlotsRef.current && window.innerWidth <= 768) {
+            timeSlotsRef.current.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            })
+          }
+        }, 300)
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        console.error(`❌ Error ${response.status}:`, errorData)
         setError(`Error ${response.status}: ${errorData.error || "No se pudieron cargar los horarios"}`)
         setAvailableSlots([])
       }
@@ -207,6 +204,7 @@ export function TimePicker({
       price: slot.price,
     })
 
+    // ✅ SCROLL AL BOTÓN SIGUIENTE (como estaba originalmente)
     setTimeout(() => {
       if (nextButtonRef?.current) {
         nextButtonRef.current.scrollIntoView({
@@ -254,12 +252,10 @@ export function TimePicker({
 
   const pricingOptions = Array.isArray(vehicle.pricing) ? vehicle.pricing : []
 
-  // ✅ ARREGLADO: Opciones individuales para motos con licencia
   const getDurationOptions = (): DurationOption[] => {
     const options: DurationOption[] = []
 
     if (vehicle.type === "boat") {
-      // Para barcos: agrupar por tipo
       const halfdayOptions = pricingOptions.filter((p) => p.duration.startsWith("halfday"))
       const fulldayOptions = pricingOptions.filter((p) => p.duration.startsWith("fullday"))
 
@@ -283,7 +279,6 @@ export function TimePicker({
         })
       }
     } else if (vehicle.type === "jetski") {
-      // ✅ ARREGLADO: Para motos, mostrar opciones individuales
       const durationMap = {
         "30min": { label: t.halfHour, description: t.quickFun },
         "1hour": { label: t.oneHour, description: t.completeExperience },
@@ -293,7 +288,6 @@ export function TimePicker({
         fullday: { label: t.fullDay, description: t.fullDayFun },
       }
 
-      // Crear una opción por cada duración disponible
       pricingOptions.forEach((pricing) => {
         const durationInfo = durationMap[pricing.duration as keyof typeof durationMap]
         if (durationInfo) {
@@ -312,14 +306,13 @@ export function TimePicker({
 
   const durationOptions = getDurationOptions()
 
-  // ✅ ARREGLADO: Mejor información de stock
   const getStockInfo = (slot: TimeSlot) => {
     if (slot.availableUnits === undefined || slot.totalUnits === undefined) {
       return null
     }
 
     if (slot.totalUnits <= 1) {
-      return null // No mostrar stock si solo hay 1 unidad total
+      return null
     }
 
     const available = slot.availableUnits
@@ -334,18 +327,9 @@ export function TimePicker({
     }
   }
 
-  const getRestrictionMessage = () => {
-    if (vehicleCategory === "jetski_no_license") {
-      return t.restrictedJetski
-    } else if (vehicleCategory === "boat_no_license") {
-      return t.restrictedBoat
-    }
-    return ""
-  }
-
   return (
     <div className="space-y-6">
-      {/* ✅ MEJORADO: Selección de duración más clara */}
+      {/* Selección de duración */}
       <Card className="bg-white border border-gray-200">
         <CardContent className="p-6">
           <h4 className="text-lg font-semibold text-black mb-4">{t.selectDuration}</h4>
@@ -379,7 +363,7 @@ export function TimePicker({
         </CardContent>
       </Card>
 
-      {/* Información de restricciones - SOLO para motos sin licencia */}
+      {/* Información de restricciones */}
       {vehicleCategory === "jetski_no_license" && (
         <Card className="bg-orange-50 border border-orange-200">
           <CardContent className="p-4">
@@ -394,9 +378,9 @@ export function TimePicker({
         </Card>
       )}
 
-      {/* ✅ MEJORADO: Slots de tiempo con mejor UI */}
+      {/* ✅ SLOTS DE TIEMPO CON REF PARA SCROLL */}
       {selectedDurationType ? (
-        <Card className="bg-white border border-gray-200">
+        <Card className="bg-white border border-gray-200" ref={timeSlotsRef}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-black flex items-center">
@@ -445,23 +429,16 @@ export function TimePicker({
                             }
                           `}
                         >
-                          {/* Horario */}
                           <div className="font-semibold text-center mb-2">
                             {slot.time} - {slot.endTime}
                           </div>
-
-                          {/* Precio */}
                           <div className="text-lg font-bold text-gold mb-2">€{slot.price}</div>
-
-                          {/* ✅ MEJORADO: Información de stock más clara */}
                           {stockInfo && (
                             <div className={`text-xs flex items-center ${stockInfo.color}`}>
                               <Package className="h-3 w-3 mr-1" />
                               {stockInfo.text}
                             </div>
                           )}
-
-                          {/* Badge de seleccionado */}
                           {isSelected && (
                             <Badge className="mt-2 bg-black text-white text-xs flex items-center">
                               <CheckCircle className="h-3 w-3 mr-1" />

@@ -131,6 +131,9 @@ function PaymentFormWithElements({
     }
   }
 
+  // ✅ CALCULAR DESGLOSE PARA PAGO PARCIAL
+  const remainingRental = paymentOption.type === "partial_payment" ? amount - paymentOption.onlineAmount : 0
+
   return (
     <>
       <Card className="w-full mx-auto">
@@ -188,11 +191,29 @@ function PaymentFormWithElements({
               {loading ? "Procesando..." : `Pagar €${paymentOption.onlineAmount}`}
             </Button>
 
+            {/* ✅ MENSAJE MEJORADO CON DESGLOSE CLARO */}
             {paymentOption.type === "partial_payment" && (
-              <div className="text-center p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                <p className="text-sm text-orange-700 font-medium">
-                  ⚠️ Recuerda: Deberás pagar €{paymentOption.remainingAmount} al llegar
+              <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-700 font-medium mb-2">
+                  ⚠️ Recuerda: Deberás pagar al llegar al sitio:
                 </p>
+                <div className="space-y-1 text-sm text-orange-600">
+                  <div className="flex justify-between items-center">
+                    <span>• Resto del alquiler:</span>
+                    <span className="font-medium">€{remainingRental}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>• Fianza (reembolsable):</span>
+                    <span className="font-medium">€{securityDeposit}</span>
+                  </div>
+                  <div className="border-t border-orange-300 pt-1 mt-2">
+                    <div className="flex justify-between items-center font-semibold">
+                      <span>Total a pagar en sitio:</span>
+                      <span>€{paymentOption.remainingAmount}</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-orange-500 mt-2">💡 Puedes pagar con efectivo o tarjeta</p>
               </div>
             )}
           </form>
@@ -339,13 +360,9 @@ function PaymentForm({
         environment: environment,
       })
 
-
-
-
       if (typeof cs !== "string" || !cs.startsWith("pi_")) {
         throw new Error("Invalid client secret received")
       }
-
 
       console.log("✅ Payment intent created successfully")
       setClientSecret(cs)
