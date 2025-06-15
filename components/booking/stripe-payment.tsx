@@ -158,7 +158,6 @@ function PaymentFormWithElements({
 
   return (
     <>
-      {/* ✅ CORREGIDO: Ajustado el Card para mejor visualización en móviles */}
       <Card className="w-full mx-auto">
         <CardHeader className="px-4 sm:px-6">
           <CardTitle>Pago Seguro</CardTitle>
@@ -166,15 +165,11 @@ function PaymentFormWithElements({
         </CardHeader>
         <CardContent className="px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* ✅ CORREGIDO: Contenedor con altura mínima para evitar saltos */}
+            {/* ✅ CORREGIDO: Configuración simplificada de PaymentElement */}
             <div className="p-3 sm:p-4 border border-gray-200 rounded-lg bg-gray-50 min-h-[280px]">
               <PaymentElement
                 options={{
-                  layout: {
-                    type: "tabs",
-                    defaultCollapsed: false,
-                    spacedAccordionItems: false,
-                  },
+                  layout: "tabs", // ✅ CORREGIDO: Valor simple, no objeto
                   wallets: {
                     applePay: "auto",
                     googlePay: "auto",
@@ -205,7 +200,6 @@ function PaymentFormWithElements({
         </CardContent>
       </Card>
 
-      {/* ✅ CORREGIDO: Asegurar que el modal de éxito tenga prioridad sobre Stripe */}
       <SuccessModal
         isOpen={showSuccessModal}
         onClose={() => {
@@ -226,7 +220,6 @@ function PaymentFormWithElements({
         }}
       />
 
-      {/* ✅ CORREGIDO: Asegurar que el indicador de carga tenga prioridad sobre todo */}
       {paymentProcessing && <OroLoading />}
     </>
   )
@@ -447,7 +440,6 @@ function PaymentForm({
     return (
       <div className="space-y-6">
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
-        {/* ✅ CORREGIDO: Ajustado el Card para mejor visualización en móviles */}
         <Card className="w-full mx-auto">
           <CardContent className="p-4 sm:p-6 text-center">
             <div className="text-red-600 mb-4">
@@ -469,7 +461,6 @@ function PaymentForm({
     return (
       <div className="space-y-6">
         <DiscountInput totalAmount={amount} onDiscountApplied={handleDiscountApplied} />
-        {/* ✅ CORREGIDO: Ajustado el Card para mejor visualización en móviles */}
         <Card className="w-full mx-auto">
           <CardContent className="p-4 sm:p-6 text-center">
             <p className="mb-2">Preparando pago...</p>
@@ -482,7 +473,6 @@ function PaymentForm({
 
   return (
     <>
-      {/* ✅ CORREGIDO: Eliminado padding horizontal para evitar desbordamiento */}
       <div className="space-y-6">
         {/* Indicador de entorno */}
         {environment === "test" && (
@@ -535,29 +525,18 @@ function PaymentForm({
             </CardContent>
           </Card>
         ) : (
-          // ✅ CORREGIDO: Ajustado Elements para mejor visualización en móviles
           <Elements
             stripe={stripePromise}
             options={{
-              clientSecret,
+              clientSecret: clientSecret,
               appearance: {
-                theme: "stripe" as const,
+                theme: "stripe",
                 variables: {
                   colorPrimary: "#D4AF37",
-                  // ✅ CORREGIDO: Ajustar espaciado para móviles
                   spacingUnit: "4px",
                   borderRadius: "8px",
                 },
-                rules: {
-                  ".Tab": {
-                    padding: "8px",
-                  },
-                  ".Input": {
-                    padding: "10px",
-                  },
-                },
               },
-              // ✅ CORREGIDO: Asegurar que Stripe se muestre correctamente en móviles
               loader: "auto",
             }}
           >
@@ -576,7 +555,6 @@ function PaymentForm({
         )}
       </div>
 
-      {/* Modal de éxito para reservas gratuitas */}
       <SuccessModal
         isOpen={showSuccessModal}
         onClose={() => {
@@ -597,7 +575,6 @@ function PaymentForm({
         }}
       />
 
-      {/* ✅ CORREGIDO: Asegurar que el indicador de carga tenga prioridad sobre todo */}
       {paymentProcessing && <OroLoading />}
     </>
   )
