@@ -674,14 +674,14 @@ export function BoatsSection() {
           {/* ✅ FILTRO SIMPLE DE FECHA */}
           <SimpleDateFilter onDateSelect={handleDateSelect} isLoading={searchLoading} language={language} />
 
-          {/* 🎯 SELECTOR DE PESTAÑAS TRADICIONAL */}
-          <div className="flex justify-center mb-12 px-4">
+          {/* 🎯 SELECTOR DE PESTAÑAS OPTIMIZADO PARA MÓVILES */}
+          <div className="flex justify-center mb-12 px-2 sm:px-4">
             <div className="w-full max-w-5xl">
               <div className="flex rounded-2xl overflow-hidden shadow-lg border-2 border-gray-200">
                 {/* Pestaña Sin Licencia */}
                 <button
                   onClick={() => setActiveLicense("without")}
-                  className={`flex-1 p-6 transition-all duration-300 relative ${
+                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${
                     activeLicense === "without"
                       ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-r-2 border-gold shadow-xl"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-r border-gray-300"
@@ -689,17 +689,19 @@ export function BoatsSection() {
                 >
                   <div className="flex items-center justify-center">
                     <div
-                      className={`p-3 rounded-full mr-3 ${
+                      className={`p-2 sm:p-3 rounded-full mr-2 sm:mr-3 ${
                         activeLicense === "without"
                           ? "bg-gradient-to-r from-blue-500 to-cyan-500"
                           : "bg-white shadow-sm"
                       }`}
                     >
-                      <Waves className={`h-5 w-5 ${activeLicense === "without" ? "text-white" : "text-blue-500"}`} />
+                      <Waves
+                        className={`h-4 w-4 sm:h-5 sm:w-5 ${activeLicense === "without" ? "text-white" : "text-blue-500"}`}
+                      />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-lg font-bold">{t.withoutLicense}</h3>
-                      <p className="text-xs opacity-80 mt-1 hidden sm:block">{t.withoutLicenseDesc}</p>
+                      <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withoutLicense}</h3>
+                      <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withoutLicenseDesc}</p>
                     </div>
                   </div>
 
@@ -708,8 +710,8 @@ export function BoatsSection() {
                     <>
                       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
-                      <div className="absolute top-4 right-4 bg-gold p-2 rounded-full">
-                        <CheckCircle className="h-4 w-4 text-black" />
+                      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gold p-1 sm:p-2 rounded-full">
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
                       </div>
                     </>
                   )}
@@ -718,7 +720,7 @@ export function BoatsSection() {
                 {/* Pestaña Con Licencia */}
                 <button
                   onClick={() => setActiveLicense("with")}
-                  className={`flex-1 p-6 transition-all duration-300 relative ${
+                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${
                     activeLicense === "with"
                       ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-l-2 border-gold shadow-xl"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-l border-gray-300"
@@ -726,15 +728,17 @@ export function BoatsSection() {
                 >
                   <div className="flex items-center justify-center">
                     <div
-                      className={`p-3 rounded-full mr-3 ${
+                      className={`p-2 sm:p-3 rounded-full mr-2 sm:mr-3 ${
                         activeLicense === "with" ? "bg-gradient-to-r from-purple-500 to-blue-500" : "bg-white shadow-sm"
                       }`}
                     >
-                      <Anchor className={`h-5 w-5 ${activeLicense === "with" ? "text-white" : "text-purple-500"}`} />
+                      <Anchor
+                        className={`h-4 w-4 sm:h-5 sm:w-5 ${activeLicense === "with" ? "text-white" : "text-purple-500"}`}
+                      />
                     </div>
                     <div className="text-left">
-                      <h3 className="text-lg font-bold">{t.withLicense}</h3>
-                      <p className="text-xs opacity-80 mt-1 hidden sm:block">{t.withLicenseDesc}</p>
+                      <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withLicense}</h3>
+                      <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withLicenseDesc}</p>
                     </div>
                   </div>
 
@@ -743,29 +747,29 @@ export function BoatsSection() {
                     <>
                       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
-                      <div className="absolute top-4 right-4 bg-gold p-2 rounded-full">
-                        <CheckCircle className="h-4 w-4 text-black" />
+                      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gold p-1 sm:p-2 rounded-full">
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
                       </div>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* Indicador adicional móvil */}
-              <div className="mt-4 text-center sm:hidden">
+              {/* Indicador adicional móvil - Más compacto */}
+              <div className="mt-3 text-center sm:hidden">
                 <div
-                  className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
                     activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
                   }`}
                 >
                   {activeLicense === "without" ? (
                     <>
-                      <Waves className="h-4 w-4 mr-2" />
+                      <Waves className="h-3 w-3 mr-1.5" />
                       {t.withoutLicense}
                     </>
                   ) : (
                     <>
-                      <Anchor className="h-4 w-4 mr-2" />
+                      <Anchor className="h-3 w-3 mr-1.5" />
                       {t.withLicense}
                     </>
                   )}
