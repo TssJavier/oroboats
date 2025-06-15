@@ -1,7 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { writeFile, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
+import { put } from "@vercel/blob"
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,9 +25,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "El archivo es demasiado grande. Máximo 5MB" }, { status: 400 })
     }
 
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
     // Generar nombre único para el archivo
     const timestamp = Date.now()
     const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
@@ -38,25 +33,18 @@ export async function POST(request: NextRequest) {
     // Determinar carpeta según el tipo de vehículo
     const vehicleType = formData.get("vehicleType") as string
     const folder = vehicleType === "boat" ? "barcos" : "motos"
+    const blobName = `${folder}/${fileName}`
 
-    // Crear directorio si no existe
-    const uploadDir = path.join(process.cwd(), "public", "assets", folder)
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
+    // Subir a Vercel Blob
+    const blob = await put(blobName, file, {
+      access: "public",
+    })
 
-    // Guardar archivo
-    const filePath = path.join(uploadDir, fileName)
-    await writeFile(filePath, buffer)
-
-    // Retornar la URL pública
-    const publicUrl = `/assets/${folder}/${fileName}`
-
-    console.log(`✅ File uploaded: ${publicUrl}`)
+    console.log(`✅ File uploaded to Vercel Blob: ${blob.url}`)
 
     return NextResponse.json({
       success: true,
-      url: publicUrl,
+      url: blob.url,
       fileName,
       size: file.size,
       type: file.type,
