@@ -3,15 +3,54 @@ import { db } from "@/lib/db"
 import { discountCodes } from "@/lib/db/schema"
 import { eq, and, or, isNull, gte, lte } from "drizzle-orm"
 
+// ✅ RATE LIMITING SIMPLE (en memoria)
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+const RATE_LIMIT = 5 // máximo 5 intentos por IP
+const RATE_WINDOW = 60000 // 1 minuto
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const userLimit = rateLimitMap.get(ip)
+
+  if (!userLimit || now > userLimit.resetTime) {
+    // Resetear o crear nuevo límite
+    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_WINDOW })
+    return true
+  }
+
+  if (userLimit.count >= RATE_LIMIT) {
+    return false // Límite excedido
+  }
+
+  userLimit.count++
+  return true
+}
+
 export async function GET(request: NextRequest) {
   try {
+    // ✅ OBTENER IP PARA RATE LIMITING
+    const forwarded = request.headers.get("x-forwarded-for")
+    const ip = forwarded ? forwarded.split(",")[0] : request.headers.get("x-real-ip") || "unknown"
+
+    // ✅ VERIFICAR RATE LIMIT
+    if (!checkRateLimit(ip)) {
+      console.log(`❌ Rate limit exceeded for IP: ${ip}`)
+      return NextResponse.json(
+        {
+          valid: false,
+          error: "Demasiados intentos. Espera un minuto.",
+        },
+        { status: 429 },
+      )
+    }
+
     console.log("🎫 API: Validating discount code...")
 
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")
     const amount = Number.parseFloat(searchParams.get("amount") || "0")
 
-    console.log("📝 Received data:", { code, amount })
+    console.log("📝 Received data:", { code, amount, ip })
 
     if (!code || !amount) {
       console.log("❌ Missing code or amount")
@@ -24,9 +63,21 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // ✅ VALIDACIÓN BÁSICA DEL CÓDIGO (evitar inyecciones)
+    if (!/^[A-Z0-9]{3,20}$/i.test(code)) {
+      console.log("❌ Invalid code format")
+      return NextResponse.json(
+        {
+          valid: false,
+          error: "Formato de código inválido",
+        },
+        { status: 400 },
+      )
+    }
+
     console.log("🔍 Searching for discount code:", code.toUpperCase())
 
-    // Buscar código de descuento - USANDO LOS MISMOS CAMPOS QUE TU ADMIN
+    // Buscar código de descuento
     const discount = await db
       .select()
       .from(discountCodes)
@@ -41,32 +92,21 @@ export async function GET(request: NextRequest) {
       .limit(1)
 
     console.log("🔍 Found discount codes:", discount.length)
-    console.log("🔍 Raw discount data:", discount)
 
     if (discount.length === 0) {
       console.log("❌ No valid discount code found")
-
-      // DEBUG: Buscar CUALQUIER código con ese nombre (sin filtros)
-      const anyCode = await db.select().from(discountCodes).where(eq(discountCodes.code, code.toUpperCase())).limit(1)
-
-      console.log("🔍 Any code with that name:", anyCode)
-
+      // ✅ NO REVELAR INFORMACIÓN SOBRE CÓDIGOS EXISTENTES
       return NextResponse.json(
         {
           valid: false,
           error: "Código no válido o expirado",
-          debug: {
-            searchedCode: code.toUpperCase(),
-            foundAnyCode: anyCode.length > 0,
-            codeData: anyCode[0] || null,
-          },
         },
         { status: 200 },
       )
     }
 
     const discountData = discount[0]
-    console.log("✅ Found discount:", discountData)
+    console.log("✅ Found discount:", { code: discountData.code, type: discountData.discountType })
 
     // Verificar usos máximos
     if (discountData.maxUses && (Number(discountData.usedCount) || 0) >= discountData.maxUses) {
@@ -81,7 +121,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Verificar monto mínimo
-    const minAmount = discountData.minAmount !== null ? Number(discountData.minAmount) : 0;
+    const minAmount = discountData.minAmount !== null ? Number(discountData.minAmount) : 0
     if (amount < minAmount) {
       console.log("❌ Minimum amount not met")
       return NextResponse.json(
@@ -93,7 +133,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Calcular descuento - USANDO discountType (como en tu admin)
+    // Calcular descuento
     let discountAmount = 0
     if (discountData.discountType === "percentage") {
       discountAmount = (amount * Number(discountData.discountValue)) / 100
@@ -121,7 +161,6 @@ export async function GET(request: NextRequest) {
       {
         valid: false,
         error: "Error interno",
-        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },
     )

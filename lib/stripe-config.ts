@@ -23,10 +23,34 @@ const getStripeConfig = () => {
     const secretKey = process.env.STRIPE_SECRET_KEY_LIVE
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE
 
+    // ✅ AÑADIDO: Logging detallado para debugging en producción
+    console.log("🔍 Production keys check:", {
+      hasSecretKey: !!secretKey,
+      hasPublishableKey: !!publishableKey,
+      secretKeyPrefix: secretKey?.substring(0, 7),
+      publishableKeyPrefix: publishableKey?.substring(0, 7),
+      secretKeyLength: secretKey?.length,
+      publishableKeyLength: publishableKey?.length,
+    })
+
     if (!secretKey || !publishableKey) {
       console.warn("⚠️ Production Stripe keys not configured, falling back to test")
       // Fallback a test si no hay claves de producción
       return getTestConfig()
+    }
+
+    // ✅ AÑADIDO: Verificación de formato de claves
+    if (!secretKey.startsWith("sk_live")) {
+      console.error("❌ STRIPE_SECRET_KEY_LIVE should start with 'sk_live', got:", secretKey.substring(0, 7))
+      console.error("❌ This will cause Stripe to fail in production!")
+    }
+
+    if (!publishableKey.startsWith("pk_live")) {
+      console.error(
+        "❌ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE should start with 'pk_live', got:",
+        publishableKey.substring(0, 7),
+      )
+      console.error("❌ This will cause Stripe Elements to fail in production!")
     }
 
     console.log("🔴 Using PRODUCTION Stripe keys")
@@ -46,9 +70,28 @@ const getTestConfig = () => {
   const publishableKey =
     process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
 
+  // ✅ AÑADIDO: Logging detallado para debugging en desarrollo
+  console.log("🔍 Test keys check:", {
+    hasSecretKey: !!secretKey,
+    hasPublishableKey: !!publishableKey,
+    secretKeyPrefix: secretKey?.substring(0, 8),
+    publishableKeyPrefix: publishableKey?.substring(0, 8),
+    secretKeyLength: secretKey?.length,
+    publishableKeyLength: publishableKey?.length,
+  })
+
   if (!secretKey || !publishableKey) {
     console.error("❌ Test Stripe keys not configured")
     return null
+  }
+
+  // ✅ AÑADIDO: Verificación de formato de claves de test
+  if (!secretKey.startsWith("sk_test")) {
+    console.error("❌ Test secret key should start with 'sk_test', got:", secretKey.substring(0, 8))
+  }
+
+  if (!publishableKey.startsWith("pk_test")) {
+    console.error("❌ Test publishable key should start with 'pk_test', got:", publishableKey.substring(0, 8))
   }
 
   console.log("🧪 Using TEST Stripe keys")
@@ -64,11 +107,11 @@ const stripeConfig = getStripeConfig()
 // 🛡️ INICIALIZAR STRIPE CON SEGURIDAD
 const stripe = stripeConfig
   ? new Stripe(stripeConfig.secretKey, {
-      apiVersion: "2025-05-28.basil",
+      apiVersion: "2025-05-28.basil", // ✅ MANTENIDO: Tu versión específica
     })
   : null
 
-// 🚨 VERIFICACIONES DE SEGURIDAD
+// 🚨 VERIFICACIONES DE SEGURIDAD (MEJORADAS)
 if (stripeConfig) {
   // Verificar que las claves coinciden con el entorno
   const keyPrefix = stripeConfig.secretKey.substring(0, 7)
@@ -78,12 +121,30 @@ if (stripeConfig) {
     console.warn(`⚠️ Key type mismatch! Expected ${expectedPrefix}, got ${keyPrefix}`)
   }
 
+  // ✅ AÑADIDO: Verificación adicional para Stripe Elements
+  console.log("🔍 Stripe Elements configuration:", {
+    environment: stripeConfig.environment,
+    publishableKeyValid: stripeConfig.publishableKey.length > 20,
+    secretKeyValid: stripeConfig.secretKey.length > 20,
+    apiVersion: "2025-05-28.basil",
+  })
+
   console.log(`✅ Stripe initialized for ${stripeConfig.environment} environment`)
 } else {
   console.error("❌ Stripe not initialized - missing configuration")
+  console.error("❌ This will cause payment forms to show blank!")
 }
 
-// 📊 CONFIGURACIÓN DE MÉTODOS DE PAGO
+// ✅ AÑADIDO: Logging específico para debugging de Stripe Elements
+if (typeof window !== "undefined") {
+  console.log("🔍 Client-side Stripe config:", {
+    hasStripeConfig: !!stripeConfig,
+    environment: stripeConfig?.environment,
+    publishableKeyPrefix: stripeConfig?.publishableKey?.substring(0, 7),
+  })
+}
+
+// 📊 CONFIGURACIÓN DE MÉTODOS DE PAGO (MANTENIDA)
 export const PAYMENT_METHODS = {
   card: {
     enabled: true,
@@ -111,7 +172,7 @@ export const PAYMENT_METHODS = {
   },
 }
 
-// 🎯 FUNCIÓN PARA CREAR PAYMENT INTENT
+// 🎯 FUNCIÓN PARA CREAR PAYMENT INTENT (MANTENIDA)
 export async function createPaymentWithDeposit({
   amount,
   depositAmount,
@@ -170,7 +231,7 @@ export async function createPaymentWithDeposit({
   }
 }
 
-// 🔍 EXPORTAR INFORMACIÓN DEL ENTORNO
+// 🔍 EXPORTAR INFORMACIÓN DEL ENTORNO (MEJORADA)
 export const stripeEnvironment = {
   isProduction,
   isDevelopment,
@@ -179,6 +240,13 @@ export const stripeEnvironment = {
   configDetails: {
     hasTestKeys: !!(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
     hasLiveKeys: !!(process.env.STRIPE_SECRET_KEY_LIVE && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE),
+  },
+  // ✅ AÑADIDO: Información adicional para debugging
+  debugInfo: {
+    publishableKeyPrefix: stripeConfig?.publishableKey?.substring(0, 7),
+    secretKeyPrefix: stripeConfig?.secretKey?.substring(0, 7),
+    configExists: !!stripeConfig,
+    stripeInitialized: !!stripe,
   },
 }
 
