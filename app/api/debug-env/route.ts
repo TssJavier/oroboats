@@ -1,20 +1,28 @@
 import { NextResponse } from "next/server"
 
 export async function GET() {
-  // Verificar variables de entorno (ocultando parte de las claves por seguridad)
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "no encontrada"
-  const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "no encontrada"
-
-  // Mostrar solo los primeros y últimos caracteres
-  const maskKey = (key: string) => {
-    if (key === "no encontrada") return key
-    return `${key.substring(0, 8)}...${key.substring(key.length - 4)}`
-  }
-
   return NextResponse.json({
-    environment: process.env.NODE_ENV,
-    stripeSecretKey: maskKey(stripeSecretKey),
-    stripePublishableKey: maskKey(stripePublishableKey),
-    timestamp: new Date().toISOString(),
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+
+    // Admin
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL || "NOT_SET",
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD ? "SET" : "NOT_SET",
+
+    // Stripe
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? "SET" : "NOT_SET",
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ? "SET" : "NOT_SET",
+    STRIPE_SECRET_KEY_LIVE: process.env.STRIPE_SECRET_KEY_LIVE ? "SET" : "NOT_SET",
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE ? "SET" : "NOT_SET",
+
+    // Database
+    DATABASE_URL: process.env.DATABASE_URL ? "SET" : "NOT_SET",
+    POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING ? "SET" : "NOT_SET",
+
+    // Resend
+    RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "NOT_SET",
+
+    // JWT
+    JWT_SECRET: process.env.JWT_SECRET ? "SET" : "NOT_SET",
   })
 }
