@@ -104,10 +104,10 @@ const getTestConfig = () => {
 
 const stripeConfig = getStripeConfig()
 
-// 🛡️ INICIALIZAR STRIPE CON SEGURIDAD
+// 🛡️ INICIALIZAR STRIPE CON SEGURIDAD - ✅ VERSIÓN MÁS NUEVA
 const stripe = stripeConfig
   ? new Stripe(stripeConfig.secretKey, {
-      apiVersion: "2025-05-28.basil", // ✅ MANTENIDO: Tu versión específica
+      apiVersion: "2025-05-28.basil", // ✅ RESTAURADO: Versión más nueva como sugieres
     })
   : null
 
@@ -144,7 +144,7 @@ if (typeof window !== "undefined") {
   })
 }
 
-// 📊 CONFIGURACIÓN DE MÉTODOS DE PAGO (MANTENIDA)
+// 📊 CONFIGURACIÓN DE MÉTODOS DE PAGO (SIMPLIFICADA PARA DEBUG)
 export const PAYMENT_METHODS = {
   card: {
     enabled: true,
@@ -152,24 +152,25 @@ export const PAYMENT_METHODS = {
     description: "Visa, Mastercard, American Express",
     icon: "💳",
   },
-  paypal: {
-    enabled: !isDevelopment, // PayPal solo en producción
-    name: "PayPal",
-    description: "Paga con tu cuenta PayPal",
-    icon: "🅿️",
-  },
-  apple_pay: {
-    enabled: true,
-    name: "Apple Pay",
-    description: "Pago rápido con Touch ID",
-    icon: "🍎",
-  },
-  google_pay: {
-    enabled: true,
-    name: "Google Pay",
-    description: "Pago rápido con Google",
-    icon: "🔵",
-  },
+  // ✅ TEMPORALMENTE DESHABILITADOS PARA DEBUG
+  // paypal: {
+  //   enabled: !isDevelopment,
+  //   name: "PayPal",
+  //   description: "Paga con tu cuenta PayPal",
+  //   icon: "🅿️",
+  // },
+  // apple_pay: {
+  //   enabled: true,
+  //   name: "Apple Pay",
+  //   description: "Pago rápido con Touch ID",
+  //   icon: "🍎",
+  // },
+  // google_pay: {
+  //   enabled: true,
+  //   name: "Google Pay",
+  //   description: "Pago rápido con Google",
+  //   icon: "🔵",
+  // },
 }
 
 // 🎯 FUNCIÓN PARA CREAR PAYMENT INTENT (MANTENIDA)

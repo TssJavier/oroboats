@@ -1,138 +1,88 @@
 import { type NextRequest, NextResponse } from "next/server"
-import stripe, { stripeEnvironment } from "@/lib/stripe-config"
-import { db } from "@/lib/db"
-import { bookings } from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
+import stripe from "@/lib/stripe-config"
 
 export async function POST(request: NextRequest) {
   try {
-    // 🛡️ VERIFICAR CONFIGURACIÓN
+    const body = await request.json()
+    const { amount, paymentType, bookingData } = body
+
+    console.log("🔄 Creating payment intent:", {
+      amount,
+      paymentType,
+      hasBookingData: !!bookingData,
+    })
+
+    console.log("🧪 Stripe keys at runtime:", {
+  env: process.env.NODE_ENV,
+  secretKey: process.env.STRIPE_SECRET_KEY_LIVE?.substring(0, 8),
+  publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE?.substring(0, 8),
+})
+
+    // Validar datos básicos
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ error: "Invalid amount", details: "Amount must be greater than 0" }, { status: 400 })
+    }
+
     if (!stripe) {
-      console.error("❌ Stripe not configured:", stripeEnvironment)
       return NextResponse.json(
-        {
-          error: "Stripe not configured",
-          environment: stripeEnvironment.environment,
-          details: "Please configure Stripe keys for this environment",
-          debug: stripeEnvironment,
-        },
+        { error: "Stripe not configured", details: "Stripe configuration missing" },
         { status: 500 },
       )
     }
 
-    const body = await request.json()
-
-    // ✅ VERIFICAR Y NORMALIZAR DATOS DE PAGO PARCIAL
-    const paymentType = body.paymentType || body.bookingData?.paymentType || "full_payment"
-    const amountPaid = body.amountPaid || body.bookingData?.amountPaid || body.amount
-    const amountPending = body.amountPending || body.bookingData?.amountPending || 0
-
-    console.log(`💳 Creating payment intent (${stripeEnvironment.environment}):`, {
-      amount: body.amount,
-      environment: stripeEnvironment.environment,
-      hasValidConfig: stripeEnvironment.hasValidConfig,
-      // ✅ DATOS DE PAGO PARCIAL NORMALIZADOS
-      paymentType,
-      amountPaid,
-      amountPending,
+    // Crear Payment Intent con configuración mínima
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Convertir a centavos
+      currency: "eur",
+      payment_method_types: ["card"], // ✅ SOLO TARJETAS
+      metadata: {
+        bookingId: bookingData?.id || "unknown",
+        vehicleName: bookingData?.vehicleName || "unknown",
+        paymentType: paymentType || "full_payment",
+        environment: process.env.NODE_ENV || "unknown",
+      },
     })
 
-    const { amount, currency = "eur", metadata = {} } = body
+    {/*console.log("🔍 Stripe BACKEND DEBUG:")
+    console.log("- Entorno:", process.env.NODE_ENV)
+    console.log("- Clave secreta usada (inicio):", process.env.STRIPE_SECRET_KEY_LIVE?.substring(0, 10))
+    console.log("- client_secret generado:", paymentIntent.client_secret)
+    console.log("- ID paymentIntent:", paymentIntent.id)*/}
 
-    // 🚨 VERIFICACIÓN DE SEGURIDAD EN PRODUCCIÓN
-    if (stripeEnvironment.isProduction && amount < 0.5) {
+    console.log("✅ Payment intent created:", {
+      id: paymentIntent.id,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency,
+      status: paymentIntent.status,
+    })
+
+    return NextResponse.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      environment: process.env.NODE_ENV === "production" ? "production" : "development",
+    })
+  } catch (error) {
+    console.error("❌ Error creating payment intent:", error)
+
+    // Error específico de Stripe
+    if (error instanceof Error && "type" in error) {
+      const stripeError = error as any
       return NextResponse.json(
         {
-          error: "Invalid amount for production",
-          details: "Minimum amount in production is €0.50",
-          environment: stripeEnvironment.environment,
+          error: "Stripe error",
+          details: stripeError.message,
+          type: stripeError.type,
+          code: stripeError.code,
         },
         { status: 400 },
       )
     }
 
-    // ✅ PREPARAR DATOS DE BOOKING PARA METADATA
-    const bookingDataWithPaymentInfo = {
-      ...body.bookingData,
-      paymentType,
-      amountPaid,
-      amountPending,
-    }
-
-    // ✅ CREAR PAYMENT INTENT CON DATOS DE PAGO PARCIAL EXPLÍCITOS
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
-      currency,
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      metadata: {
-        ...metadata,
-        environment: stripeEnvironment.environment,
-        bookingData: JSON.stringify(bookingDataWithPaymentInfo),
-        isTestMode: stripeEnvironment.isDevelopment ? "true" : "false",
-        // ✅ DATOS DE PAGO PARCIAL EXPLÍCITOS
-        paymentType,
-        amountPaid: String(amountPaid),
-        amountPending: String(amountPending),
-      },
-    })
-
-    console.log(`✅ Payment Intent created (${stripeEnvironment.environment}):`, {
-      id: paymentIntent.id,
-      paymentType,
-      amountPaid,
-      amountPending,
-    })
-
-    // ✅ NUEVA FUNCIONALIDAD: Actualizar reserva con paymentId y marcar si es de prueba
-    if (body.bookingData?.bookingId) {
-      try {
-        await db
-          .update(bookings)
-          .set({
-            paymentId: paymentIntent.id,
-            isTestBooking: stripeEnvironment.isDevelopment,
-            // ✅ DATOS DE PAGO PARCIAL
-            paymentType,
-            amountPaid: amountPaid || null,
-            amountPending: amountPending || 0,
-            paymentLocation: amountPending > 0 ? "mixed" : "online",
-          })
-          .where(eq(bookings.id, body.bookingData.bookingId))
-
-        console.log(`📝 Booking updated with payment ID and test flag:`, {
-          bookingId: body.bookingData.bookingId,
-          paymentId: paymentIntent.id,
-          isTest: stripeEnvironment.isDevelopment,
-          paymentType,
-        })
-      } catch (dbError) {
-        console.error("⚠️ Error updating booking:", dbError)
-        // No fallar el payment intent por un error de DB
-      }
-    }
-
-    return NextResponse.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      environment: stripeEnvironment.environment,
-      debug: {
-        isProduction: stripeEnvironment.isProduction,
-        isDevelopment: stripeEnvironment.isDevelopment,
-        hasValidConfig: stripeEnvironment.hasValidConfig,
-        paymentType,
-      },
-    })
-  } catch (error) {
-    console.error("❌ Error creating payment intent:", error)
-
+    // Error genérico
     return NextResponse.json(
       {
-        error: "Failed to create payment intent",
-        environment: stripeEnvironment.environment,
+        error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
-        debug: stripeEnvironment,
       },
       { status: 500 },
     )
