@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { CalendarPicker } from "./calendar-picker"
 import { TimePicker } from "./time-picker"
-import { BookingSummary } from "./booking-summary"
 import { LiabilityWaiver } from "./liability-waiver"
 import { ArrowLeft, Ship, Zap, Users, Calendar, CreditCard, FileText } from "lucide-react"
 import Image from "next/image"
@@ -221,7 +220,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
       ...prev,
       liabilityWaiverId: waiverId,
     }))
-    setCurrentStep(4)
+    setCurrentStep(5) // ✅ SALTAR DIRECTAMENTE AL PASO 5 (PAGO)
   }
 
   const handleBooking = () => {
@@ -258,16 +257,16 @@ export function BookingForm({ vehicle }: BookingFormProps) {
           {/* ✅ PROGRESS STEPS RESPONSIVE MEJORADO */}
           <div className="flex items-center justify-center mb-8 sm:mb-12 overflow-x-auto px-2">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-max">
-              {[1, 2, 3, 4, 5].map((step) => (
+              {[1, 2, 3, 5].map((step, index) => (
                 <div key={step} className="flex items-center">
                   <div
                     className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm sm:text-base ${
                       currentStep >= step ? "bg-gold text-black" : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {step}
+                    {index + 1} {/* Mostrar 1,2,3,4 en lugar de 1,2,3,5 */}
                   </div>
-                  {step < 5 && (
+                  {index < 3 && (
                     <div className={`w-8 sm:w-16 h-1 mx-1 sm:mx-2 ${currentStep > step ? "bg-gold" : "bg-gray-200"}`} />
                   )}
                 </div>
@@ -460,13 +459,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     />
                   )}
 
-                  {/* Step 4: Summary and Payment */}
-                  {currentStep === 4 && (
-                    <div className="space-y-6">
-                      <BookingSummary vehicle={vehicle} bookingData={bookingData} />
-                    </div>
-                  )}
-
                   {/* Step 5: Payment */}
                   {currentStep === 5 && (
                     <div className="space-y-6">
@@ -513,7 +505,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                   {/* Navigation Buttons */}
                   <div className="pt-6 border-t border-gray-200">
                     {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
-                      // Two buttons layout - Skip step 3 because it has its own navigation
+                      // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
                       <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
                         <Button
                           variant="outline"
@@ -525,28 +517,18 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                         </Button>
 
                         <div className="order-1 sm:order-2">
-                          {currentStep < 4 ? (
-                            <Button
-                              ref={nextButtonRef}
-                              onClick={handleNextStep}
-                              className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
-                            >
-                              Siguiente
-                              <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-                            </Button>
-                          ) : currentStep === 4 ? (
-                            <Button
-                              onClick={handleBooking}
-                              className="bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg px-6 py-3 w-full sm:w-auto"
-                            >
-                              <CreditCard className="h-5 w-5 mr-2" />
-                              Proceder al Pago
-                            </Button>
-                          ) : null}
+                          <Button
+                            ref={nextButtonRef}
+                            onClick={handleNextStep}
+                            className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+                          >
+                            Siguiente
+                            <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                          </Button>
                         </div>
                       </div>
                     ) : currentStep === 1 ? (
-                      // Single button layout - First step
+                      // Primer paso
                       <div className="flex justify-end">
                         <Button
                           ref={nextButtonRef}

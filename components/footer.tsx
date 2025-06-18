@@ -1,8 +1,9 @@
 "use client"
-import { Facebook, Instagram, Twitter, Youtube, Ship, Mail, Phone } from "lucide-react"
+import { Facebook, Instagram, Mail, Phone } from "lucide-react"
 import { useApp } from "@/components/providers"
 import { OroLoading, useNavigationLoading } from "@/components/ui/oro-loading"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 const translations = {
   es: {
@@ -61,7 +62,8 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
-              <Ship className="h-6 w-6 text-gold" />
+              {/* ✅ CAMBIO: Usar imagen en lugar del icono Ship */}
+              <Image src="/assets/logo.png" alt="OroBoats Logo" width={24} height={24} className="h-12 w-12" />
               <span className="text-2xl font-bold">
                 Oro<span className="text-gold">Boats</span>
               </span>
@@ -164,18 +166,18 @@ export function Footer() {
 
             <div className="flex items-center space-x-6">
               <span className="text-gray-400 font-medium mr-4">{t.follow}</span>
-              <a href="https://www.facebook.com/oroboats/" className="text-gray-400 hover:text-gold transition-colors duration-300">
+              <a
+                href="https://www.facebook.com/oroboats/"
+                className="text-gray-400 hover:text-gold transition-colors duration-300"
+              >
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="https://www.instagram.com/oroboats" className="text-gray-400 hover:text-gold transition-colors duration-300">
+              <a
+                href="https://www.instagram.com/oroboats"
+                className="text-gray-400 hover:text-gold transition-colors duration-300"
+              >
                 <Instagram className="h-5 w-5" />
               </a>
-              {/*<a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
-                <Twitter className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-gold transition-colors duration-300">
-                <Youtube className="h-5 w-5" />
-              </a>*/}
             </div>
           </div>
         </div>

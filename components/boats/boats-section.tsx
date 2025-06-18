@@ -79,6 +79,7 @@ interface Vehicle {
   available: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  manualDeposit?: number
   isAvailable?: boolean
 }
 
@@ -144,19 +145,19 @@ const translations = {
   es: {
     title: "Nuestra Flota",
     subtitle: "Motos de agua y barcos para experiencias inolvidables",
-    withLicense: "Con Licencia",
-    withoutLicense: "Sin Licencia",
+    withLicense: "CON LICENCIA",
+    withoutLicense: "SIN LICENCIA",
     reserve: "Reservar",
     from: "Desde",
     capacity: "Capacidad",
     includes: "Incluye",
     available: "Disponible",
-    fuelSeparate: "Gasolina aparte",
-    fuelIncluded: "Gasolina incluida",
+    fuelSeparate: "GASOLINA APARTE",
+    fuelIncluded: "GASOLINA INCLUIDA",
     noVehicles: "No hay vehículos disponibles en esta categoría",
     loading: "Cargando...",
-    licenseRequired: "Licencia requerida",
-    noLicenseNeeded: "Sin licencia",
+    licenseRequired: "LICENCIA REQUERIDA",
+    noLicenseNeeded: "SIN LICENCIA",
     restrictedHours: "Horario restringido",
     restrictedInfo: "Motos sin licencia: No disponible de 14:00 a 16:00 (descanso del personal)",
     licenseWarningTitle: "Licencia de Navegación Requerida",
@@ -209,12 +210,12 @@ const translations = {
     capacity: "Capacity",
     includes: "Includes",
     available: "Available",
-    fuelSeparate: "Fuel separate",
-    fuelIncluded: "Fuel included",
+    fuelSeparate: "FUEL SEPARATE",
+    fuelIncluded: "FUEL INCLUDED",
     noVehicles: "No vehicles available in this category",
     loading: "Loading...",
-    licenseRequired: "License required",
-    noLicenseNeeded: "No license needed",
+    licenseRequired: "LICENSE REQUIRED",
+    noLicenseNeeded: "NO LICENSE NEEDED",
     restrictedHours: "Restricted hours",
     restrictedInfo: "Jet skis without license: Not available from 14:00 to 16:00 (staff break)",
     licenseWarningTitle: "Navigation License Required",
@@ -326,17 +327,20 @@ function LicenseWarningModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full mx-4 shadow-xl">
-        <div className="p-6">
+      <div className="bg-white rounded-lg max-w-md w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className="bg-blue-100 p-2 rounded-full mr-3">
-                <FileText className="h-6 w-6 text-blue-600" />
+            <div className="flex items-center flex-1 min-w-0">
+              <div className="bg-blue-100 p-2 rounded-full mr-3 flex-shrink-0">
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
               </div>
-              <h3 className="text-lg font-bold text-black">{t.licenseWarningTitle}</h3>
+              <h3 className="text-base sm:text-lg font-bold text-black truncate">{t.licenseWarningTitle}</h3>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1 ml-2 flex-shrink-0"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -367,18 +371,21 @@ function LicenseWarningModal({
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="flex gap-3">
+          {/* Buttons - ARREGLADO PARA MÓVIL */}
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button
               variant="outline"
               onClick={onClose}
-              className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+              className="w-full sm:flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 py-3"
             >
               {t.cancel}
             </Button>
-            <Button onClick={onContinue} className="flex-1 bg-blue-600 text-white hover:bg-blue-700">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              {t.continueReservation}
+            <Button
+              onClick={onContinue}
+              className="w-full sm:flex-1 bg-blue-600 text-white hover:bg-blue-700 py-3 text-sm sm:text-base"
+            >
+              <CheckCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+              <span className="truncate">{t.continueReservation}</span>
             </Button>
           </div>
         </div>
@@ -681,24 +688,12 @@ export function BoatsSection() {
                 {/* Pestaña Sin Licencia */}
                 <button
                   onClick={() => setActiveLicense("without")}
-                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${
-                    activeLicense === "without"
+                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${activeLicense === "without"
                       ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-r-2 border-gold shadow-xl"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-r border-gray-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-center">
-                    <div
-                      className={`p-2 sm:p-3 rounded-full mr-2 sm:mr-3 ${
-                        activeLicense === "without"
-                          ? "bg-gradient-to-r from-blue-500 to-cyan-500"
-                          : "bg-white shadow-sm"
-                      }`}
-                    >
-                      <Waves
-                        className={`h-4 w-4 sm:h-5 sm:w-5 ${activeLicense === "without" ? "text-white" : "text-blue-500"}`}
-                      />
-                    </div>
                     <div className="text-left">
                       <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withoutLicense}</h3>
                       <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withoutLicenseDesc}</p>
@@ -720,22 +715,12 @@ export function BoatsSection() {
                 {/* Pestaña Con Licencia */}
                 <button
                   onClick={() => setActiveLicense("with")}
-                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${
-                    activeLicense === "with"
+                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${activeLicense === "with"
                       ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-l-2 border-gold shadow-xl"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-l border-gray-300"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-center">
-                    <div
-                      className={`p-2 sm:p-3 rounded-full mr-2 sm:mr-3 ${
-                        activeLicense === "with" ? "bg-gradient-to-r from-purple-500 to-blue-500" : "bg-white shadow-sm"
-                      }`}
-                    >
-                      <Anchor
-                        className={`h-4 w-4 sm:h-5 sm:w-5 ${activeLicense === "with" ? "text-white" : "text-purple-500"}`}
-                      />
-                    </div>
                     <div className="text-left">
                       <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withLicense}</h3>
                       <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withLicenseDesc}</p>
@@ -758,9 +743,8 @@ export function BoatsSection() {
               {/* Indicador adicional móvil - Más compacto */}
               <div className="mt-3 text-center sm:hidden">
                 <div
-                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                    activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
-                  }`}
+                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
+                    }`}
                 >
                   {activeLicense === "without" ? (
                     <>
@@ -881,7 +865,7 @@ function VehicleCard({
   return (
     <Card
       className="bg-white border border-gray-200 hover:border-gold hover:shadow-lg transition-all duration-300 group overflow-hidden flex flex-col h-full cursor-pointer"
-      onClick={handleCardClick} // ✅ NUEVO: Hacer toda la tarjeta clickable
+      onClick={handleCardClick}
     >
       <div className="relative">
         <div className="w-full h-72 bg-gray-50 flex items-center justify-center overflow-hidden">
@@ -912,27 +896,29 @@ function VehicleCard({
           )}
         </Badge>
 
-        {/* Badge de licencia */}
-        <Badge
-          className={`absolute top-4 left-4 font-semibold ${
-            vehicle.requiresLicense ? "bg-blue-600 text-white" : "bg-green-600 text-white"
-          }`}
-        >
-          {vehicle.requiresLicense ? t.licenseRequired : t.noLicenseNeeded}
-        </Badge>
+        {/* ✅ ARREGLO: Badges horizontales en línea */}
+        <div className="absolute top-4 left-4 flex gap-2">
+          {/* Badge de licencia */}
+          <Badge
+            className={`font-semibold ${vehicle.requiresLicense ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+              }`}
+          >
+            {vehicle.requiresLicense ? t.licenseRequired : t.noLicenseNeeded}
+          </Badge>
 
-        {/* Badge de gasolina */}
-        {vehicle.fuelIncluded ? (
-          <Badge className="absolute top-16 left-4 bg-green-500 text-white font-semibold">
-            <Fuel className="h-3 w-3 mr-1" />
-            {t.fuelIncluded}
-          </Badge>
-        ) : (
-          <Badge className="absolute top-16 left-4 bg-orange-500 text-white font-semibold">
-            <Fuel className="h-3 w-3 mr-1" />
-            {t.fuelSeparate}
-          </Badge>
-        )}
+          {/* Badge de gasolina */}
+          {vehicle.fuelIncluded ? (
+            <Badge className="bg-green-500 text-white font-semibold">
+              <Fuel className="h-3 w-3 mr-1" />
+              {t.fuelIncluded}
+            </Badge>
+          ) : (
+            <Badge className="bg-orange-500 text-white font-semibold">
+              <Fuel className="h-3 w-3 mr-1" />
+              {t.fuelSeparate}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <CardHeader className="pb-4">
@@ -1057,6 +1043,12 @@ function VehicleCard({
                 </div>
                 <Badge className="bg-blue-600 text-white text-sm">€{vehicle.securityDeposit}</Badge>
               </div>
+            </div>
+          )}
+
+          {vehicle.manualDeposit && vehicle.manualDeposit > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
+              <span className="text-sm text-yellow-800 font-medium">Fianza a dejar en el sitio: €{vehicle.manualDeposit}</span>
             </div>
           )}
         </div>

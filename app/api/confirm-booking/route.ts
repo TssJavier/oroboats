@@ -1,220 +1,223 @@
 import { type NextRequest, NextResponse } from "next/server"
 import stripe from "@/lib/stripe-config"
-import { createBooking } from "@/lib/db/queries"
 import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
-import { db } from "@/lib/db"
-import { discountCodes, discountUsage } from "@/lib/db/schema"
-import { eq, sql } from "drizzle-orm"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
-    const { paymentIntentId, paymentType = "full_payment", amountPaid, amountPending } = await request.json()
-    console.log("🔍 Confirming booking for payment:", paymentIntentId, { paymentType, amountPaid, amountPending })
+    const body = await request.json()
+    const {
+      paymentIntentId,
+      depositPaymentIntentId,
+      paymentType = "full_payment",
+      amountPaid,
+      amountPending,
+      liabilityWaiverId,
+    } = body
 
-    // Verificar el pago en Stripe
+    console.log("🔍 Confirming booking for payment:", paymentIntentId, {
+      depositPaymentIntentId,
+      paymentType,
+      amountPaid,
+      amountPending,
+      liabilityWaiverId,
+    })
+
     if (!stripe) {
       return NextResponse.json({ error: "Stripe configuration error" }, { status: 500 })
     }
 
-    // ✅ CORREGIDO: No intentar expandir metadata, no es un campo expandible
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
-
-    if (paymentIntent.status !== "succeeded") {
-      return NextResponse.json({ error: "Payment not completed" }, { status: 400 })
-    }
-
-    // ✅ MOSTRAR TODOS LOS METADATOS PARA DEBUGGING
-    console.log("🔍 Payment intent metadata:", paymentIntent.metadata)
-
-    // Extraer datos de reserva del metadata
-    const bookingData = JSON.parse(paymentIntent.metadata.bookingData || "{}")
-    console.log("📅 Creating booking with confirmed payment:", bookingData)
-    console.log("🔍 Liability Waiver ID in booking data:", bookingData.liabilityWaiverId)
-
-    // ✅ EXTRAER DATOS DE PAGO PARCIAL DE LOS METADATOS DE STRIPE
-    // Priorizar los metadatos directos sobre los anidados en bookingData
-    const paymentTypeFromMetadata =
-      paymentIntent.metadata.paymentType || bookingData.paymentType || paymentType || "full_payment"
-    const amountPaidFromMetadata =
-      Number.parseFloat(paymentIntent.metadata.amountPaid || "0") ||
-      bookingData.amountPaid ||
-      amountPaid ||
-      bookingData.finalAmount
-    const amountPendingFromMetadata =
-      Number.parseFloat(paymentIntent.metadata.amountPending || "0") || bookingData.amountPending || amountPending || 0
-
-    console.log("💰 Payment details from Stripe metadata:", {
-      paymentType: paymentTypeFromMetadata,
-      amountPaid: amountPaidFromMetadata,
-      amountPending: amountPendingFromMetadata,
+    // ✅ OBTENER DATOS DEL PAYMENT INTENT PRINCIPAL
+    const mainPaymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
+    console.log("💳 Main Payment Intent retrieved:", {
+      id: mainPaymentIntent.id,
+      amount: mainPaymentIntent.amount / 100,
+      status: mainPaymentIntent.status,
+      paymentType: mainPaymentIntent.metadata.paymentType,
+      chargedAmount: mainPaymentIntent.metadata.chargedAmount,
+      totalRentalAmount: mainPaymentIntent.metadata.totalRentalAmount,
+      remainingAmount: mainPaymentIntent.metadata.remainingAmount,
     })
 
-    // ✅ AÑADIR CAMPOS DE PAGO PARCIAL
-    const paymentLocation = amountPendingFromMetadata > 0 ? "mixed" : "online"
-
-    // ✅ AÑADIR LIABILITY WAIVER ID DIRECTAMENTE A LOS DATOS DE RESERVA
-    const finalBookingData = {
-      ...bookingData,
-      paymentId: paymentIntentId,
-      paymentStatus: "completed",
-      status: "confirmed",
-      liability_waiver_id: bookingData.liabilityWaiverId ? Number(bookingData.liabilityWaiverId) : null,
-      // ✅ CORREGIDO: Usar datos de los metadatos de Stripe y los parámetros de la solicitud
-      payment_type: paymentTypeFromMetadata,
-      amount_paid: amountPaidFromMetadata,
-      amount_pending: amountPendingFromMetadata,
-      payment_location: paymentLocation,
+    // ✅ VERIFICAR PAGO PRINCIPAL
+    if (mainPaymentIntent.status !== "succeeded") {
+      return NextResponse.json({ error: "Main payment not completed" }, { status: 400 })
     }
 
-    // ✅ MOSTRAR DATOS COMPLETOS PARA DEBUG
-    console.log("🔍 DB: Creating booking with data:", JSON.stringify(finalBookingData, null, 2))
-    console.log("🔍 DB: timeSlot value:", finalBookingData.timeSlot)
-    console.log("🔍 DB: payment_type value:", finalBookingData.payment_type)
+    // ✅ CONFIRMAR DEPOSIT PAYMENT INTENT (solo para pago completo)
+    const securityDeposit = Number.parseFloat(mainPaymentIntent.metadata.securityDeposit || "0")
 
-    // Crear la reserva en la base de datos
-    const booking = await createBooking(finalBookingData)
-    console.log("✅ DB: Booking created successfully:", booking)
-    console.log("✅ Booking created after payment:", booking[0])
-
-    // ✅ VERIFICAR QUE EL PAYMENT_TYPE SE GUARDÓ CORRECTAMENTE
-    if (booking[0]) {
-      console.log("🔍 Verification: Payment type saved as:", booking[0].payment_type)
-
-      // Double-check con una query directa
-      const verificationQuery = await db.execute(sql`
-        SELECT payment_type, amount_paid, amount_pending 
-        FROM bookings 
-        WHERE id = ${booking[0].id}
-      `)
-      console.log("🔍 Direct DB verification:", verificationQuery[0])
-    }
-
-    // ✅ ACTUALIZAR EL LIABILITY_WAIVER_ID EN LA RESERVA
-    if (bookingData.liabilityWaiverId && booking[0]) {
+    if (
+      depositPaymentIntentId &&
+      securityDeposit > 0 &&
+      mainPaymentIntent.payment_method &&
+      paymentType === "full_payment"
+    ) {
       try {
-        const bookingId = Number(booking[0].id)
-        const waiverId = Number(bookingData.liabilityWaiverId)
+        console.log("🛡️ Confirming deposit authorization:", depositPaymentIntentId)
 
-        console.log(`🔗 Updating booking ${bookingId} with liability waiver ${waiverId}`)
+        const depositIntent = await stripe.paymentIntents.retrieve(depositPaymentIntentId)
+        console.log("🔍 Current deposit intent status:", depositIntent.status)
 
-        // ✅ USAR SQL DIRECTO PARA ASEGURAR LA ACTUALIZACIÓN
-        await db.execute(sql`
-          UPDATE bookings 
-          SET liability_waiver_id = ${waiverId}
-          WHERE id = ${bookingId}
-        `)
-
-        // También actualizar el waiver con el booking_id
-        await db.execute(sql`
-          UPDATE liability_waivers 
-          SET booking_id = ${bookingId}
-          WHERE id = ${waiverId}
-        `)
-
-        console.log("✅ Liability waiver association updated successfully")
-      } catch (error) {
-        console.error("❌ Error updating liability waiver association:", error)
-      }
-    } else {
-      console.log("⚠️ No liability waiver ID provided or booking creation failed")
-    }
-
-    // Actualizar código de descuento si se usó
-    if (bookingData.discountCode && booking[0]) {
-      try {
-        const discountCode = await db.query.discountCodes.findFirst({
-          where: eq(discountCodes.code, bookingData.discountCode),
-        })
-
-        if (discountCode) {
-          await db
-            .update(discountCodes)
-            .set({
-              usedCount: (discountCode.usedCount ?? 0) + 1,
-            })
-            .where(eq(discountCodes.id, discountCode.id))
-
-          // ✅ CORREGIR TIPOS Y NOMBRES DE COLUMNAS
-          await db.insert(discountUsage).values({
-            discountCodeId: Number(discountCode.id), // Asegurar que es number
-            bookingId: Number(booking[0].id), // Asegurar que es number
-            customerEmail: String(bookingData.customerEmail), // Asegurar que es string
-            discountAmount: String(bookingData.discountAmount || 0), // Asegurar que es string
-            usedAt: new Date(), // Añadir timestamp
+        if (depositIntent.status === "requires_payment_method") {
+          const confirmedDepositIntent = await stripe.paymentIntents.confirm(depositPaymentIntentId, {
+            payment_method: mainPaymentIntent.payment_method as string,
+            return_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://oroboats.com"}/admin/bookings`,
           })
 
-          console.log("✅ Discount code usage recorded successfully")
+          console.log("✅ Deposit intent confirmed:", {
+            id: confirmedDepositIntent.id,
+            status: confirmedDepositIntent.status,
+            amount: confirmedDepositIntent.amount / 100,
+          })
         }
-      } catch (error) {
-        console.error("⚠️ Error updating discount code:", error)
+      } catch (depositError: any) {
+        console.error("❌ Error confirming deposit authorization:", depositError)
+        console.warn("⚠️ Continuing without deposit confirmation")
       }
     }
 
-    // Obtener nombre del vehículo
-    let vehicleName = "Vehículo"
-    try {
-      const vehicleData = await db.query.vehicles.findFirst({
-        where: (vehicles, { eq }) => eq(vehicles.id, Number(bookingData.vehicleId)),
-      })
-      vehicleName = vehicleData?.name || "Vehículo"
-    } catch (error) {
-      console.error("⚠️ Error fetching vehicle data:", error)
-    }
+    // ✅ EXTRAER DATOS DEL METADATA CON MONTOS CORRECTOS
+    const metadata = mainPaymentIntent.metadata
+    console.log("🔍 Payment metadata:", metadata)
 
-    // ✅ PREPARAR DATOS PARA EMAILS
-    const emailData = {
-      bookingId: Number(booking[0].id),
-      customerName: bookingData.customerName,
-      customerEmail: bookingData.customerEmail,
-      customerPhone: bookingData.customerPhone,
-      vehicleName: vehicleName,
-      bookingDate: bookingData.bookingDate,
-      startTime: bookingData.startTime,
-      endTime: bookingData.endTime,
-      totalPrice: bookingData.totalPrice,
-      discountAmount: bookingData.discountAmount > 0 ? bookingData.discountAmount : undefined,
-      originalPrice: bookingData.discountAmount > 0 ? bookingData.originalPrice : undefined,
-      discountCode: bookingData.discountCode || undefined,
-      securityDeposit: bookingData.securityDeposit || 0,
-      // ✅ CORREGIDO: Usar datos de los metadatos de Stripe
-      paymentType: paymentTypeFromMetadata,
-      amountPaid: amountPaidFromMetadata,
-      amountPending: amountPendingFromMetadata,
-    }
+    const finalLiabilityWaiverId = liabilityWaiverId || metadata.liabilityWaiverId || null
 
-    console.log("📧 Preparing to send booking emails with data:", {
-      bookingId: emailData.bookingId,
-      customerEmail: emailData.customerEmail,
-      vehicleName: emailData.vehicleName,
-      paymentType: emailData.paymentType,
-      amountPaid: emailData.amountPaid,
-      amountPending: emailData.amountPending,
+    // ✅ ARREGLO CRÍTICO: USAR MONTOS CORRECTOS SEGÚN TIPO DE PAGO
+    const totalRentalAmount = metadata.totalRentalAmount || metadata.rentalAmount || "0"
+    const actualAmountPaid = metadata.chargedAmount || (mainPaymentIntent.amount / 100).toString()
+    const actualAmountPending = metadata.remainingAmount || "0"
+
+    console.log("💰 BOOKING AMOUNTS:", {
+      totalRentalAmount,
+      actualAmountPaid,
+      actualAmountPending,
+      paymentType,
+      securityDeposit,
     })
 
-    // ✅ ENVIAR EMAILS DE RESERVA (NO BLOQUEAR SI FALLAN)
-    try {
-      console.log("📧 Sending admin notification...")
-      const adminResult = await sendAdminNotification(emailData)
-      console.log("📧 Admin notification result:", adminResult)
-    } catch (error) {
-      console.error("❌ Error sending admin notification:", error)
+    const bookingData = {
+      customer_name: metadata.customerName || "Unknown",
+      customer_email: metadata.customerEmail || "unknown@email.com",
+      customer_phone: metadata.customerPhone || "",
+      vehicle_id: Number.parseInt(metadata.vehicleId || "1"),
+      vehicle_name: metadata.vehicleName || "Unknown Vehicle",
+      booking_date: metadata.bookingDate || new Date().toISOString().split("T")[0],
+      time_slot: `${metadata.startTime || "10:00"}-${metadata.endTime || "14:00"}`,
+      start_time: metadata.startTime || "10:00",
+      end_time: metadata.endTime || "14:00",
+      duration: "4 horas",
+      total_price: totalRentalAmount, // ✅ PRECIO TOTAL DEL ALQUILER
+      security_deposit: metadata.securityDeposit || "0",
+      status: "confirmed",
+      payment_status: paymentType === "partial_payment" ? "partial_paid" : "completed",
+      inspection_status: "pending",
+      payment_id: paymentIntentId,
+      deposit_payment_intent_id: depositPaymentIntentId,
+      payment_type: paymentType,
+      amount_paid: actualAmountPaid, // ✅ MONTO REALMENTE PAGADO
+      amount_pending: actualAmountPending, // ✅ MONTO PENDIENTE
+      liability_waiver_id: finalLiabilityWaiverId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
+    // ✅ VALIDACIÓN DE DATOS CRÍTICOS
+    const requiredFields: (keyof typeof bookingData)[] = [
+      "customer_name",
+      "customer_email",
+      "vehicle_id",
+      "booking_date",
+    ]
+    const missingFields = requiredFields.filter((field) => !bookingData[field])
+
+    if (missingFields.length > 0) {
+      console.error("❌ Missing required booking data:", missingFields)
+      return NextResponse.json(
+        {
+          error: "Missing required booking data",
+          missingFields,
+        },
+        { status: 400 },
+      )
+    }
+
+    console.log("💾 Creating booking with CORRECTED amounts:", {
+      totalPrice: bookingData.total_price,
+      amountPaid: bookingData.amount_paid,
+      amountPending: bookingData.amount_pending,
+      paymentType: bookingData.payment_type,
+      paymentStatus: bookingData.payment_status,
+    })
+
+    const { data: newBooking, error: newBookingError } = await supabase
+      .from("bookings")
+      .insert([bookingData])
+      .select()
+      .single()
+
+    if (newBookingError) {
+      console.error("❌ Error creating booking:", newBookingError)
+      return NextResponse.json({ error: "Failed to create booking" }, { status: 500 })
+    }
+
+    console.log("✅ Booking created successfully:", {
+      id: newBooking.id,
+      totalPrice: newBooking.total_price,
+      amountPaid: newBooking.amount_paid,
+      amountPending: newBooking.amount_pending,
+      paymentType: newBooking.payment_type,
+    })
+
+    // ✅ ENVIAR EMAILS CON MONTOS CORRECTOS
     try {
-      console.log("📧 Sending customer confirmation...")
-      const customerResult = await sendCustomerConfirmation(emailData)
-      console.log("📧 Customer confirmation result:", customerResult)
-    } catch (error) {
-      console.error("❌ Error sending customer confirmation:", error)
+      const emailData = {
+        bookingId: Number(newBooking.id),
+        customerName: bookingData.customer_name,
+        customerEmail: bookingData.customer_email,
+        customerPhone: bookingData.customer_phone,
+        vehicleName: bookingData.vehicle_name,
+        bookingDate: bookingData.booking_date,
+        startTime: bookingData.start_time,
+        endTime: bookingData.end_time,
+        totalPrice: Number(bookingData.total_price),
+        securityDeposit: Number(bookingData.security_deposit),
+        paymentType: paymentType,
+        amountPaid: Number(bookingData.amount_paid), // ✅ MONTO CORRECTO
+        amountPending: Number(bookingData.amount_pending), // ✅ MONTO CORRECTO
+      }
+
+      await sendAdminNotification(emailData)
+      await sendCustomerConfirmation(emailData)
+      console.log("✅ Booking emails sent with correct amounts")
+    } catch (emailError) {
+      console.error("⚠️ Error sending emails:", emailError)
     }
 
     return NextResponse.json({
       success: true,
-      booking: booking[0],
-      message: "Reserva confirmada y pago procesado exitosamente",
+      bookingId: newBooking.id,
+      message: "Reserva confirmada con montos correctos",
+      paymentInfo: {
+        mainPaymentId: paymentIntentId,
+        depositPaymentId: depositPaymentIntentId || null,
+        totalRentalAmount: Number(totalRentalAmount),
+        amountPaid: Number(actualAmountPaid),
+        amountPending: Number(actualAmountPending),
+        paymentType: paymentType,
+        liabilityWaiverId: finalLiabilityWaiverId,
+      },
     })
   } catch (error) {
     console.error("❌ Error confirming booking:", error)
-    return NextResponse.json({ error: "Failed to confirm booking" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Failed to confirm booking",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

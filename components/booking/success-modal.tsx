@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Calendar, Clock, Mail, CreditCard, Shield, MapPin } from "lucide-react"
+import { CheckCircle, Calendar, Clock, Mail, CreditCard, Shield, MapPin, X } from "lucide-react"
 import { OroLoading } from "@/components/ui/oro-loading"
 
 interface SuccessModalProps {
@@ -38,11 +38,10 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
     setNavigationLoading(true)
     setIsVisible(false)
 
-    // Mostrar loading antes de navegar
     setTimeout(() => {
       onClose()
       setNavigationLoading(false)
-    }, 1500) // Esperar 1.5 segundos antes de navegar
+    }, 1000)
   }
 
   if (!isOpen) return null
@@ -58,22 +57,30 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
   }
 
   const formatTime = (time: string) => {
-    return time.substring(0, 5) // Remove seconds if present
+    return time.substring(0, 5)
   }
 
-  // Determinar si es pago parcial
   const isPartialPayment = bookingData.paymentType === "partial_payment"
+
+  // ✅ ARREGLO: Calcular el precio total correctamente
+  const displayTotalPrice = bookingData.totalPrice || 0
+  const displayAmountPaid = isPartialPayment ? bookingData.amountPaid || 0 : displayTotalPrice
+  const displayAmountPending = isPartialPayment ? bookingData.amountPending || 0 : 0
+
+  console.log("🔍 Success Modal Debug:", {
+    totalPrice: bookingData.totalPrice,
+    amountPaid: bookingData.amountPaid,
+    amountPending: bookingData.amountPending,
+    paymentType: bookingData.paymentType,
+    isPartialPayment,
+    displayTotalPrice,
+    displayAmountPaid,
+    displayAmountPending,
+  })
 
   return (
     <>
-      {/* Modal con z-index máximo y centrado perfecto */}
-      <div
-        className="fixed inset-0 z-[99999] flex items-center justify-center p-0"
-        style={{
-          touchAction: "none", // Prevenir scroll en dispositivos táctiles
-        }}
-      >
-        {/* Overlay */}
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
         <div
           className={`absolute inset-0 bg-black transition-opacity duration-300 ${
             isVisible ? "opacity-50" : "opacity-0"
@@ -81,155 +88,149 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
           onClick={handleClose}
         />
 
-        {/* Modal con ancho optimizado y centrado */}
         <Card
-          className={`relative w-[98%] max-w-[400px] transform transition-all duration-300 ${
+          className={`relative w-full max-w-sm transform transition-all duration-300 ${
             isVisible ? "scale-100 opacity-100" : "scale-95 opacity-0"
-          } max-h-[90vh] overflow-y-auto ml-[10px] mr-[90px] `}
+          } max-h-[85vh] overflow-y-auto`}
         >
-          {/* Para moverlo horizontalmente: cambia el valor de `mx-auto` por márgenes específicos como `ml-[valor]` o `mr-[valor]` */}
           <CardContent className="p-0">
-            {/* Header */}
-            <div className="bg-gold p-5 text-center rounded-t-lg">
+            {/* Header compacto con gradiente */}
+            <div className="bg-gradient-to-r from-gold via-yellow-400 to-gold p-4 text-center rounded-t-lg relative">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleClose}
-                className="absolute top-2 right-2 text-black hover:bg-black/10"
+                className="absolute top-2 right-2 text-black hover:bg-black/10 h-6 w-6 p-0"
               >
-                ✕
+                <X className="h-4 w-4" />
               </Button>
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white">
-                <CheckCircle className="h-6 w-6 text-green-600" />
+              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white">
+                <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
-              <h2 className="text-xl font-bold text-black mb-1">¡Reserva Confirmada!</h2>
-              <p className="text-black/80 text-sm">Tu reserva ha sido procesada exitosamente</p>
+              <h2 className="text-lg font-bold text-black mb-1">¡Reserva Confirmada!</h2>
+              <p className="text-black/80 text-xs">Procesada exitosamente</p>
             </div>
 
-            {/* Contenido con padding optimizado */}
-            <div className="p-5 space-y-4">
-              {/* Booking details - Estructura más compacta */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <span className="font-medium text-sm">Fecha:</span>
-                    <div className="text-gray-800 text-sm">{formatDate(bookingData.bookingDate)}</div>
+            {/* Contenido en grid compacto */}
+            <div className="p-4 space-y-3">
+              {/* Info principal en grid 2x2 */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Fecha */}
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <div className="flex items-center mb-1">
+                    <Calendar className="h-3 w-3 text-blue-600 mr-1" />
+                    <span className="text-xs font-medium text-blue-800">Fecha</span>
                   </div>
+                  <p className="text-xs text-blue-700 font-semibold">{formatDate(bookingData.bookingDate)}</p>
                 </div>
 
-                <div className="flex items-start gap-2">
-                  <Clock className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <span className="font-medium text-sm">Horario:</span>
-                    <div className="text-gray-800 text-sm">
-                      {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
-                    </div>
+                {/* Horario */}
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <div className="flex items-center mb-1">
+                    <Clock className="h-3 w-3 text-green-600 mr-1" />
+                    <span className="text-xs font-medium text-green-800">Horario</span>
                   </div>
+                  <p className="text-xs text-green-700 font-semibold">
+                    {formatTime(bookingData.startTime)} - {formatTime(bookingData.endTime)}
+                  </p>
                 </div>
 
-                {bookingData.vehicleName && (
-                  <div className="flex items-start gap-2">
-                    <div className="w-4 flex-shrink-0" /> {/* Espacio para alineación */}
-                    <div>
-                      <span className="font-medium text-sm">Vehículo:</span>
-                      <div className="text-gray-800 text-sm">{bookingData.vehicleName}</div>
-                    </div>
+                {/* Precio pagado */}
+                <div className="bg-purple-50 p-3 rounded-lg">
+                  <div className="flex items-center mb-1">
+                    <CreditCard className="h-3 w-3 text-purple-600 mr-1" />
+                    <span className="text-xs font-medium text-purple-800">
+                      {isPartialPayment ? "Pagado ahora" : "Total pagado"}
+                    </span>
                   </div>
-                )}
-
-                <div className="flex items-start gap-2">
-                  <CreditCard className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <span className="font-medium text-sm">Precio del alquiler:</span>
-                    <div className="text-gray-800 font-semibold text-sm">€{bookingData.totalPrice}</div>
-                  </div>
+                  <p className="text-xs text-purple-700 font-bold">€{displayAmountPaid}</p>
                 </div>
 
-                {/* Información de pago parcial */}
-                {isPartialPayment && typeof bookingData.amountPaid === "number" && (
-                  <div className="flex items-start gap-2">
-                    <CreditCard className="h-4 w-4 text-green-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <span className="font-medium text-sm">Pagado ahora:</span>
-                      <div className="text-green-600 font-semibold text-sm">€{bookingData.amountPaid}</div>
+                {/* Pendiente o Fianza */}
+                {isPartialPayment && displayAmountPending > 0 ? (
+                  <div className="bg-orange-50 p-3 rounded-lg">
+                    <div className="flex items-center mb-1">
+                      <MapPin className="h-3 w-3 text-orange-600 mr-1" />
+                      <span className="text-xs font-medium text-orange-800">Pendiente</span>
                     </div>
+                    <p className="text-xs text-orange-700 font-bold">€{displayAmountPending}</p>
                   </div>
-                )}
-
-                {/* Monto pendiente */}
-                {isPartialPayment && typeof bookingData.amountPending === "number" && bookingData.amountPending > 0 && (
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-orange-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <span className="font-medium text-sm">A pagar en sitio:</span>
-                      <div className="text-orange-600 font-semibold text-sm">€{bookingData.amountPending}</div>
+                ) : bookingData.securityDeposit && bookingData.securityDeposit > 0 ? (
+                  <div className="bg-cyan-50 p-3 rounded-lg">
+                    <div className="flex items-center mb-1">
+                      <Shield className="h-3 w-3 text-cyan-600 mr-1" />
+                      <span className="text-xs font-medium text-cyan-800">Fianza</span>
                     </div>
+                    <p className="text-xs text-cyan-700 font-bold">€{bookingData.securityDeposit}</p>
                   </div>
-                )}
-
-                {/* Security deposit info */}
-                {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Shield className="h-4 w-4 text-blue-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <span className="font-medium text-sm">Fianza (reembolsable):</span>
-                      <div className="text-blue-600 font-semibold text-sm">€{bookingData.securityDeposit}</div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-2">
-                  <Mail className="h-4 w-4 text-gray-500 flex-shrink-0 mt-1" />
-                  <div>
-                    <span className="font-medium text-sm">Confirmación enviada a:</span>
-                    <div className="text-gray-800 break-words text-sm">{bookingData.customerEmail}</div>
-                  </div>
-                </div>
+                ) : null}
               </div>
 
-              {/* Información de pago parcial */}
-              {isPartialPayment && typeof bookingData.amountPending === "number" && bookingData.amountPending > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs">
-                      <p className="font-medium text-orange-800">Pago pendiente en sitio</p>
-                      <p className="text-orange-700">
-                        Recuerda que deberás pagar €{bookingData.amountPending} al recoger el vehículo. Puedes pagar con
-                        tarjeta o efectivo.
-                      </p>
-                    </div>
+              {/* ✅ TOTAL DEL ALQUILER - SIEMPRE VISIBLE */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <CreditCard className="h-4 w-4 text-green-600 mr-2" />
+                    <span className="text-sm font-bold text-green-800">Total del alquiler</span>
                   </div>
+                  <p className="text-lg font-bold text-green-700">€{displayTotalPrice}</p>
+                </div>
+                {isPartialPayment && (
+                  <div className="mt-2 text-xs text-green-600">
+                    Pagado: €{displayAmountPaid} | Pendiente: €{displayAmountPending}
+                  </div>
+                )}
+              </div>
+
+              {/* Vehículo */}
+              {bookingData.vehicleName && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs font-medium text-gray-600 mb-1">Vehículo:</p>
+                  <p className="text-sm font-bold text-gray-800">{bookingData.vehicleName}</p>
                 </div>
               )}
 
-              {/* Security deposit information */}
+              {/* Email */}
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <Mail className="h-3 w-3 text-gray-600 mr-1" />
+                  <span className="text-xs font-medium text-gray-600">Confirmación enviada a:</span>
+                </div>
+                <p className="text-xs text-gray-800 break-all">{bookingData.customerEmail}</p>
+              </div>
+
+              {/* Información adicional para pago parcial */}
+              {isPartialPayment && displayAmountPending > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-xs font-medium text-orange-800 mb-1">💰 Pago pendiente en sitio</p>
+                  <p className="text-xs text-orange-700">
+                    Recuerda traer €{displayAmountPending} (efectivo o tarjeta) al recoger el vehículo.
+                  </p>
+                </div>
+              )}
+
+              {/* Información de fianza */}
               {bookingData.securityDeposit && bookingData.securityDeposit > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs">
-                      <p className="font-medium text-blue-800">Información sobre la fianza</p>
-                      <p className="text-blue-700">
-                        La fianza de €{bookingData.securityDeposit} se devolverá al finalizar la reserva, siempre que no
-                        haya daños por uso irresponsable.
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-xs font-medium text-blue-800 mb-1">🛡️ Sobre la fianza</p>
+                  <p className="text-xs text-blue-700">
+                    Se devolverá €{bookingData.securityDeposit} al finalizar si no hay daños.
+                  </p>
                 </div>
               )}
 
-              {/* Additional information */}
+              {/* Nota importante */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <p className="text-xs text-gray-700">
-                  <span className="font-medium">Importante:</span> Revisa tu email para obtener todos los detalles de tu
-                  reserva. Si tienes alguna pregunta, no dudes en contactarnos.
+                  <span className="font-medium">Importante:</span> Revisa tu email para todos los detalles.
                 </p>
               </div>
 
-              {/* Close button */}
-              <Button onClick={handleClose} className="w-full bg-gold text-black hover:bg-black hover:text-white">
+              {/* Botón de cierre */}
+              <Button
+                onClick={handleClose}
+                className="w-full bg-gradient-to-r from-gold to-yellow-500 text-black hover:from-black hover:to-gray-800 hover:text-white font-medium py-2 h-10"
+              >
                 Entendido
               </Button>
             </div>
@@ -237,7 +238,6 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
         </Card>
       </div>
 
-      {/* Indicador de carga durante la navegación */}
       {navigationLoading && <OroLoading />}
     </>
   )

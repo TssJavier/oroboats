@@ -94,6 +94,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
         custom_duration_enabled = ${customDurationEnabled},
         extra_features = ${JSON.stringify(extraFeatures || [])},
         security_deposit = ${Number(securityDeposit) || 0},
+        manualDeposit = ${Number(body.manualDeposit) || 0},
         stock = ${Number(stock) || 1}
       WHERE id = ${id}
       RETURNING *

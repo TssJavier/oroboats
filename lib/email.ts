@@ -3,7 +3,7 @@ import { Resend } from "resend"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "./email-templates"
 
 // Variables para configuración
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "fergsaenz@gmail.com"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@oroboats.com"
 
 // Función para obtener una instancia de Resend con validación
 function getResendClient() {
@@ -53,7 +53,7 @@ export async function sendAdminNotification(booking: BookingEmailData) {
 
     // Enviar email directamente con Resend
     const { data, error } = await resend.emails.send({
-      from: "OroBoats Granada <onboarding@resend.dev>",
+      from: "OroBoats Granada <info@oroboats.com>",
       to: [ADMIN_EMAIL],
       subject: `Nueva reserva #${booking.bookingId} - ${booking.vehicleName}`,
       html: emailHtml,
@@ -85,7 +85,7 @@ export async function sendCustomerConfirmation(booking: BookingEmailData) {
 
     // Enviar email directamente con Resend
     const { data, error } = await resend.emails.send({
-      from: "OroBoats Granada <onboarding@resend.dev>",
+      from: "OroBoats Granada <info@oroboats.com>",
       to: [booking.customerEmail],
       subject: `Confirmación de reserva #${booking.bookingId} - Oro Boats`,
       html: emailHtml,

@@ -41,6 +41,7 @@ interface Vehicle {
   customDurationEnabled: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  manualDeposit?: number
   stock?: number // Nuevo campo para stock/inventario
 }
 
@@ -148,6 +149,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     customDurationEnabled: false,
     extraFeatures: AVAILABLE_EXTRA_FEATURES.map((f) => ({ ...f })),
     securityDeposit: 0,
+    manualDeposit: 0,
     stock: 1, // ✅ NUEVO: Stock por defecto
   })
   const [newInclude, setNewInclude] = useState("")
@@ -160,6 +162,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         ...vehicle,
         extraFeatures: vehicle.extraFeatures || AVAILABLE_EXTRA_FEATURES.map((f) => ({ ...f })),
         securityDeposit: vehicle.securityDeposit || 0,
+        manualDeposit: vehicle.manualDeposit || 0,
         stock: vehicle.stock || 1, // ✅ NUEVO: Cargar stock existente
       })
     }
@@ -190,6 +193,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         availableDurations: formData.pricing.map((p) => p.duration),
         extraFeatures: formData.extraFeatures || [],
         securityDeposit: formData.securityDeposit || 0,
+        manualDeposit: formData.manualDeposit || 0,
         stock: formData.stock || 1, // ✅ NUEVO: Incluir stock
       }
 
@@ -657,6 +661,23 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                   La fianza se retiene temporalmente y se devuelve tras la devolución del vehículo en buen estado
                 </p>
               </div>
+
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fianza manual en sitio (€)</label>
+                <Input
+                  type="number"
+                  value={formData.manualDeposit}
+                  onChange={(e) => setFormData({ ...formData, manualDeposit: Number.parseFloat(e.target.value) })}
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="bg-gray-50 border-gray-200"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Esta fianza se paga en el sitio y no se incluye en el precio online
+                </p>
+              </div>
+
             </CardContent>
           </Card>
 

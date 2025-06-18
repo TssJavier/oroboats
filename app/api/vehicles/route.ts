@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
         custom_duration_enabled as "customDurationEnabled",
         extra_features as "extraFeatures",
         security_deposit as "securityDeposit",
+        manualDeposit as "manualDeposit",
         stock  -- ✅ CAMPO STOCK INCLUIDO
       FROM vehicles
       ${!includeUnavailable ? sql`WHERE available = true` : sql``}
@@ -127,6 +128,8 @@ export async function POST(request: NextRequest) {
       customDurationEnabled,
       extraFeatures,
       securityDeposit,
+      manualDeposit,
+
       stock  // ✅ AÑADIDO: Campo stock
     } = body
 
@@ -155,6 +158,7 @@ export async function POST(request: NextRequest) {
         custom_duration_enabled,
         extra_features,
         security_deposit,
+        manualDeposit,
         stock,
         created_at,
         updated_at
@@ -175,6 +179,7 @@ export async function POST(request: NextRequest) {
         ${customDurationEnabled || false},
         ${JSON.stringify(extraFeatures || [])},
         ${Number(securityDeposit) || 0},
+        ${Number(manualDeposit) || 0},
         ${Number(stock) || 1},
         NOW(),
         NOW()

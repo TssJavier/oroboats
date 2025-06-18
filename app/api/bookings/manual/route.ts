@@ -6,7 +6,7 @@ import { jwtVerify } from "jose"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "@/lib/email-templates"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "fergsaenz@gmail.com"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@oroboats.com"
 
 // ✅ NUEVO: Función para obtener Resend solo cuando se necesite
 function getResend() {
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
         // 1. Email al administrador
         const adminHtml = renderAdminBookingNotification(emailData)
         const adminEmailResult = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>",
+          from: "OroBoats Granada <info@oroboats.com>",
           to: [ADMIN_EMAIL],
           subject: `Nueva reserva manual #${bookingId} - ${vehicleName || vehicle.name}`,
           html: adminHtml,
@@ -308,7 +308,7 @@ export async function POST(request: NextRequest) {
         if (finalEmail && !finalEmail.includes("@manual.booking")) {
           const customerHtml = renderCustomerBookingConfirmation(emailData)
           customerEmailResult = await resend.emails.send({
-            from: "OroBoats Granada <onboarding@resend.dev>",
+            from: "OroBoats Granada <info@oroboats.com>",
             to: [finalEmail],
             subject: `Confirmación de reserva #${bookingId} - OroBoats`,
             html: customerHtml,

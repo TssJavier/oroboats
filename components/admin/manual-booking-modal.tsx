@@ -376,7 +376,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
               </div>
 
               <div>
-                <Label htmlFor="customerEmail">Email (opcional)</Label>
+                <Label htmlFor="customerEmail">Email (obligatorio)</Label>
                 <Input
                   id="customerEmail"
                   type="email"

@@ -59,6 +59,7 @@ interface Vehicle {
   customDurationEnabled: boolean
   extraFeatures?: ExtraFeature[]
   securityDeposit?: number
+  manualDeposit?: number
   stock?: number
 }
 
@@ -397,6 +398,13 @@ export function VehicleManagement() {
           </div>
         )}
 
+        {vehicle.manualDeposit && vehicle.manualDeposit > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
+            <span className="text-sm text-yellow-800 font-medium">Fianza en sitio: €{vehicle.manualDeposit}</span>
+          </div>
+        )}
+
+
         {vehicle.stock && vehicle.stock > 1 && (
           <div className="bg-green-50 border border-green-200 rounded p-2">
             <span className="text-sm text-green-800 font-medium">📦 {vehicle.stock} unidades disponibles</span>
@@ -431,11 +439,10 @@ export function VehicleManagement() {
             onClick={() => toggleAvailability(vehicle)}
             variant="outline"
             size="sm"
-            className={`border-gray-300 ${
-              vehicle.available
+            className={`border-gray-300 ${vehicle.available
                 ? "hover:border-gray-500 hover:text-gray-700"
                 : "hover:border-green-500 hover:text-green-600"
-            }`}
+              }`}
           >
             {vehicle.available ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>

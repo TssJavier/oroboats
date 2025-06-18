@@ -1,128 +1,283 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { db } from "@/lib/db"
-import { bookings } from "@/lib/db/schema"
-import { eq } from "drizzle-orm"
+import { createClient } from "@supabase/supabase-js"
 import stripe from "@/lib/stripe-config"
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const bookingId = Number.parseInt(params.id)
-    const formData = await request.formData()
+    let requestData
+    try {
+      requestData = await request.json()
+    } catch (jsonError) {
+      console.error("❌ JSON parsing error:", jsonError)
+      return NextResponse.json({ error: "Invalid JSON data" }, { status: 400 })
+    }
 
-    const action = formData.get("action") as string
-    const damageDescription = formData.get("damageDescription") as string
-    const damageCost = formData.get("damageCost") as string
+    const { action, damageDescription, damageCost } = requestData
+    const bookingId = params.id
 
-    // Obtener la reserva actual para acceder al ID de pago de la fianza
-    const booking = await db.query.bookings.findFirst({
-      where: eq(bookings.id, bookingId),
+    console.log(`🔄 Processing deposit ${action} for booking ${bookingId}`)
+
+    // Obtener datos de la reserva
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("id", bookingId)
+      .single()
+
+    if (bookingError || !booking) {
+      console.error("❌ Booking not found:", bookingError)
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 })
+    }
+
+    console.log("🔍 Booking found:", {
+      id: booking.id,
+      depositPaymentIntentId: booking.deposit_payment_intent_id,
+      securityDeposit: booking.security_deposit,
+      inspectionStatus: booking.inspection_status,
+      paymentId: booking.payment_id,
     })
 
-    if (!booking) {
-      return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 })
-    }
+    const depositAmount = Number.parseFloat(booking.security_deposit || "0")
 
     if (action === "approve") {
-      // DEVOLUCIÓN AUTOMÁTICA CON STRIPE
-      if (booking.depositPaymentIntentId && stripe) {
+      // ✅ DEVOLVER FIANZA
+      let stripeOperationSuccess = false
+
+      if (booking.deposit_payment_intent_id && stripe) {
         try {
-          console.log(`Procesando devolución para fianza: ${booking.depositPaymentIntentId}`)
+          console.log(`💰 Processing deposit return: ${booking.deposit_payment_intent_id}`)
 
-          // 1. Cancelar la autorización de pago (para fianzas que solo están autorizadas)
-          const paymentIntent = await stripe.paymentIntents.cancel(booking.depositPaymentIntentId, {
-            cancellation_reason: "requested_by_customer",
-          })
+          // ✅ PASO 1: VERIFICAR ESTADO ACTUAL
+          const paymentIntent = await stripe.paymentIntents.retrieve(booking.deposit_payment_intent_id)
+          console.log("🔍 Current deposit payment intent status:", paymentIntent.status)
 
-          console.log("Autorización de fianza cancelada:", paymentIntent.id)
+          if (paymentIntent.status === "requires_payment_method") {
+            // ✅ PASO 2: CONFIRMAR PRIMERO CON EL PAYMENT METHOD DEL PAGO PRINCIPAL
+            console.log("🔄 Deposit was never authorized, confirming first...")
 
-          // 2. Alternativa: Si la fianza ya fue capturada, crear un reembolso
-          // const refund = await stripe.refunds.create({
-          //   payment_intent: booking.depositPaymentIntentId,
-          //   amount: Math.round(Number(booking.securityDeposit) * 100)
-          // })
-          // console.log("Reembolso creado:", refund.id)
-        } catch (stripeError) {
-          console.error("Error al procesar la devolución con Stripe:", stripeError)
-          return NextResponse.json({ error: "Error al procesar la devolución con Stripe" }, { status: 500 })
+            // Obtener el payment method del pago principal
+            const mainPaymentIntent = await stripe.paymentIntents.retrieve(booking.payment_id)
+            console.log("🔍 Main payment method:", mainPaymentIntent.payment_method)
+
+            if (mainPaymentIntent.payment_method) {
+              try {
+                const confirmedIntent = await stripe.paymentIntents.confirm(booking.deposit_payment_intent_id, {
+                  payment_method: mainPaymentIntent.payment_method as string,
+                  return_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://oroboats.com"}/admin/bookings`,
+                })
+
+                console.log("✅ Deposit intent confirmed:", {
+                  id: confirmedIntent.id,
+                  status: confirmedIntent.status,
+                  amount: confirmedIntent.amount / 100,
+                })
+
+                // ✅ PASO 3: CANCELAR DESPUÉS DE CONFIRMAR
+                if (confirmedIntent.status === "requires_capture") {
+                  const cancelledIntent = await stripe.paymentIntents.cancel(booking.deposit_payment_intent_id)
+                  console.log("✅ Deposit authorization canceled after confirmation:", {
+                    id: cancelledIntent.id,
+                    status: cancelledIntent.status,
+                  })
+                  stripeOperationSuccess = true
+                } else if (confirmedIntent.status === "succeeded") {
+                  // Si ya se capturó, crear un refund
+                  const refund = await stripe.refunds.create({
+                    payment_intent: booking.deposit_payment_intent_id,
+                    amount: Math.round(depositAmount * 100),
+                  })
+                  console.log("✅ Deposit refunded:", refund.id)
+                  stripeOperationSuccess = true
+                } else {
+                  console.warn(`⚠️ Unexpected status after confirmation: ${confirmedIntent.status}`)
+                }
+              } catch (confirmError: any) {
+                console.error("❌ Error confirming deposit intent:", confirmError)
+                console.warn("⚠️ Will mark as returned in database only")
+              }
+            } else {
+              console.warn("⚠️ No payment method found in main payment intent")
+            }
+          } else if (paymentIntent.status === "requires_capture") {
+            // ✅ CASO NORMAL: CANCELAR AUTORIZACIÓN
+            const cancelledIntent = await stripe.paymentIntents.cancel(booking.deposit_payment_intent_id)
+            console.log("✅ Deposit authorization canceled:", {
+              id: cancelledIntent.id,
+              status: cancelledIntent.status,
+            })
+            stripeOperationSuccess = true
+          } else if (paymentIntent.status === "succeeded") {
+            // ✅ YA SE CAPTURÓ: CREAR REFUND
+            const refund = await stripe.refunds.create({
+              payment_intent: booking.deposit_payment_intent_id,
+              amount: Math.round(depositAmount * 100),
+            })
+            console.log("✅ Deposit refunded:", refund.id)
+            stripeOperationSuccess = true
+          } else if (paymentIntent.status === "canceled") {
+            console.log("✅ Deposit already canceled")
+            stripeOperationSuccess = true
+          } else {
+            console.warn(`⚠️ Cannot process deposit in status: ${paymentIntent.status}`)
+          }
+        } catch (stripeError: any) {
+          console.error("❌ Stripe error:", stripeError)
+          console.warn("⚠️ Continuing with database update only")
         }
       } else {
-        console.log("No hay ID de pago de fianza o Stripe no está configurado")
+        console.warn("⚠️ No deposit payment intent ID or Stripe not configured")
       }
 
-      // Actualizar estado en la base de datos
-      await db
-        .update(bookings)
-        .set({
-          inspectionStatus: "approved",
-          updatedAt: new Date(),
+      // ✅ ACTUALIZAR BASE DE DATOS
+      const { error: updateError } = await supabase
+        .from("bookings")
+        .update({
+          inspection_status: "approved",
+          deposit_status: "refunded",
+          updated_at: new Date().toISOString(),
         })
-        .where(eq(bookings.id, bookingId))
+        .eq("id", bookingId)
+
+      if (updateError) {
+        console.error("❌ Database update error:", updateError)
+        return NextResponse.json(
+          {
+            error: "Error updating booking",
+            details: updateError.message,
+          },
+          { status: 500 },
+        )
+      }
 
       return NextResponse.json({
         success: true,
-        message: "Fianza aprobada y devuelta al cliente",
+        message: stripeOperationSuccess
+          ? "Fianza devuelta correctamente en Stripe y base de datos"
+          : "Fianza marcada como devuelta en base de datos (Stripe no procesado)",
+        amount: depositAmount,
+        stripeProcessed: stripeOperationSuccess,
       })
     } else if (action === "reject") {
-      // CAPTURAR PAGO DE FIANZA CON STRIPE
-      const cost = damageCost ? Number.parseFloat(damageCost) : 0
+      // ✅ RETENER FIANZA
+      const cost = damageCost ? Number.parseFloat(damageCost) : depositAmount
 
-      if (booking.depositPaymentIntentId && stripe) {
+      if (!damageDescription?.trim()) {
+        return NextResponse.json({ error: "Descripción de daños requerida" }, { status: 400 })
+      }
+
+      let stripeOperationSuccess = false
+
+      if (booking.deposit_payment_intent_id && stripe) {
         try {
-          console.log(`Capturando fianza por daños: ${booking.depositPaymentIntentId}`)
+          console.log(`💰 Processing deposit capture for damages...`)
 
-          // Capturar el pago de la fianza (convertir la autorización en cargo)
-          const captureAmount = Math.min(Math.round(cost * 100), Math.round(Number(booking.securityDeposit) * 100))
+          // ✅ VERIFICAR ESTADO ACTUAL
+          const paymentIntent = await stripe.paymentIntents.retrieve(booking.deposit_payment_intent_id)
+          console.log("🔍 Current deposit payment intent status:", paymentIntent.status)
 
-          if (captureAmount > 0) {
-            const paymentIntent = await stripe.paymentIntents.capture(booking.depositPaymentIntentId, {
-              amount_to_capture: captureAmount,
-            })
+          if (paymentIntent.status === "requires_payment_method") {
+            // ✅ CONFIRMAR PRIMERO
+            console.log("🔄 Confirming deposit intent first...")
 
-            console.log("Fianza capturada por daños:", paymentIntent.id, "Monto:", captureAmount / 100)
+            const mainPaymentIntent = await stripe.paymentIntents.retrieve(booking.payment_id)
 
-            // Si el coste de daños es menor que la fianza, devolver la diferencia
-            const remainingAmount = Math.round(Number(booking.securityDeposit) * 100) - captureAmount
-
-            if (remainingAmount > 0) {
-              // Crear un reembolso parcial por la diferencia
-              const refund = await stripe.refunds.create({
-                payment_intent: booking.depositPaymentIntentId,
-                amount: remainingAmount,
+            if (mainPaymentIntent.payment_method) {
+              const confirmedIntent = await stripe.paymentIntents.confirm(booking.deposit_payment_intent_id, {
+                payment_method: mainPaymentIntent.payment_method as string,
+                return_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://oroboats.com"}/admin/bookings`,
               })
 
-              console.log("Reembolso parcial creado:", refund.id, "Monto:", remainingAmount / 100)
+              console.log("✅ Deposit intent confirmed for capture:", confirmedIntent.status)
+
+              // ✅ CAPTURAR DESPUÉS DE CONFIRMAR
+              if (confirmedIntent.status === "requires_capture") {
+                const captureAmount = Math.min(cost, depositAmount)
+                const captureAmountCents = Math.round(captureAmount * 100)
+
+                const capturedIntent = await stripe.paymentIntents.capture(booking.deposit_payment_intent_id, {
+                  amount_to_capture: captureAmountCents,
+                })
+
+                console.log("✅ Deposit captured successfully:", {
+                  id: capturedIntent.id,
+                  status: capturedIntent.status,
+                  captured: captureAmount,
+                })
+                stripeOperationSuccess = true
+              }
             }
+          } else if (paymentIntent.status === "requires_capture") {
+            // ✅ CASO NORMAL: CAPTURAR DIRECTAMENTE
+            const captureAmount = Math.min(cost, depositAmount)
+            const captureAmountCents = Math.round(captureAmount * 100)
+
+            const capturedIntent = await stripe.paymentIntents.capture(booking.deposit_payment_intent_id, {
+              amount_to_capture: captureAmountCents,
+            })
+
+            console.log("✅ Deposit captured successfully:", {
+              id: capturedIntent.id,
+              status: capturedIntent.status,
+              captured: captureAmount,
+            })
+            stripeOperationSuccess = true
+          } else if (paymentIntent.status === "succeeded") {
+            console.log("✅ Deposit already captured")
+            stripeOperationSuccess = true
           } else {
-            // Si no hay coste, cancelar la autorización
-            await stripe.paymentIntents.cancel(booking.depositPaymentIntentId)
-            console.log("Autorización cancelada (sin daños que cobrar)")
+            console.warn(`⚠️ Cannot capture deposit in status: ${paymentIntent.status}`)
           }
-        } catch (stripeError) {
-          console.error("Error al procesar el cobro de fianza con Stripe:", stripeError)
-          return NextResponse.json({ error: "Error al procesar el cobro de fianza con Stripe" }, { status: 500 })
+        } catch (stripeError: any) {
+          console.error("❌ Stripe capture error:", stripeError)
+          console.warn("⚠️ Continuing with database update only")
         }
       }
 
-      // Actualizar estado en la base de datos
-      await db
-        .update(bookings)
-        .set({
-          inspectionStatus: "damaged",
-          damageDescription: damageDescription,
-          damageCost: cost.toString(),
-          updatedAt: new Date(),
+      // ✅ ACTUALIZAR BASE DE DATOS
+      const { error: updateError } = await supabase
+        .from("bookings")
+        .update({
+          inspection_status: "damaged",
+          deposit_status: "retained",
+          damage_description: damageDescription,
+          damage_cost: cost.toString(),
+          updated_at: new Date().toISOString(),
         })
-        .where(eq(bookings.id, bookingId))
+        .eq("id", bookingId)
+
+      if (updateError) {
+        console.error("❌ Database update error:", updateError)
+        return NextResponse.json(
+          {
+            error: "Error updating booking",
+            details: updateError.message,
+          },
+          { status: 500 },
+        )
+      }
 
       return NextResponse.json({
         success: true,
-        message: "Fianza procesada y daños registrados",
+        message: stripeOperationSuccess
+          ? "Fianza retenida correctamente en Stripe y base de datos"
+          : "Fianza marcada como retenida en base de datos (Stripe no procesado)",
+        captured: Math.min(cost, depositAmount),
+        refunded: Math.max(0, depositAmount - cost),
+        stripeProcessed: stripeOperationSuccess,
       })
     }
 
-    return NextResponse.json({ error: "Acción no válida" }, { status: 400 })
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
   } catch (error) {
-    console.error("Error processing deposit:", error)
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 })
+    console.error("❌ Error processing deposit:", error)
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
   }
 }

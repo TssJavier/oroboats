@@ -9,18 +9,18 @@ import { ChevronDown } from "lucide-react"
 
 const translations = {
   es: {
-    title: "Atrévete a",
-    titleHighlights: ["navegar cada ola", "visitar nuevas calas", "explorar el horizonte", "vivir la aventura"],
-    description: "Descubre la elegancia en cada ola con nuestra flota de barcos y motos de agua.",
-    rentNow: "Alquilar Ahora",
+    title: "", // ❌ ELIMINADO "Atrévete a"
+    titleHighlights: ["Sé diferente", "Be genuine", "Sii diverso", "كن مختلفا", "Soyez différent", "달라지다"], // ✅ NUEVOS TEXTOS
+    //description: "Descubre la elegancia en cada ola con nuestra flota de barcos y motos de agua.",
+    rentNow: "RESERVA AHORA",
     scroll: "Descubre más",
     loadingRent: "Preparando experiencias de alquiler...",
   },
   en: {
-    title: "Dare to",
-    titleHighlights: ["ride every wave", "discover hidden coves", "explore the horizon", "live the adventure"],
-    description: "Discover elegance in every wave with our fleet of luxury boats and jet skis.",
-    rentNow: "Rent Now",
+    title: "", // ❌ ELIMINADO "Dare to"
+    titleHighlights: ["Sé diferente", "Be genuine", "Sii diverso", "كن مختلفا", "Soyez différent", "달라지다"], // ✅ NUEVOS TEXTOS
+    //description: "Discover elegance in every wave with our fleet of luxury boats and jet skis.",
+    rentNow: "RENT NOW",
     scroll: "Discover more",
     loadingRent: "Preparing rental experiences...",
   },
@@ -32,7 +32,8 @@ export function HeroSection() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [currentHighlightIndex, setCurrentHighlightIndex] = useState(0)
-  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [displayedText, setDisplayedText] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // 🎯 CONTROLA EL ZOOM DEL VIDEO AQUÍ
@@ -59,25 +60,35 @@ export function HeroSection() {
     }
   }, [])
 
-  // Text rotation effect
+  // ✨ EFECTO TYPEWRITER LETRA POR LETRA - MÁS RÁPIDO
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsTransitioning(true)
+    const currentPhrase = t.titleHighlights[currentHighlightIndex]
+    let currentIndex = 0
+    setIsTyping(true)
+    setDisplayedText("")
 
-      setTimeout(() => {
-        setCurrentHighlightIndex((prev) => (prev + 1) % t.titleHighlights.length)
-        setIsTransitioning(false)
-      }, 300) // Half of transition duration
-    }, 3000) // Change every 3 seconds
+    // Escribir letra por letra MÁS RÁPIDO
+    const typeInterval = setInterval(() => {
+      if (currentIndex < currentPhrase.length) {
+        setDisplayedText(currentPhrase.slice(0, currentIndex + 1))
+        currentIndex++
+      } else {
+        clearInterval(typeInterval)
+        setIsTyping(false)
 
-    return () => clearInterval(interval)
-  }, [t.titleHighlights.length])
+        // Esperar MENOS tiempo antes de cambiar a la siguiente frase
+        setTimeout(() => {
+          setCurrentHighlightIndex((prev) => (prev + 1) % t.titleHighlights.length)
+        }, 800) // ⚡ Reducido de 2000ms a 800ms
+      }
+    }, 60) // ⚡ Reducido de 100ms a 60ms por letra
+
+    return () => clearInterval(typeInterval)
+  }, [currentHighlightIndex, t.titleHighlights])
 
   if (loading) {
     return <OroLoading />
   }
-
-  const currentHighlight = t.titleHighlights[currentHighlightIndex]
 
   return (
     <section className="relative min-h-screen bg-white">
@@ -109,20 +120,12 @@ export function HeroSection() {
           </div>
 
           {/* Text Content */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1>
+          <div className="mb-8 mt-2">
+            {/* ❌ ELIMINADO: <h1 className="text-4xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1> */}
             <div className="relative h-16 flex items-center justify-center">
-              <h2
-                className={`text-4xl font-bold text-gold mb-6 transition-all duration-600 ease-in-out ${
-                  isTransitioning
-                    ? "opacity-0 transform translate-y-4 scale-95"
-                    : "opacity-100 transform translate-y-0 scale-100"
-                }`}
-              >
-                {currentHighlight}
-              </h2>
+              <h2 className="text-4xl font-black italic font-roboto text-black mb-6">{displayedText}</h2>
             </div>
-            <p className="text-lg text-gray-600 mb-8">{t.description}</p>
+            {/*<p className="text-lg text-gray-600 mb-8">{t.description}</p>*/}
           </div>
 
           {/* Buttons */}
@@ -130,7 +133,7 @@ export function HeroSection() {
             <Button
               size="lg"
               onClick={handleNavigation}
-              className="bg-gold hover:bg-yellow-300 text-black font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-300 w-full max-w-xs"
+              className="bg-gold hover:bg-yellow-300 text-black font-bold font-roboto text-lg px-8 py-3 rounded-lg transition-all duration-300 w-full max-w-xs"
             >
               {t.rentNow}
             </Button>
@@ -174,27 +177,19 @@ export function HeroSection() {
 
           {/* Right Column - Content */}
           <div className="text-left">
-            <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1>
-            <div className="relative h-20 flex items-center">
-              <h2
-                className={`text-5xl lg:text-6xl font-bold text-gold mb-6 transition-all duration-600 ease-in-out ${
-                  isTransitioning
-                    ? "opacity-0 transform translate-y-6 scale-95"
-                    : "opacity-100 transform translate-y-0 scale-100"
-                }`}
-              >
-                {currentHighlight}
-              </h2>
+            {/* ❌ ELIMINADO: <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 mb-2 leading-tight">{t.title}</h1> */}
+            <div className="relative h-20 flex items-center mt-2">
+              <h2 className="text-5xl lg:text-6xl font-black italic font-roboto text-black mb-6">{displayedText}</h2>
             </div>
 
-            <p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-lg">{t.description}</p>
+            {/*<p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-lg">{t.description}</p>*/}
 
             {/* Buttons */}
             <div className="flex justify-start">
               <Button
                 size="lg"
                 onClick={handleNavigation}
-                className="bg-gold hover:bg-yellow-300 text-black font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-300 transform hover:scale-105"
+                className="bg-gold hover:bg-yellow-300 text-black font-bold font-roboto text-lg px-8 py-3 rounded-lg transition-all duration-300 transform hover:scale-105"
               >
                 {t.rentNow}
               </Button>

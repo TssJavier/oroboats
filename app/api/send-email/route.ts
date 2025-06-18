@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ Validar API key antes de inicializar Resend
     const RESEND_API_KEY = process.env.RESEND_API_KEY
-    const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "fergsaenz@gmail.com"
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@oroboats.com"
 
     console.log("🔍 Checking environment variables...")
     console.log("🔍 RESEND_API_KEY:", RESEND_API_KEY ? "✅ Found" : "❌ Missing")
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         console.log("📧 API: Sending booking admin notification")
         const html = renderAdminBookingNotification(data)
         const { data: result, error } = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [ADMIN_EMAIL],
           subject: `Nueva reserva #${data.bookingId} - ${data.vehicleName}`,
           html,
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         console.log("📧 API: Sending booking customer confirmation")
         const html = renderCustomerBookingConfirmation(data)
         const { data: result, error } = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [data.customerEmail],
           subject: `Confirmación de reserva #${data.bookingId} - OroBoats`,
           html,
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         // Enviar email al admin
         const adminHtml = renderAdminBookingNotification(data)
         const adminResult = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [ADMIN_EMAIL],
           subject: `Nueva reserva #${data.bookingId} - ${data.vehicleName}`,
           html: adminHtml,
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         // Enviar email al cliente
         const customerHtml = renderCustomerBookingConfirmation(data)
         const customerResult = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [data.customerEmail],
           subject: `Confirmación de reserva #${data.bookingId} - OroBoats`,
           html: customerHtml,
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         // Enviar notificación al admin
         const adminHtml = renderContactNotification(data)
         const adminResult = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [ADMIN_EMAIL],
           subject: `Nuevo mensaje de contacto - ${data.name}`,
           html: adminHtml,
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
         // Enviar confirmación al cliente
         const customerHtml = renderContactConfirmation(data)
         const customerResult = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [data.email],
           subject: "Hemos recibido tu mensaje - OroBoats",
           html: customerHtml,
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         console.log("📧 API: Sending contact notification to admin")
         const html = renderContactNotification(data)
         const { data: result, error } = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [ADMIN_EMAIL],
           subject: `Nuevo mensaje de contacto - ${data.name}`,
           html,
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
         console.log("📧 API: Sending contact confirmation to customer")
         const html = renderContactConfirmation(data)
         const { data: result, error } = await resend.emails.send({
-          from: "OroBoats Granada <onboarding@resend.dev>", // ✅ Dominio verificado
+          from: "OroBoats Granada <info@oroboats.com>", // ✅ Dominio verificado
           to: [data.email],
           subject: "Hemos recibido tu mensaje - OroBoats",
           html,

@@ -1,7 +1,8 @@
 "use client"
 
-import { MapPin, Clock, Phone } from 'lucide-react'
+import { MapPin, Clock, Phone, ExternalLink } from "lucide-react"
 import { useApp } from "@/components/providers"
+import Image from "next/image"
 
 const translations = {
   es: {
@@ -11,6 +12,8 @@ const translations = {
     location: "La herradura, Granada",
     hours: "Abierto todos los días: 9:00 - 21:00",
     phone: "+34 655 52 79 88",
+    openInMaps: "Abrir en Google Maps",
+    clickToOpen: "Haz clic para abrir en Google Maps",
   },
   en: {
     title: "Exclusive Location",
@@ -19,12 +22,22 @@ const translations = {
     location: "La herradura, Granada",
     hours: "Open every day: 9:00 AM - 9:00 PM",
     phone: "+34 655 52 79 88",
+    openInMaps: "Open in Google Maps",
+    clickToOpen: "Click to open in Google Maps",
   },
 }
 
 export function LocationSection() {
   const { language } = useApp()
   const t = translations[language]
+
+  const openInGoogleMaps = () => {
+    window.open(
+      "https://maps.google.com/?q=Paseo+Andrés+Segovia+62+La+Herradura+Granada",
+      "_blank",
+      "noopener,noreferrer",
+    )
+  }
 
   return (
     <section className="py-24 bg-white">
@@ -65,20 +78,41 @@ export function LocationSection() {
                 <p className="text-gray-600">{t.phone}</p>
               </div>
             </div>
+
+            <div className="pt-4">
+              <button
+                onClick={openInGoogleMaps}
+                className="inline-flex items-center px-6 py-3 bg-gold hover:bg-yellow-500 text-black font-medium rounded-lg transition-colors duration-200"
+              >
+                <ExternalLink className="h-5 w-5 mr-2" />
+                {t.openInMaps}
+              </button>
+            </div>
           </div>
 
+          {/* ✅ IMAGEN ESTÁTICA CLICKEABLE */}
           <div className="relative">
-            <div className="h-96 rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-              <iframe 
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3197.3831137595275!2d-3.7498650246999996!3d36.73737417123954!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0xd7227f6e8188561%3A0x62d3e3e8c5ffe44e!2sP.%C2%BA%20Andr%C3%A9s%20Segovia%2C%2062%2C%2018697%20La%20Herradura%2C%20Granada!5e0!3m2!1ses!2ses!4v1748376175251!5m2!1ses!2ses" 
-                width="100%" 
-                height="100%" 
-                style={{ border: 0 }} 
-                allowFullScreen 
-                loading="lazy" 
-                referrerPolicy="no-referrer-when-downgrade"
-                className="rounded-lg"
+            <div
+              className="h-96 rounded-lg border border-gray-200 overflow-hidden shadow-sm cursor-pointer group relative"
+              onClick={openInGoogleMaps}
+            >
+              <Image
+                src="/assets/sitio.png"
+                alt="Ubicación OroBoats - Paseo Andrés Segovia, 62, La Herradura, Granada"
+                fill
+                className="object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
+
+              {/* Overlay con efecto hover */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg flex items-center justify-center transition-all duration-300">
+                <div className="bg-white bg-opacity-0 group-hover:bg-opacity-95 rounded-lg px-4 py-2 transition-all duration-300">
+                  <div className="flex items-center text-sm font-medium text-black opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    {t.clickToOpen}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

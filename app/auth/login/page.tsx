@@ -88,7 +88,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="info@oroboats.com"
+                  placeholder="email@oroboats.com"
                   required
                   disabled={loading}
                   className="bg-gray-50 border-gray-200"

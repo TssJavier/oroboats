@@ -8,8 +8,9 @@ import { useApp } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Mail, Phone, MapPin, Clock, MessageCircle, User } from "lucide-react"
+import { Mail, Phone, MapPin, Clock, MessageCircle, User, ExternalLink } from "lucide-react"
 import { useState } from "react"
+import Image from "next/image"
 
 const translations = {
   es: {
@@ -22,6 +23,7 @@ const translations = {
     address: "Dirección",
     hours: "Horarios",
     owner: "Propietario",
+    clickToOpen: "Haz clic para abrir en Google Maps",
     form: {
       title: "Envíanos un Mensaje",
       name: "Nombre",
@@ -53,6 +55,7 @@ const translations = {
     address: "Address",
     hours: "Hours",
     owner: "Owner",
+    clickToOpen: "Click to open in Google Maps",
     form: {
       title: "Send us a Message",
       name: "Name",
@@ -136,6 +139,14 @@ export default function ContactPage() {
     }))
   }
 
+  const openInGoogleMaps = () => {
+    window.open(
+      "https://maps.google.com/?q=Paseo+Andrés+Segovia+62+La+Herradura+Granada",
+      "_blank",
+      "noopener,noreferrer",
+    )
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <Navigation />
@@ -204,18 +215,29 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              {/* Map */}
+              {/* ✅ IMAGEN ESTÁTICA CLICKEABLE EN LUGAR DEL IFRAME */}
               <div className="mt-8">
-                <div className="aspect-video rounded-lg overflow-hidden">
-                  <iframe
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3179.8!2d-3.7275!3d36.7275!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMzbCsDQzJzM5LjAiTiAzwrA0Myc0My4wIlc!5e0!3m2!1sen!2ses!4v1234567890"
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  ></iframe>
+                <div
+                  className="aspect-video rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer group relative"
+                  onClick={openInGoogleMaps}
+                >
+                  <Image
+                    src="/assets/sitio.png"
+                    alt="Ubicación OroBoats - Paseo Andrés Segovia, 62, La Herradura, Granada"
+                    fill
+                    className="object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+
+                  {/* Overlay con efecto hover */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg flex items-center justify-center transition-all duration-300">
+                    <div className="bg-white bg-opacity-0 group-hover:bg-opacity-95 rounded-lg px-4 py-2 transition-all duration-300">
+                      <div className="flex items-center text-sm font-medium text-black opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        {t.clickToOpen}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

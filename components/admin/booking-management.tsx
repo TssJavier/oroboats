@@ -50,18 +50,17 @@ interface Booking {
     damageDescription?: string
     damageCost: string
     liabilityWaiverId?: number
+    liability_waiver_id?: number
     isTestBooking?: boolean
     isManualBooking?: boolean
     salesPerson?: string
     vehicleName?: string
     vehicleType?: string
-    // ✅ NUEVO: Campos para pago parcial
     paymentType?: string
     amountPaid?: string
     amountPending?: string
     paymentLocation?: string
     payment_type?: string
-    // ✅ NUEVO: Campo para método de pago
     paymentMethod?: "cash" | "card"
   }
   vehicle: {
@@ -102,64 +101,30 @@ export function BookingManagement() {
       const data = await response.json()
       console.log("🔍 Frontend: Bookings data received:", data)
 
-      // ✅ NUEVO: Debug específico para métodos de pago
-      if (Array.isArray(data) && data.length > 0) {
-        console.log("🔍 MÉTODOS DE PAGO DETECTADOS:")
-        const paymentMethods = data
-          .map((b) => ({
-            id: b.booking.id,
-            name: b.booking.customerName,
-            method: b.booking.paymentMethod,
-            isManual: b.booking.isManualBooking,
-          }))
-          .filter((b) => b.isManual)
-        console.table(paymentMethods)
-      }
-
-      // Añadir este log para inspeccionar la estructura exacta de los primeros registros
-      if (Array.isArray(data) && data.length > 0) {
-        console.log("🔎 INSPECCIÓN DETALLADA DE DATOS:")
-        console.log("Primer registro completo:", JSON.stringify(data[0], null, 2))
-        console.log("Campos de pago:", {
-          payment_type: data[0].booking.payment_type,
-          paymentType: data[0].booking.paymentType,
-          amountPaid: data[0].booking.amountPaid,
-          amountPending: data[0].booking.amountPending,
-          paymentMethod: data[0].booking.paymentMethod,
-        })
-      }
-
       if (Array.isArray(data)) {
         // Ordenar por fecha de creación, más recientes primero
         const sortedBookings = data.sort(
           (a, b) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
         )
 
-        // Debug detallado para verificar liabilityWaiverId
+        // ✅ ARREGLO: DEBUG MEJORADO PARA WAIVERS
         const withWaivers = sortedBookings.filter((b) => {
-          const hasWaiver = b.booking.liabilityWaiverId && b.booking.liabilityWaiverId !== null
-          console.log(
-            `🔍 Booking ${b.booking.id} (${b.booking.customerName}): liabilityWaiverId = ${b.booking.liabilityWaiverId}, hasWaiver = ${hasWaiver}`,
-          )
+          // ✅ VERIFICAR MÚLTIPLES CAMPOS POSIBLES
+          const waiverId = b.booking.liabilityWaiverId || b.booking.liability_waiver_id
+          const hasWaiver = waiverId && waiverId !== null && waiverId !== 0
+
+          console.log(`🔍 WAIVER DEBUG - Booking ${b.booking.id} (${b.booking.customerName}):`, {
+            liabilityWaiverId: b.booking.liabilityWaiverId,
+            liability_waiver_id: b.booking.liability_waiver_id,
+            waiverId,
+            hasWaiver,
+            rawBooking: b.booking,
+          })
+
           return hasWaiver
         }).length
 
-        // ✅ NUEVO: Contar reservas con pago parcial
         const withPartialPayment = sortedBookings.filter((b) => b.booking.payment_type === "partial_payment").length
-
-        // ✅ DEBUG: Verificar detección de pagos parciales
-        sortedBookings.forEach((booking, index) => {
-          if (index < 5) {
-            // Solo los primeros 5 para no saturar el log
-            console.log(`🔍 Booking ${booking.booking.id}:`, {
-              paymentType: booking.booking.payment_type,
-              amountPaid: booking.booking.amountPaid,
-              amountPending: booking.booking.amountPending,
-              isPartialPayment: booking.booking.payment_type === "partial_payment",
-              paymentMethod: booking.booking.paymentMethod,
-            })
-          }
-        })
 
         console.log(`✅ Frontend: Found ${withWaivers} bookings with signed liability waivers`)
         console.log(`✅ Frontend: Found ${withPartialPayment} bookings with partial payment`)
@@ -169,8 +134,8 @@ export function BookingManagement() {
           withWaivers,
           withPartialPayment,
           sampleWaiverIds: sortedBookings
-            .filter((b) => b.booking.liabilityWaiverId)
-            .map((b) => b.booking.liabilityWaiverId)
+            .filter((b) => b.booking.liabilityWaiverId || b.booking.liability_waiver_id)
+            .map((b) => b.booking.liabilityWaiverId || b.booking.liability_waiver_id)
             .slice(0, 5),
         })
 
@@ -202,11 +167,9 @@ export function BookingManagement() {
     let successCount = 0
     let errorCount = 0
 
-    // Crear una copia para evitar problemas con el estado durante el procesamiento
     const bookingsToProcess = [...filteredBookings]
 
     for (const booking of bookingsToProcess) {
-      // Solo procesar reservas que no estén ya completadas o canceladas
       if (booking.booking.status !== "completed" && booking.booking.status !== "cancelled") {
         try {
           const response = await fetch(`/api/bookings/${booking.booking.id}`, {
@@ -228,19 +191,15 @@ export function BookingManagement() {
       }
     }
 
-    // Mostrar resultado
     alert(`Proceso completado:\n- ${successCount} reservas completadas exitosamente\n- ${errorCount} errores`)
-
-    // Recargar los datos
     fetchBookings()
   }
 
-  // ✅ FUNCIÓN CORREGIDA: Abrir documento como HTML en nueva pestaña
+  // ✅ ARREGLO: FUNCIÓN MEJORADA PARA WAIVERS
   const viewWaiver = async (waiverId: number, customerName: string) => {
     try {
       console.log(`🔍 Opening waiver ${waiverId} for ${customerName}...`)
 
-      // Abrir en nueva pestaña como HTML
       const url = `/api/liability-waiver/${waiverId}/pdf`
       window.open(url, "_blank")
     } catch (error) {
@@ -249,7 +208,6 @@ export function BookingManagement() {
     }
   }
 
-  // ✅ NUEVA FUNCIÓN: Obtener nombre del comercial
   const getSalesPersonName = (id?: string) => {
     if (!id) return null
 
@@ -262,17 +220,9 @@ export function BookingManagement() {
     return salesPerson || id
   }
 
-  // ✅ NUEVA FUNCIÓN: Determinar el tipo de pago para mostrar
   const getPaymentTypeDisplay = (booking: Booking) => {
-    // Verificar ambas propiedades para mayor seguridad
     const isPartial =
       booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
-
-    console.log(`🔍 Booking ${booking.booking.id} payment check:`, {
-      payment_type: booking.booking.payment_type,
-      paymentType: booking.booking.paymentType,
-      isPartial,
-    })
 
     if (isPartial) {
       return {
@@ -293,12 +243,8 @@ export function BookingManagement() {
     }
   }
 
-  // ✅ FUNCIÓN CORREGIDA: Obtener información del método de pago
   const getPaymentMethodDisplay = (booking: Booking) => {
     if (!booking.booking.isManualBooking) return null
-
-    // ✅ CORREGIDO: Verificar correctamente el método de pago
-    console.log(`🔍 Checking payment method for booking ${booking.booking.id}:`, booking.booking.paymentMethod)
 
     if (booking.booking.paymentMethod === "card") {
       return {
@@ -307,7 +253,6 @@ export function BookingManagement() {
         color: "text-blue-600",
       }
     } else {
-      // Por defecto o si es "cash"
       return {
         label: "Efectivo",
         icon: Banknote,
@@ -316,7 +261,6 @@ export function BookingManagement() {
     }
   }
 
-  // Función para filtrar reservas por fecha o tipo
   const getFilteredBookings = () => {
     if (dateFilter === "test") {
       return bookings.filter((booking) => booking.booking.isTestBooking === true)
@@ -333,7 +277,6 @@ export function BookingManagement() {
       )
     }
 
-    // ✅ NUEVO: Filtro por comercial específico
     if (dateFilter === "salesperson" && selectedSalesperson) {
       return bookings.filter((booking) => booking.booking.salesPerson === selectedSalesperson)
     }
@@ -360,7 +303,6 @@ export function BookingManagement() {
     })
   }
 
-  // ✅ NUEVA FUNCIÓN: Obtener estadísticas de comerciales
   const getSalespersonStats = () => {
     const salespeople = ["manuel", "fermin", "javier"]
     return salespeople.map((id) => {
@@ -371,7 +313,7 @@ export function BookingManagement() {
       const totalRevenue = salesPersonBookings.reduce((sum, b) => {
         const price = Number(b.booking.totalPrice) || 0
         const deposit = Number(b.booking.securityDeposit) || 0
-        return sum + (price - deposit) // Restar fianza
+        return sum + (price - deposit)
       }, 0)
 
       return {
@@ -431,32 +373,40 @@ export function BookingManagement() {
     if (!selectedBooking || !depositAction) return
 
     try {
-      const formData = new FormData()
-      formData.append("action", depositAction)
-
-      if (depositAction === "reject") {
-        formData.append("damageDescription", damageDescription)
-        formData.append("damageCost", damageCost)
-        damageImages.forEach((file, index) => {
-          formData.append(`damageImage${index}`, file)
-        })
+      const requestBody = {
+        action: depositAction,
+        ...(depositAction === "reject" && {
+          damageDescription,
+          damageCost,
+        }),
       }
+
+      console.log("🔄 Sending deposit request:", requestBody)
 
       const response = await fetch(`/api/bookings/${selectedBooking.booking.id}/deposit`, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
       })
+
+      const result = await response.json()
+      console.log("📥 Deposit response:", result)
 
       if (response.ok) {
         setShowDepositModal(false)
         setSelectedBooking(null)
         setDepositAction(null)
         fetchBookings()
+
+        alert(result.message || "Fianza procesada correctamente")
       } else {
-        setError("Error al procesar la fianza")
+        console.error("❌ Deposit processing failed:", result)
+        setError(result.error || "Error al procesar la fianza")
       }
     } catch (err) {
-      console.error("Error processing deposit:", err)
+      console.error("❌ Error processing deposit:", err)
       setError("Error al procesar la fianza")
     }
   }
@@ -560,7 +510,7 @@ export function BookingManagement() {
 
   const testBookingsCount = bookings.filter((b) => b.booking.isTestBooking === true).length
   const manualBookingsCount = bookings.filter((b) => b.booking.isManualBooking === true).length
-  const withWaiversCount = bookings.filter((b) => b.booking.liabilityWaiverId).length
+  const withWaiversCount = bookings.filter((b) => b.booking.liabilityWaiverId || b.booking.liability_waiver_id).length
   const partialPaymentBookingsCount = bookings.filter((b) => b.booking.payment_type === "partial_payment").length
 
   return (
@@ -570,7 +520,24 @@ export function BookingManagement() {
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
 
-      {/* ✅ NUEVA: Leyenda de Estados */}
+      {/* Debug info */}
+      {debug && (
+        <Card className="bg-yellow-50 border border-yellow-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center text-yellow-800">🔍 Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-yellow-800">
+              <div>Total bookings: {debug.totalBookings}</div>
+              <div>With waivers: {debug.withWaivers}</div>
+              <div>With partial payment: {debug.withPartialPayment}</div>
+              <div>Sample waiver IDs: {debug.sampleWaiverIds.join(", ")}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Leyenda de Estados */}
       <Card className="bg-gray-50 border border-gray-200">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center text-gray-800">
@@ -766,152 +733,19 @@ export function BookingManagement() {
         </CardContent>
       </Card>
 
-      {/* ✅ NUEVO: Panel de filtros por comercial */}
-      <Card className="bg-white border border-gray-200">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-gray-800">
-            <UserCheck className="h-5 w-5 mr-2" />
-            Filtrar por Comercial
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Botones de comerciales */}
-            <div className="flex flex-wrap gap-3">
-              {getSalespersonStats().map((salesperson) => (
-                <Button
-                  key={salesperson.id}
-                  variant={
-                    dateFilter === "salesperson" && selectedSalesperson === salesperson.id ? "default" : "outline"
-                  }
-                  onClick={() => {
-                    setDateFilter("salesperson")
-                    setSelectedSalesperson(salesperson.id)
-                  }}
-                  className={
-                    dateFilter === "salesperson" && selectedSalesperson === salesperson.id
-                      ? "bg-purple-600 text-white hover:bg-purple-700"
-                      : ""
-                  }
-                >
-                  <UserCheck className="h-4 w-4 mr-2" />
-                  {salesperson.name} ({salesperson.count})
-                </Button>
-              ))}
-
-              {/* Botón para limpiar filtro */}
-              {dateFilter === "salesperson" && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDateFilter("all")
-                    setSelectedSalesperson("")
-                  }}
-                  className="border-gray-300"
-                >
-                  Limpiar filtro
-                </Button>
-              )}
-            </div>
-
-            {/* Estadísticas de comerciales */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {getSalespersonStats().map((salesperson) => (
-                <div
-                  key={salesperson.id}
-                  className={`p-4 rounded-lg border ${
-                    dateFilter === "salesperson" && selectedSalesperson === salesperson.id
-                      ? "bg-purple-50 border-purple-200"
-                      : "bg-gray-50 border-gray-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-gray-800">{salesperson.name}</h4>
-                    <Badge className="bg-purple-600 text-white">{salesperson.count} ventas</Badge>
-                  </div>
-                  <div className="text-2xl font-bold text-purple-600">€{salesperson.revenue.toFixed(2)}</div>
-                  <div className="text-sm text-gray-600">Ingresos netos (sin fianza)</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Información del filtro activo */}
-            {dateFilter === "salesperson" && selectedSalesperson && (
-              <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                <div className="text-sm text-purple-800">
-                  <strong>Mostrando reservas de: {getSalesPersonName(selectedSalesperson)}</strong>
-                  <br />
-                  {filteredBookings.length} reserva(s) • €
-                  {filteredBookings
-                    .reduce((sum, b) => {
-                      const price = Number(b.booking.totalPrice) || 0
-                      const deposit = Number(b.booking.securityDeposit) || 0
-                      return sum + (price - deposit)
-                    }, 0)
-                    .toFixed(2)}{" "}
-                  en ingresos netos
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Panel de ayuda para clientes */}
-      <Card className="bg-blue-50 border-blue-200 mb-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center text-blue-800">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            Información sobre Tipos de Pago
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Pago Completo
-              </h4>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="text-green-800 text-sm">
-                  <strong>✅ Todo pagado online</strong>
-                  <br />
-                  Cliente pagó alquiler + fianza. Solo entregar vehículo y devolver fianza al final.
-                </p>
-              </div>
-            </div>
-            <div>
-              <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
-                <Banknote className="h-4 w-4 mr-2" />
-                Pago Parcial
-              </h4>
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                <p className="text-orange-800 text-sm">
-                  <strong>⚠️ Cobrar en sitio</strong>
-                  <br />
-                  Cliente pagó 50€/100€ online.{" "}
-                  <strong>Debes cobrar el resto + fianza antes de entregar el vehículo.</strong>
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* Lista de reservas */}
       {Array.isArray(filteredBookings) && filteredBookings.length > 0 ? (
         <div className="space-y-6">
           {filteredBookings.map((booking) => {
-            // Debug específico para cada reserva
-            const hasWaiver = booking.booking.liabilityWaiverId && booking.booking.liabilityWaiverId !== null
+            // ✅ ARREGLO: DETECCIÓN MEJORADA DE WAIVERS
+            const waiverId = booking.booking.liabilityWaiverId || booking.booking.liability_waiver_id
+            const hasWaiver = waiverId && waiverId !== null && waiverId !== 0
+
             const isManual = booking.booking.isManualBooking === true
-            // Buscar esta línea:
-            // const isPartialPayment = booking.booking.paymentType === "partial_payment"
-            // Y cambiarla por:
             const isPartialPayment =
               booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
             const salesPersonName = getSalesPersonName(booking.booking.salesPerson)
             const paymentTypeInfo = getPaymentTypeDisplay(booking)
-            // ✅ NUEVO: Obtener información del método de pago
             const paymentMethodInfo = getPaymentMethodDisplay(booking)
 
             return (
@@ -930,58 +764,60 @@ export function BookingManagement() {
                 }`}
               >
                 <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-xl font-bold text-black flex items-center">
-                        <User className="h-5 w-5 text-gold mr-2" />
-                        {booking.booking.customerName}
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg sm:text-xl font-bold text-black flex flex-wrap items-center gap-2">
+                        <User className="h-5 w-5 text-gold flex-shrink-0" />
+                        <span className="break-words">{booking.booking.customerName}</span>
                         {booking.booking.isTestBooking && (
-                          <Badge className="ml-2 bg-purple-600 text-white">
+                          <Badge className="bg-purple-600 text-white text-xs">
                             <Beaker className="h-3 w-3 mr-1" />
                             Prueba
                           </Badge>
                         )}
                         {isManual && (
-                          <Badge className="ml-2 bg-orange-600 text-white">
+                          <Badge className="bg-orange-600 text-white text-xs">
                             <Settings className="h-3 w-3 mr-1" />
                             Manual
                           </Badge>
                         )}
-                        {/* ✅ NUEVO: Badge mejorado para tipo de pago */}
-                        <Badge className={`ml-2 ${paymentTypeInfo.color}`}>
+                        <Badge className={`${paymentTypeInfo.color} text-xs`}>
                           <paymentTypeInfo.icon className="h-3 w-3 mr-1" />
                           {paymentTypeInfo.label}
                         </Badge>
-                        {/* ✅ NUEVO: Badge para método de pago en reservas manuales */}
                         {isManual && paymentMethodInfo && (
-                          <Badge className="ml-2 bg-gray-600 text-white">
+                          <Badge className="bg-gray-600 text-white text-xs">
                             <paymentMethodInfo.icon className={`h-3 w-3 mr-1 ${paymentMethodInfo.color}`} />
                             {paymentMethodInfo.label}
                           </Badge>
                         )}
                       </CardTitle>
                       <CardDescription className="flex items-center mt-1">
-                        <Ship className="h-4 w-4 mr-1" />
-                        {booking.booking.vehicleName || booking.vehicle?.name || "Producto eliminado"}
-                        {(booking.booking.vehicleType || booking.vehicle?.type) && (
-                          <span className="text-gray-500 ml-1">
-                            ({booking.booking.vehicleType || booking.vehicle?.type})
-                          </span>
-                        )}
+                        <Ship className="h-4 w-4 mr-1 flex-shrink-0" />
+                        <span className="break-words">
+                          {booking.booking.vehicleName || booking.vehicle?.name || "Producto eliminado"}
+                          {(booking.booking.vehicleType || booking.vehicle?.type) && (
+                            <span className="text-gray-500 ml-1">
+                              ({booking.booking.vehicleType || booking.vehicle?.type})
+                            </span>
+                          )}
+                        </span>
                       </CardDescription>
                     </div>
-                    <div className="flex gap-2 flex-wrap">
-                      <Badge className={getStatusColor(booking.booking.status)}>{booking.booking.status}</Badge>
-                      <Badge className={getPaymentStatusColor(booking.booking.paymentStatus)}>
+                    <div className="flex flex-wrap gap-1 sm:gap-2">
+                      <Badge className={`${getStatusColor(booking.booking.status)} text-xs`}>
+                        {booking.booking.status}
+                      </Badge>
+                      <Badge className={`${getPaymentStatusColor(booking.booking.paymentStatus)} text-xs`}>
                         {booking.booking.paymentStatus}
                       </Badge>
                       {Number(booking.booking.securityDeposit) > 0 && (
-                        <Badge className={getInspectionStatusColor(booking.booking.inspectionStatus)}>
+                        <Badge className={`${getInspectionStatusColor(booking.booking.inspectionStatus)} text-xs`}>
                           Fianza: {booking.booking.inspectionStatus}
                         </Badge>
                       )}
                       {hasWaiver && (
-                        <Badge className="bg-purple-600 text-white">
+                        <Badge className="bg-purple-600 text-white text-xs">
                           <FileText className="h-3 w-3 mr-1" />
                           Documento firmado
                         </Badge>
@@ -991,24 +827,24 @@ export function BookingManagement() {
                 </CardHeader>
 
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-700 flex items-center">
+                      <h4 className="font-semibold text-gray-700 flex items-center text-sm">
                         <User className="h-4 w-4 mr-1" />
                         Contacto
                       </h4>
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-center text-gray-600">
-                          <Mail className="h-3 w-3 mr-2" />
-                          {booking.booking.customerEmail}
+                      <div className="space-y-1 text-xs sm:text-sm">
+                        <div className="flex items-center text-gray-600 break-all">
+                          <Mail className="h-3 w-3 mr-2 flex-shrink-0" />
+                          <span className="break-all">{booking.booking.customerEmail}</span>
                         </div>
                         <div className="flex items-center text-gray-600">
-                          <Phone className="h-3 w-3 mr-2" />
-                          {booking.booking.customerPhone}
+                          <Phone className="h-3 w-3 mr-2 flex-shrink-0" />
+                          <span>{booking.booking.customerPhone}</span>
                         </div>
                         {salesPersonName && (
                           <div className="flex items-center text-gray-600">
-                            <UserCheck className="h-3 w-3 mr-2" />
+                            <UserCheck className="h-3 w-3 mr-2 flex-shrink-0" />
                             <span className="font-medium">Comercial: {salesPersonName}</span>
                           </div>
                         )}
@@ -1016,43 +852,42 @@ export function BookingManagement() {
                     </div>
 
                     <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-700 flex items-center">
+                      <h4 className="font-semibold text-gray-700 flex items-center text-sm">
                         <Calendar className="h-4 w-4 mr-1" />
                         Fecha y Hora
                       </h4>
-                      <div className="space-y-1 text-sm">
+                      <div className="space-y-1 text-xs sm:text-sm">
                         <div className="text-gray-600">
                           {new Date(booking.booking.bookingDate).toLocaleDateString("es-ES")}
                         </div>
                         <div className="flex items-center text-gray-600">
-                          <Clock className="h-3 w-3 mr-2" />
-                          {booking.booking.timeSlot}
+                          <Clock className="h-3 w-3 mr-2 flex-shrink-0" />
+                          <span>{booking.booking.timeSlot}</span>
                         </div>
                         <div className="text-gray-600">Duración: {booking.booking.duration}</div>
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-700 flex items-center">
+                      <h4 className="font-semibold text-gray-700 flex items-center text-sm">
                         <Euro className="h-4 w-4 mr-1" />
                         Información de Pago
                       </h4>
-                      <div className="text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
+                      <div className="text-xl sm:text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
                       {Number(booking.booking.securityDeposit) > 0 && (
-                        <div className="text-sm text-gray-600">
+                        <div className="text-xs sm:text-sm text-gray-600">
                           <Shield className="h-3 w-3 inline mr-1" />
                           Fianza: €{booking.booking.securityDeposit}
                         </div>
                       )}
-                      {/* ✅ MEJORADO: Información clara de pago parcial */}
                       {isPartialPayment && (
                         <div className="space-y-1">
-                          <div className="text-sm text-green-600 font-medium">
+                          <div className="text-xs sm:text-sm text-green-600 font-medium">
                             <CheckCircle className="h-3 w-3 inline mr-1" />
                             Pagado online: €{booking.booking.amountPaid}
                           </div>
                           {Number(booking.booking.amountPending) > 0 && (
-                            <div className="text-sm text-red-600 font-bold bg-red-50 p-2 rounded border border-red-200">
+                            <div className="text-xs sm:text-sm text-red-600 font-bold bg-red-50 p-2 rounded border border-red-200">
                               <AlertTriangle className="h-3 w-3 inline mr-1" />
                               COBRAR EN SITIO: €{booking.booking.amountPending}
                             </div>
@@ -1060,9 +895,8 @@ export function BookingManagement() {
                         </div>
                       )}
 
-                      {/* ✅ NUEVO: Mostrar método de pago para reservas manuales */}
                       {isManual && paymentMethodInfo && (
-                        <div className="mt-2 text-sm">
+                        <div className="mt-2 text-xs sm:text-sm">
                           <div className={`flex items-center font-medium ${paymentMethodInfo.color}`}>
                             <paymentMethodInfo.icon className="h-3 w-3 inline mr-1" />
                             Pagado con: {paymentMethodInfo.label}
@@ -1072,26 +906,27 @@ export function BookingManagement() {
                     </div>
 
                     <div className="space-y-2">
-                      <h4 className="font-semibold text-gray-700">Acciones</h4>
+                      <h4 className="font-semibold text-gray-700 text-sm">Acciones</h4>
                       <div className="flex flex-col gap-2">
                         {hasWaiver && (
                           <Button
                             size="sm"
-                            onClick={() => viewWaiver(booking.booking.liabilityWaiverId!, booking.booking.customerName)}
-                            className="bg-purple-600 text-white hover:bg-purple-700"
+                            onClick={() => viewWaiver(waiverId!, booking.booking.customerName)}
+                            className="bg-purple-600 text-white hover:bg-purple-700 text-xs"
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
+                            <ExternalLink className="h-3 w-3 mr-1" />
                             Ver Documento
                           </Button>
                         )}
 
-                        {/* ✅ MEJORADO: Alerta más prominente para pagos pendientes */}
                         {isPartialPayment && Number(booking.booking.amountPending) > 0 && (
-                          <div className="p-3 bg-red-50 border-2 border-red-300 rounded-lg">
+                          <div className="p-2 sm:p-3 bg-red-50 border-2 border-red-300 rounded-lg">
                             <div className="text-center">
-                              <AlertTriangle className="h-5 w-5 text-red-600 mx-auto mb-1" />
+                              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 mx-auto mb-1" />
                               <p className="text-xs font-bold text-red-800">COBRAR ANTES DE ENTREGAR</p>
-                              <p className="text-lg font-bold text-red-600">€{booking.booking.amountPending}</p>
+                              <p className="text-sm sm:text-lg font-bold text-red-600">
+                                €{booking.booking.amountPending}
+                              </p>
                               <p className="text-xs text-red-600">(Resto + Fianza)</p>
                             </div>
                           </div>
@@ -1101,9 +936,9 @@ export function BookingManagement() {
                           <Button
                             size="sm"
                             onClick={() => updateBookingStatus(booking.booking.id, "confirmed")}
-                            className="bg-green-600 text-white hover:bg-green-700"
+                            className="bg-green-600 text-white hover:bg-green-700 text-xs"
                           >
-                            <CheckCircle className="h-4 w-4 mr-1" />
+                            <CheckCircle className="h-3 w-3 mr-1" />
                             Auto-Confirmar
                           </Button>
                         )}
@@ -1115,17 +950,17 @@ export function BookingManagement() {
                               <Button
                                 size="sm"
                                 onClick={() => handleDepositAction(booking, "approve")}
-                                className="bg-green-600 text-white hover:bg-green-700"
+                                className="bg-green-600 text-white hover:bg-green-700 text-xs"
                               >
-                                <CheckCircle className="h-4 w-4 mr-1" />
+                                <CheckCircle className="h-3 w-3 mr-1" />
                                 Completar Fianza
                               </Button>
                               <Button
                                 size="sm"
                                 onClick={() => handleDepositAction(booking, "reject")}
-                                className="bg-red-600 text-white hover:bg-red-700"
+                                className="bg-red-600 text-white hover:bg-red-700 text-xs"
                               >
-                                <XCircle className="h-4 w-4 mr-1" />
+                                <XCircle className="h-3 w-3 mr-1" />
                                 Rechazar Fianza
                               </Button>
                             </>
@@ -1137,7 +972,7 @@ export function BookingManagement() {
                             <Button
                               size="sm"
                               onClick={() => updateBookingStatus(booking.booking.id, "completed")}
-                              className="bg-blue-600 text-white hover:bg-blue-700"
+                              className="bg-blue-600 text-white hover:bg-blue-700 text-xs"
                             >
                               Completar Reserva
                             </Button>
@@ -1148,7 +983,7 @@ export function BookingManagement() {
                             size="sm"
                             variant="outline"
                             onClick={() => updateBookingStatus(booking.booking.id, "cancelled")}
-                            className="border-red-300 text-red-600 hover:bg-red-50"
+                            className="border-red-300 text-red-600 hover:bg-red-50 text-xs"
                           >
                             Cancelar
                           </Button>
@@ -1157,34 +992,34 @@ export function BookingManagement() {
                     </div>
                   </div>
 
-                  {/* Información de daños si existe */}
                   {booking.booking.damageDescription && (
                     <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <h5 className="font-semibold text-red-800 mb-1 flex items-center">
+                      <h5 className="font-semibold text-red-800 mb-1 flex items-center text-sm">
                         <AlertTriangle className="h-4 w-4 mr-1" />
                         Daños Registrados:
                       </h5>
-                      <p className="text-red-700 text-sm mb-1">{booking.booking.damageDescription}</p>
+                      <p className="text-red-700 text-xs sm:text-sm mb-1">{booking.booking.damageDescription}</p>
                       {Number(booking.booking.damageCost) > 0 && (
-                        <p className="text-red-700 text-sm font-semibold">Coste: €{booking.booking.damageCost}</p>
+                        <p className="text-red-700 text-xs sm:text-sm font-semibold">
+                          Coste: €{booking.booking.damageCost}
+                        </p>
                       )}
                     </div>
                   )}
 
                   {booking.booking.notes && (
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                      <h5 className="font-semibold text-gray-700 mb-1">Notas:</h5>
-                      <p className="text-gray-600 text-sm">{booking.booking.notes}</p>
+                      <h5 className="font-semibold text-gray-700 mb-1 text-sm">Notas:</h5>
+                      <p className="text-gray-600 text-xs sm:text-sm">{booking.booking.notes}</p>
                     </div>
                   )}
 
-                  <div className="mt-4 text-xs text-gray-500">
+                  <div className="mt-4 text-xs text-gray-500 break-words">
                     Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
                     {isManual && salesPersonName && <span className="ml-2">• Comercial: {salesPersonName}</span>}
                     {isPartialPayment && (
                       <span className="ml-2 font-medium text-orange-600">• {paymentTypeInfo.description}</span>
                     )}
-                    {/* ✅ NUEVO: Mostrar método de pago en el footer */}
                     {isManual && paymentMethodInfo && (
                       <span className={`ml-2 font-medium ${paymentMethodInfo.color}`}>
                         • Pagado con {paymentMethodInfo.label.toLowerCase()}
@@ -1200,24 +1035,8 @@ export function BookingManagement() {
         <Card className="bg-white border border-gray-200">
           <CardContent className="text-center py-12">
             <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              {dateFilter === "all"
-                ? "No hay reservas"
-                : dateFilter === "test"
-                  ? "No hay reservas de prueba"
-                  : dateFilter === "manual"
-                    ? "No hay reservas manuales"
-                    : dateFilter === "partial"
-                      ? "No hay reservas con pago parcial"
-                      : dateFilter === "salesperson"
-                        ? `No hay reservas de ${getSalesPersonName(selectedSalesperson)}`
-                        : `No hay reservas para ${dateFilter === "today" ? "hoy" : "mañana"}`}
-            </h3>
-            <p className="text-gray-500">
-              {dateFilter === "all"
-                ? "Las reservas aparecerán aquí cuando los clientes hagan pedidos"
-                : "Prueba con otro filtro de fecha o revisa las reservas de otros días"}
-            </p>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay reservas</h3>
+            <p className="text-gray-500">Las reservas aparecerán aquí cuando los clientes hagan pedidos</p>
           </CardContent>
         </Card>
       )}
