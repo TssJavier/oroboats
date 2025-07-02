@@ -714,7 +714,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         <Button
           variant="outline"
           onClick={generateShareLink}
-          className="border-gold text-gold hover:bg-gold hover:text-black bg-transparent w-full sm:w-auto"
+          className="border-gold text-black hover:bg-gold hover:text-black bg-transparent w-full sm:w-auto"
         >
           <Share2 className="h-4 w-4 mr-2" />
           {t.shareBooking}
