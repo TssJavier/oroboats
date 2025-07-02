@@ -365,7 +365,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
               <p className="text-lg text-gray-600">{t.subtitle}</p>
             </div>
 
-            {/* ✅ NUEVO: Botón de compartir (solo en paso 1 y si hay selección) */}
+            {/* ✅ NUEVO: Botón de compartir (solo en paso 1 y si hay selección)
             {currentStep === 1 && selectedDate && selectedTime && !isDeeplink && (
               <Button
                 variant="outline"
@@ -375,7 +375,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                 <Share2 className="h-4 w-4 mr-2" />
                 {t.shareBooking}
               </Button>
-            )}
+            )} */}
           </div>
 
           {/* ✅ NUEVO: Banner de deeplink */}
@@ -668,48 +668,62 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Navigation Buttons */}
-                  <div className="pt-6 border-t border-gray-200">
-                    {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
-                      // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
-                      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-                        {/* ✅ MODIFICADO: Solo mostrar botón "Anterior" si no es deeplink en paso 2 */}
-                        {!(isDeeplink && currentStep === 2) && (
-                          <Button
-                            variant="outline"
-                            onClick={handlePrevStep}
-                            className="border-gray-300 w-full sm:w-auto order-2 sm:order-1 bg-transparent"
-                          >
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Anterior
-                          </Button>
-                        )}
 
-                        <div className="order-1 sm:order-2">
-                          <Button
-                            ref={nextButtonRef}
-                            onClick={handleNextStep}
-                            className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
-                          >
-                            Siguiente
-                            <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : currentStep === 1 ? (
-                      // Primer paso
-                      <div className="flex justify-end">
-                        <Button
-                          ref={nextButtonRef}
-                          onClick={handleNextStep}
-                          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
-                        >
-                          Siguiente
-                          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
+{/* Navigation Buttons */}
+<div className="pt-6 border-t border-gray-200 space-y-4">
+  {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
+    // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
+    <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
+      {/* ✅ MODIFICADO: Solo mostrar botón "Anterior" si no es deeplink en paso 2 */}
+      {!(isDeeplink && currentStep === 2) && (
+        <Button
+          variant="outline"
+          onClick={handlePrevStep}
+          className="border-gray-300 w-full sm:w-auto order-2 sm:order-1 bg-transparent"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Anterior
+        </Button>
+      )}
+
+      <div className="order-1 sm:order-2">
+        <Button
+          ref={nextButtonRef}
+          onClick={handleNextStep}
+          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+        >
+          Siguiente
+          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+        </Button>
+      </div>
+    </div>
+  ) : currentStep === 1 ? (
+    // Primer paso
+    <div className="flex flex-col gap-4 sm:items-end">
+      <Button
+        ref={nextButtonRef}
+        onClick={handleNextStep}
+        className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+      >
+        Siguiente
+        <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+      </Button>
+
+      {/* ✅ Botón de compartir debajo del botón Siguiente */}
+      {selectedDate && selectedTime && !isDeeplink && (
+        <Button
+          variant="outline"
+          onClick={generateShareLink}
+          className="border-gold text-gold hover:bg-gold hover:text-black bg-transparent w-full sm:w-auto"
+        >
+          <Share2 className="h-4 w-4 mr-2" />
+          {t.shareBooking}
+        </Button>
+      )}
+    </div>
+  ) : null}
+</div>
+
                 </CardContent>
               </Card>
             </div>
