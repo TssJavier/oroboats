@@ -67,11 +67,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { customerName, customerEmail, language = "es", signatureData } = body
+    const { customerName, customerEmail, customerDni, language = "es", signatureData, manualDeposit = 0 } = body
+
+    // ✅ AÑADIR LOG PARA DEBUG DEL MANUAL DEPOSIT
+    console.log("🔍 DEBUG - API received:", {
+      customerName,
+      customerEmail,
+      language,
+      manualDeposit,
+      manualDepositType: typeof manualDeposit,
+      bodyKeys: Object.keys(body),
+    })
 
     // Verificar que tenemos los datos necesarios
-    if (!customerName || !customerEmail) {
-      console.error("❌ Missing required fields:", { customerName: !!customerName, customerEmail: !!customerEmail })
+    if (!customerName || !customerEmail || !customerDni) {
+      console.error("❌ Missing required fields:", { customerName: !!customerName, customerEmail: !!customerEmail, customerDni: !!customerDni })
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
@@ -109,10 +119,18 @@ export async function POST(request: NextRequest) {
 
     console.log("🔍 Request info:", { ip, userAgent: userAgent.substring(0, 50) })
 
+    // ✅ CONVERTIR MANUAL DEPOSIT A NÚMERO SEGURO
+    const safeManualDeposit = Number(manualDeposit) || 0
+    console.log("💰 Manual deposit processing:", {
+      original: manualDeposit,
+      converted: safeManualDeposit,
+      type: typeof safeManualDeposit,
+    })
+
     // Generar contenido del documento
     let waiverContent: string
     try {
-      waiverContent = getWaiverContent(language, customerName, ip)
+      waiverContent = getWaiverContent(language, customerName, ip, safeManualDeposit)
       console.log("📝 Waiver content generated, length:", waiverContent.length)
     } catch (contentError) {
       console.error("❌ Error generating waiver content:", contentError)
@@ -125,7 +143,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`📝 Creating waiver for ${customerName} with validated signature`)
+    console.log(`📝 Creating waiver for ${customerName} with validated signature and deposit ${safeManualDeposit}`)
 
     // ✅ VERIFICAR CONEXIÓN A BASE DE DATOS ANTES DE INSERTAR
     try {
@@ -143,16 +161,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Guardar en base de datos con manejo de errores mejorado
+    // ✅ GUARDAR EN BASE DE DATOS INCLUYENDO MANUAL_DEPOSIT
     try {
-      console.log("💾 Inserting into database...")
+      console.log("💾 Inserting into database with manualdeposit:", safeManualDeposit)
 
-      // Usar parámetros seguros para evitar problemas de SQL injection y formato
       const result = await db.execute(sql`
         INSERT INTO liability_waivers 
-        (customer_name, customer_email, waiver_content, ip_address, user_agent, signature_data, signed_at, created_at)
+        (customer_name, customer_email, customer_dni, waiver_content, ip_address, user_agent, signature_data, manualdeposit, signed_at, created_at)
         VALUES 
-        (${customerName}, ${customerEmail}, ${waiverContent}, ${ip}, ${userAgent}, ${validatedSignature}, NOW(), NOW())
+        (${customerName}, ${customerEmail}, ${customerDni}, ${waiverContent}, ${ip}, ${userAgent}, ${validatedSignature}, ${safeManualDeposit}, NOW(), NOW())
         RETURNING id
       `)
 
@@ -164,9 +181,9 @@ export async function POST(request: NextRequest) {
 
       console.log(`✅ Waiver created successfully with ID: ${waiverId}`)
 
-      // Verificar que se guardó correctamente
+      // ✅ VERIFICAR QUE SE GUARDÓ CORRECTAMENTE INCLUYENDO MANUAL_DEPOSIT
       const verification = await db.execute(sql`
-        SELECT id, customer_name, 
+        SELECT id, customer_name, manualdeposit,
                CASE WHEN signature_data IS NOT NULL THEN true ELSE false END AS has_signature,
                CASE WHEN signature_data IS NOT NULL THEN LENGTH(signature_data) ELSE 0 END AS sig_length
         FROM liability_waivers
@@ -175,7 +192,7 @@ export async function POST(request: NextRequest) {
 
       if (verification && verification.length > 0) {
         console.log(
-          `✅ Verification: Waiver ${waiverId} for ${verification[0].customer_name}, has signature: ${verification[0].has_signature}, length: ${verification[0].sig_length}`,
+          `✅ Verification: Waiver ${waiverId} for ${verification[0].customer_name}, manualdeposit: ${verification[0].manual_deposit}, has signature: ${verification[0].has_signature}, length: ${verification[0].sig_length}`,
         )
       }
 
@@ -184,12 +201,14 @@ export async function POST(request: NextRequest) {
         waiverId: waiverId,
         content: waiverContent,
         hasSignature: true,
+        manualDeposit: safeManualDeposit,
       })
     } catch (dbError) {
       console.error("❌ Database error details:", {
         error: dbError,
         message: dbError instanceof Error ? dbError.message : "Unknown database error",
         customerName,
+        manualDeposit: safeManualDeposit,
         signatureLength: validatedSignature?.length || 0,
       })
 

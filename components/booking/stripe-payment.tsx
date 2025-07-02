@@ -13,17 +13,24 @@ import { PaymentTypeSelector } from "./payment-type-selector"
 import { OroLoading } from "@/components/ui/oro-loading"
 
 // 🔍 DETECTAR ENTORNO Y CONFIGURAR STRIPE
-const isProduction = process.env.NEXT_PUBLIC_ENVIRONMENT === "production"
+const isProduction = process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_ENVIRONMENT === "production"
 
-const stripePublishableKey = isProduction
-  ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE
-  : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
 console.log("🌍 Stripe client environment:", {
   isProduction,
   hasKey: !!stripePublishableKey,
   keyPrefix: stripePublishableKey?.substring(0, 7),
   domain: typeof window !== "undefined" ? window.location.hostname : "server",
+})
+
+console.log("🌍 Stripe client environment:", {
+  isProduction,
+  hasKey: !!stripePublishableKey,
+  keyPrefix: stripePublishableKey?.substring(0, 7),
+  domain: typeof window !== "undefined" ? window.location.hostname : "server",
+  nodeEnv: process.env.NODE_ENV,  // ✅ AÑADIR
+  publicEnv: process.env.NEXT_PUBLIC_ENVIRONMENT,  // ✅ AÑADIR
 })
 
 // ✅ CONFIGURACIÓN STRIPE SIMPLE

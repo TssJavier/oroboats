@@ -31,6 +31,7 @@ export const vehicles = pgTable("vehicles", {
   // ✅ NUEVAS COLUMNAS AÑADIDAS
   extraFeatures: jsonb("extra_features").default([]), // Array de ExtraFeature
   securityDeposit: decimal("security_deposit", { precision: 10, scale: 2 }).default("0"), // Fianza en euros
+  manualDeposit: decimal("manualdeposit", { precision: 10, scale: 2 }).default("0"), // ✅ AÑADIR ESTA LÍNEA
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })

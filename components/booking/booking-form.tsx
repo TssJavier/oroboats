@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,13 +10,14 @@ import { Badge } from "@/components/ui/badge"
 import { CalendarPicker } from "./calendar-picker"
 import { TimePicker } from "./time-picker"
 import { LiabilityWaiver } from "./liability-waiver"
-import { ArrowLeft, Ship, Zap, Users, Calendar, CreditCard, FileText } from "lucide-react"
+import { ArrowLeft, Ship, Zap, Users, Calendar, CreditCard, FileText, Share2, Copy, Check } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { StripePayment } from "./stripe-payment"
 import { OroLoading } from "@/components/ui/oro-loading"
+import { useToast } from "@/components/ui/use-toast"
 
 interface BookingFormProps {
   vehicle: Vehicle
@@ -28,6 +28,7 @@ interface BookingData {
   customerName: string
   customerEmail: string
   customerPhone: string
+  customerDni: string
   bookingDate: string
   startTime: string
   endTime: string
@@ -68,6 +69,14 @@ const translations = {
     fillAllFields: "Completa todos los campos obligatorios",
     bookingSuccess: "¡Reserva creada exitosamente!",
     pastBookingError: "No puedes reservar en el pasado",
+    // ✅ NUEVAS TRADUCCIONES PARA DEEPLINK
+    shareBooking: "Compartir reserva",
+    shareDescription: "Comparte este enlace para que el cliente complete la reserva",
+    linkCopied: "Enlace copiado al portapapeles",
+    prefilledBooking: "Reserva preconfigurada",
+    prefilledDescription: "",
+    vehicleSelected: "Vehículo seleccionado",
+    dateTimeSelected: "Fecha y hora seleccionadas",
   },
   en: {
     title: "Book",
@@ -97,6 +106,14 @@ const translations = {
     fillAllFields: "Fill all required fields",
     bookingSuccess: "Booking created successfully!",
     pastBookingError: "You cannot book in the past",
+    // ✅ NUEVAS TRADUCCIONES PARA DEEPLINK
+    shareBooking: "Share booking",
+    shareDescription: "Share this link for the customer to complete the booking",
+    linkCopied: "Link copied to clipboard",
+    prefilledBooking: "Pre-configured booking",
+    prefilledDescription:"",
+    vehicleSelected: "Vehicle selected",
+    dateTimeSelected: "Date and time selected",
   },
 }
 
@@ -104,9 +121,18 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const { language } = useApp()
   const t = translations[language]
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { toast } = useToast()
+
+  // ✅ NUEVO: Estados para deeplink
+  const [isDeeplink, setIsDeeplink] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareUrl, setShareUrl] = useState("")
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Obtener la fianza del vehículo
   const securityDeposit = Number(vehicle.securityDeposit) || 0
+  const manualDeposit = Number(vehicle.manualDeposit) || 0
 
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedDate, setSelectedDate] = useState<string>("")
@@ -121,6 +147,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
+    customerDni: "",
     bookingDate: "",
     startTime: "",
     endTime: "",
@@ -139,6 +166,36 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const stepTitleRef = useRef<HTMLDivElement>(null)
   const nextButtonRef = useRef<HTMLButtonElement>(null)
   const durationSectionRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>
+
+  // ✅ NUEVO: Efecto para manejar parámetros de deeplink
+  useEffect(() => {
+    const date = searchParams.get("date")
+    const startTime = searchParams.get("startTime")
+    const endTime = searchParams.get("endTime")
+    const duration = searchParams.get("duration")
+    const price = searchParams.get("price")
+
+    if (date && startTime && endTime && duration && price) {
+      console.log("🔗 Deeplink detectado:", { date, startTime, endTime, duration, price })
+
+      setIsDeeplink(true)
+      setSelectedDate(date)
+      setSelectedTime({
+        start: startTime,
+        end: endTime,
+        duration: duration,
+        price: Number(price),
+      })
+
+      // Saltar directamente al paso 2 (datos del cliente)
+      setCurrentStep(2)
+
+      toast({
+        title: t.prefilledBooking,
+        description: t.prefilledDescription,
+      })
+    }
+  }, [searchParams, t, toast])
 
   useEffect(() => {
     if (selectedDate && selectedTime) {
@@ -168,6 +225,50 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     return () => clearTimeout(scrollTimer)
   }, [currentStep])
 
+  // ✅ NUEVA FUNCIÓN: Generar deeplink
+  const generateShareLink = () => {
+    if (!selectedDate || !selectedTime) {
+      toast({
+        title: "Error",
+        description: "Selecciona fecha y hora primero",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const baseUrl = window.location.origin
+    const vehiclePath = `/boats/${vehicle.id}/book`
+    const params = new URLSearchParams({
+      date: selectedDate,
+      startTime: selectedTime.start,
+      endTime: selectedTime.end,
+      duration: selectedTime.duration,
+      price: selectedTime.price.toString(),
+    })
+
+    const fullUrl = `${baseUrl}${vehiclePath}?${params.toString()}`
+    setShareUrl(fullUrl)
+    setShowShareModal(true)
+  }
+
+  // ✅ NUEVA FUNCIÓN: Copiar enlace
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setLinkCopied(true)
+      toast({
+        title: t.linkCopied,
+        description: "El enlace se ha copiado al portapapeles",
+      })
+
+      setTimeout(() => {
+        setLinkCopied(false)
+      }, 3000)
+    } catch (err) {
+      console.error("Error copying to clipboard:", err)
+    }
+  }
+
   // ✅ FUNCIÓN SIMPLE PARA SCROLL EN MÓVIL
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>, delay = 500) => {
     setTimeout(() => {
@@ -196,7 +297,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     }
 
     if (currentStep === 2) {
-      if (!bookingData.customerName || !bookingData.customerEmail || !bookingData.customerPhone) {
+      if (
+        !bookingData.customerName ||
+        !bookingData.customerEmail ||
+        !bookingData.customerPhone ||
+        !bookingData.customerDni
+      ) {
         setError(t.fillAllFields)
         return
       }
@@ -209,6 +315,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     setNavigationLoading(true)
 
     setTimeout(() => {
+      // ✅ NUEVO: Si es deeplink, no permitir volver al paso 1
+      if (isDeeplink && currentStep === 2) {
+        setNavigationLoading(false)
+        return
+      }
+
       setCurrentStep((prev) => prev - 1)
       setError("")
       setNavigationLoading(false)
@@ -246,27 +358,69 @@ export function BookingForm({ vehicle }: BookingFormProps) {
               <ArrowLeft className="h-4 w-4 mr-2" />
               {t.back}
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl md:text-4xl font-bold text-black">
                 {t.title} {vehicle.name}
               </h1>
               <p className="text-lg text-gray-600">{t.subtitle}</p>
             </div>
+
+            {/* ✅ NUEVO: Botón de compartir (solo en paso 1 y si hay selección) */}
+            {currentStep === 1 && selectedDate && selectedTime && !isDeeplink && (
+              <Button
+                variant="outline"
+                onClick={generateShareLink}
+                className="border-gold text-gold hover:bg-gold hover:text-black bg-transparent"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                {t.shareBooking}
+              </Button>
+            )}
           </div>
+
+          {/* ✅ NUEVO: Banner de deeplink */}
+          {isDeeplink && (
+            <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Calendar className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-blue-900">{t.prefilledBooking}</h3>
+                  <p className="text-blue-700 text-sm mb-3">{t.prefilledDescription}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div className="bg-white p-3 rounded border">
+                      <div className="font-medium text-blue-900">{t.vehicleSelected}</div>
+                      <div className="text-blue-700">{vehicle.name}</div>
+                    </div>
+                    <div className="bg-white p-3 rounded border">
+                      <div className="font-medium text-blue-900">{t.dateTimeSelected}</div>
+                      <div className="text-blue-700">
+                        {new Date(selectedDate).toLocaleDateString("es-ES")} • {selectedTime?.start} -{" "}
+                        {selectedTime?.end}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ✅ PROGRESS STEPS RESPONSIVE MEJORADO */}
           <div className="flex items-center justify-center mb-8 sm:mb-12 overflow-x-auto px-2">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-max">
-              {[1, 2, 3, 5].map((step, index) => (
+              {/* ✅ MODIFICADO: Mostrar pasos según si es deeplink o no */}
+              {(isDeeplink ? [2, 3, 5] : [1, 2, 3, 5]).map((step, index) => (
                 <div key={step} className="flex items-center">
                   <div
                     className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm sm:text-base ${
                       currentStep >= step ? "bg-gold text-black" : "bg-gray-200 text-gray-500"
                     }`}
                   >
-                    {index + 1} {/* Mostrar 1,2,3,4 en lugar de 1,2,3,5 */}
+                    {index + 1}
                   </div>
-                  {index < 3 && (
+                  {index < (isDeeplink ? 2 : 3) && (
                     <div className={`w-8 sm:w-16 h-1 mx-1 sm:mx-2 ${currentStep > step ? "bg-gold" : "bg-gray-200"}`} />
                   )}
                 </div>
@@ -362,8 +516,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Step 1: Date and Time Selection */}
-                  {currentStep === 1 && (
+                  {/* Step 1: Date and Time Selection - ✅ OCULTAR SI ES DEEPLINK */}
+                  {currentStep === 1 && !isDeeplink && (
                     <div className="space-y-8">
                       <div>
                         <h3 className="text-lg font-semibold text-black mb-4">{t.selectDate}</h3>
@@ -372,7 +526,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                           selectedDate={selectedDate}
                           onDateSelect={(date) => {
                             setSelectedDate(date)
-                            // ✅ SCROLL A DURACIÓN cuando se selecciona fecha
                             scrollToSection(durationSectionRef, 300)
                           }}
                         />
@@ -437,6 +590,17 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                       </div>
 
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">DNI/NIE *</label>
+                        <Input
+                          value={bookingData.customerDni}
+                          onChange={(e) => setBookingData((prev) => ({ ...prev, customerDni: e.target.value }))}
+                          placeholder="12345678A"
+                          required
+                          className="bg-gray-50 border-gray-200"
+                        />
+                      </div>
+
+                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">{t.notes}</label>
                         <Textarea
                           value={bookingData.notes}
@@ -454,6 +618,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     <LiabilityWaiver
                       customerName={bookingData.customerName}
                       customerEmail={bookingData.customerEmail}
+                      customerDni={bookingData.customerDni}
+                      manualDeposit={manualDeposit}
                       onWaiverSigned={handleWaiverSigned}
                       onBack={handlePrevStep}
                     />
@@ -507,14 +673,17 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
                       // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
                       <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-                        <Button
-                          variant="outline"
-                          onClick={handlePrevStep}
-                          className="border-gray-300 w-full sm:w-auto order-2 sm:order-1"
-                        >
-                          <ArrowLeft className="h-4 w-4 mr-2" />
-                          Anterior
-                        </Button>
+                        {/* ✅ MODIFICADO: Solo mostrar botón "Anterior" si no es deeplink en paso 2 */}
+                        {!(isDeeplink && currentStep === 2) && (
+                          <Button
+                            variant="outline"
+                            onClick={handlePrevStep}
+                            className="border-gray-300 w-full sm:w-auto order-2 sm:order-1 bg-transparent"
+                          >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Anterior
+                          </Button>
+                        )}
 
                         <div className="order-1 sm:order-2">
                           <Button
@@ -547,6 +716,40 @@ export function BookingForm({ vehicle }: BookingFormProps) {
           </div>
         </div>
       </section>
+
+      {/* ✅ NUEVO: Modal para compartir enlace */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">{t.shareBooking}</h3>
+            <p className="text-gray-600 text-sm mb-4">{t.shareDescription}</p>
+
+            <div className="bg-gray-50 p-3 rounded border mb-4">
+              <p className="text-xs text-gray-500 mb-2">Enlace de reserva:</p>
+              <p className="text-sm font-mono break-all">{shareUrl}</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button onClick={copyToClipboard} className="flex-1" variant={linkCopied ? "default" : "outline"}>
+                {linkCopied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copiado
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar
+                  </>
+                )}
+              </Button>
+              <Button onClick={() => setShowShareModal(false)} variant="outline">
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Indicador de carga durante la navegación */}
       {navigationLoading && <OroLoading />}

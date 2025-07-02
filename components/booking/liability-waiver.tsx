@@ -10,16 +10,27 @@ import { getWaiverContent } from "@/lib/waiver-content"
 interface LiabilityWaiverProps {
   customerName: string
   customerEmail: string
+  customerDni: string
+  manualDeposit: number
   onWaiverSigned: (waiverId: number) => void
   className?: string
   onBack: () => void
 }
 
-export function LiabilityWaiver({ customerName, customerEmail, onWaiverSigned, className = "" }: LiabilityWaiverProps) {
+export function LiabilityWaiver({ customerName, customerEmail, customerDni, manualDeposit, onWaiverSigned, className = "" }: LiabilityWaiverProps) {
   const [agreed, setAgreed] = useState(false)
   const [signatureData, setSignatureData] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  console.log("🔍 DEBUG - LiabilityWaiver received:", {
+    customerName,
+    customerEmail,
+    manualDeposit,
+    manualDepositType: typeof manualDeposit,
+  })
+
+  
 
   const handleSignatureComplete = (data: string) => {
     console.log("✅ Firma recibida del componente SignatureCanvas")
@@ -53,7 +64,9 @@ export function LiabilityWaiver({ customerName, customerEmail, onWaiverSigned, c
         body: JSON.stringify({
           customerName,
           customerEmail,
+          customerDni,
           signatureData,
+          manualDeposit,
         }),
       })
 
@@ -73,8 +86,16 @@ export function LiabilityWaiver({ customerName, customerEmail, onWaiverSigned, c
     }
   }
 
+  console.log("🔍 DEBUG - Before getWaiverContent:", {
+    language: "es",
+    customerName,
+    ip: "127.0.0.1",
+    manualDeposit,
+    manualDepositFormatted: (typeof manualDeposit === 'number' ? manualDeposit : 0).toFixed(2) + " €",
+
+  })
   // Generar contenido del waiver
-  const waiverContent = getWaiverContent("es", customerName, "127.0.0.1")
+  const waiverContent = getWaiverContent("es", customerName, "127.0.0.1", manualDeposit)
 
   return (
     <div className={`space-y-4 ${className}`}>

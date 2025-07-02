@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       customerName,
       customerPhone,
       customerEmail,
+      customerDni,
       bookingDate,
       timeSlot,
       startTime,
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validaciones básicas
-    if (!vehicleId || !customerName || !customerPhone || !bookingDate || !timeSlot || !totalPrice) {
+    if (!vehicleId || !customerName || !customerPhone || !customerDni || !bookingDate || !timeSlot || !totalPrice) {
       return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 })
     }
 
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Checking vehicle ${vehicleId}...`)
 
     const vehicleResult = await db.execute(sql`
-      SELECT id, name, type, stock, security_deposit FROM vehicles WHERE id = ${vehicleId}
+      SELECT id, name, type, stock, security_deposit, manualDeposit FROM vehicles WHERE id = ${vehicleId}
     `)
 
     if (!vehicleResult || vehicleResult.length === 0) {
@@ -196,6 +197,7 @@ export async function POST(request: NextRequest) {
           vehicle_id,
           customer_name,
           customer_email,
+          customer_dni,
           customer_phone,
           booking_date,
           time_slot,
@@ -221,6 +223,7 @@ export async function POST(request: NextRequest) {
           ${customerName},
           ${customerEmail || `${customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`},
           ${customerPhone},
+          ${customerDni},
           ${bookingDate},
           ${timeSlot},
           ${startTime},

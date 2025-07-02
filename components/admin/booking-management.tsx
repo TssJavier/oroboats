@@ -37,6 +37,7 @@ interface Booking {
     customerName: string
     customerEmail: string
     customerPhone: string
+    customerDni: string
     bookingDate: string
     timeSlot: string
     duration: string
@@ -768,6 +769,11 @@ export function BookingManagement() {
                     <div className="flex-1">
                       <CardTitle className="text-lg sm:text-xl font-bold text-black flex flex-wrap items-center gap-2">
                         <User className="h-5 w-5 text-gold flex-shrink-0" />
+                        {booking.booking.customerDni && (  // ✅ AÑADIR ESTE BLOQUE (OPCIONAL)
+                          <span className="text-sm font-normal text-gray-600">
+                            ({booking.booking.customerDni})
+                          </span>
+                        )}
                         <span className="break-words">{booking.booking.customerName}</span>
                         {booking.booking.isTestBooking && (
                           <Badge className="bg-purple-600 text-white text-xs">
@@ -842,6 +848,12 @@ export function BookingManagement() {
                           <Phone className="h-3 w-3 mr-2 flex-shrink-0" />
                           <span>{booking.booking.customerPhone}</span>
                         </div>
+                        {booking.booking.customerDni && ( 
+                          <div className="flex items-center text-gray-600">
+                            <UserCheck className="h-3 w-3 mr-2 flex-shrink-0" />
+                            <span>DNI: {booking.booking.customerDni}</span>
+                          </div>
+                        )}
                         {salesPersonName && (
                           <div className="flex items-center text-gray-600">
                             <UserCheck className="h-3 w-3 mr-2 flex-shrink-0" />

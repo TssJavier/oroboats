@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         custom_duration_enabled as "customDurationEnabled",
         extra_features as "extraFeatures",
         security_deposit as "securityDeposit",
-        manualDeposit as "manualDeposit",
+        manualDeposit as "manualdeposit",
         stock  -- ✅ CAMPO STOCK INCLUIDO
       FROM vehicles
       ${!includeUnavailable ? sql`WHERE available = true` : sql``}

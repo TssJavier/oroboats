@@ -26,6 +26,7 @@ interface Vehicle {
     label: string
   }>
   securityDeposit?: number
+  manualdeposit?: number
   stock?: number
 }
 
@@ -59,6 +60,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     customerName: "",
     customerPhone: "",
     customerEmail: "",
+    customerDni: "",
     bookingDate: "",
     notes: "",
     salesPerson: "",
@@ -174,6 +176,11 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
       return
     }
 
+    if (!formData.customerDni.trim()) { 
+      toast.error("El DNI del cliente es requerido")
+      return
+    }
+
     if (!formData.bookingDate) {
       toast.error("La fecha de reserva es requerida")
       return
@@ -242,6 +249,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
           customerPhone: formData.customerPhone,
           customerEmail:
             formData.customerEmail || `${formData.customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`,
+          customerDni: formData.customerDni,
           bookingDate: formData.bookingDate,
           timeSlot: `${selectedSlot.startTime}-${selectedSlot.endTime}`,
           startTime: selectedSlot.startTime,
@@ -273,6 +281,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
         customerName: "",
         customerPhone: "",
         customerEmail: "",
+        customerDni: "",
         bookingDate: "",
         notes: "",
         salesPerson: "",
@@ -373,6 +382,17 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                     required
                   />
                 </div>
+              </div>
+
+              <div> 
+                    <Label htmlFor="customerDni">DNI/NIE *</Label>
+                    <Input
+                      id="customerDni"
+                      value={formData.customerDni}
+                      onChange={(e) => handleInputChange("customerDni", e.target.value)}
+                      placeholder="12345678A"
+                      required
+                    />
               </div>
 
               <div>
@@ -655,8 +675,10 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
         </DialogContent>
       </Dialog>
 
+
       {/* 🆕 MODAL DE FIRMA */}
       <ManualWaiverModal
+      
         isOpen={showWaiverModal}
         onClose={() => setShowWaiverModal(false)}
         onWaiverSigned={handleWaiverSigned}
@@ -664,6 +686,8 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
         customerEmail={
           formData.customerEmail || `${formData.customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`
         }
+        customerDni={formData.customerDni}
+        manualDeposit={vehicle?.manualdeposit || 0}
       />
     </>
   )

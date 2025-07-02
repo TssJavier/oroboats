@@ -11,6 +11,8 @@ interface ManualWaiverModalProps {
   onWaiverSigned: (waiverId: number) => void
   customerName: string
   customerEmail: string
+  customerDni: string
+  manualDeposit: number
 }
 
 export function ManualWaiverModal({
@@ -19,6 +21,8 @@ export function ManualWaiverModal({
   onWaiverSigned,
   customerName,
   customerEmail,
+  customerDni,
+  manualDeposit
 }: ManualWaiverModalProps) {
   const [step, setStep] = useState(1)
 
@@ -45,6 +49,8 @@ export function ManualWaiverModal({
           <LiabilityWaiver
             customerName={customerName}
             customerEmail={customerEmail}
+            customerDni={customerDni}
+            manualDeposit={manualDeposit}
             onWaiverSigned={handleWaiverSigned}
             onBack={handleBack}
           />
