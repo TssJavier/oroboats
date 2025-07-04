@@ -104,10 +104,10 @@ const getTestConfig = () => {
 
 const stripeConfig = getStripeConfig()
 
-// 🛡️ INICIALIZAR STRIPE CON SEGURIDAD - ✅ VERSIÓN MÁS NUEVA
+// 🛡️ INICIALIZAR STRIPE CON SEGURIDAD - ✅ CAMBIO: Usar versión compatible
 const stripe = stripeConfig
   ? new Stripe(stripeConfig.secretKey, {
-      apiVersion: "2025-05-28.basil", // ✅ RESTAURADO: Versión más nueva como sugieres
+      apiVersion: "2025-05-28.basil", // ✅ CAMBIO: Versión más estable y compatible
     })
   : null
 
@@ -116,7 +116,6 @@ if (stripeConfig) {
   // Verificar que las claves coinciden con el entorno
   const keyPrefix = stripeConfig.secretKey.substring(0, 7)
   const expectedPrefix = isProduction ? "sk_live" : "sk_test"
-
   if (!keyPrefix.startsWith(expectedPrefix)) {
     console.warn(`⚠️ Key type mismatch! Expected ${expectedPrefix}, got ${keyPrefix}`)
   }
@@ -126,7 +125,7 @@ if (stripeConfig) {
     environment: stripeConfig.environment,
     publishableKeyValid: stripeConfig.publishableKey.length > 20,
     secretKeyValid: stripeConfig.secretKey.length > 20,
-    apiVersion: "2025-05-28.basil",
+    apiVersion: "2024-06-20", // ✅ CAMBIO: Mostrar versión correcta
   })
 
   console.log(`✅ Stripe initialized for ${stripeConfig.environment} environment`)

@@ -1,53 +1,59 @@
 import { NextResponse } from "next/server"
-import { db } from "@/lib/db"
-import { sql } from "drizzle-orm"
+import { neon } from "@neondatabase/serverless"
 
 export async function GET() {
   try {
-    console.log("🔍 Checking database connection...")
+    console.log("🔍 Debug DB Connection API")
 
-    // Verificar conexión básica
-    const result = await db.execute(sql`SELECT 1 as test`)
-    console.log("✅ Database connection OK:", result)
+    const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL_NON_POOLING
 
-    // Verificar si existe la tabla vehicles
-    const vehiclesCheck = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'vehicles'
-      );
-    `)
-    console.log("📋 Vehicles table exists:", vehiclesCheck)
+    if (!databaseUrl) {
+      return NextResponse.json(
+        {
+          error: "No database URL configured",
+          env: process.env.NODE_ENV,
+        },
+        { status: 500 },
+      )
+    }
 
-    // Verificar si existe la tabla pricing_rules
-    const pricingRulesCheck = await db.execute(sql`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_name = 'pricing_rules'
-      );
-    `)
-    console.log("📋 Pricing rules table exists:", pricingRulesCheck)
+    // Extraer host sin mostrar credenciales
+    const urlParts = databaseUrl.match(/postgresql:\/\/.*@([^/]+)\//)
+    const host = urlParts ? urlParts[1] : "unknown"
 
-    // Obtener algunos vehículos para ver su estructura
-    const vehicles = await db.execute(sql`
-      SELECT id, name, pricing FROM vehicles LIMIT 3;
-    `)
-    console.log("🚗 Sample vehicles:", vehicles)
+    console.log("🔗 Database host:", host)
+
+    // Verificar que no sea Supabase
+    if (host.includes("supabase.com")) {
+      return NextResponse.json(
+        {
+          error: "Using Supabase URL instead of Neon",
+          host: host,
+          fix: "Change DATABASE_URL to your Neon database URL",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Intentar conexión
+    const sql = neon(databaseUrl)
+    const result = await sql`SELECT NOW() as current_time, 'connection_ok' as status`
 
     return NextResponse.json({
       success: true,
-      dbConnection: true,
-      vehiclesTable: vehiclesCheck,
-      pricingRulesTable: pricingRulesCheck,
-      sampleVehicles: vehicles,
+      host: host,
+      timestamp: result[0].current_time,
+      status: result[0].status,
+      env: process.env.NODE_ENV,
     })
   } catch (error) {
-    console.error("❌ Database debug error:", error)
+    console.error("❌ DB Debug Error:", error)
+
     return NextResponse.json(
       {
-        error: "Database debug failed",
+        error: "Database connection failed",
         details: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
+        env: process.env.NODE_ENV,
       },
       { status: 500 },
     )

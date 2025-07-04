@@ -12,29 +12,34 @@ import { DiscountInput } from "./discount-input"
 import { PaymentTypeSelector } from "./payment-type-selector"
 import { OroLoading } from "@/components/ui/oro-loading"
 
-// 🔍 DETECTAR ENTORNO Y CONFIGURAR STRIPE
-const isProduction = process.env.NODE_ENV === "production" && process.env.NEXT_PUBLIC_ENVIRONMENT === "production"
+// ✅ CONFIGURACIÓN STRIPE CORREGIDA Y FUNCIONAL
+const getStripeConfig = () => {
+  const nodeEnv = process.env.NODE_ENV
+  const publicEnv = process.env.NEXT_PUBLIC_ENVIRONMENT
 
-const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_TEST || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  // ✅ LÓGICA SIMPLIFICADA: Solo usar LIVE si ambos son production
+  const shouldUseLive = nodeEnv === "production" && publicEnv === "production"
 
-console.log("🌍 Stripe client environment:", {
-  isProduction,
-  hasKey: !!stripePublishableKey,
-  keyPrefix: stripePublishableKey?.substring(0, 7),
-  domain: typeof window !== "undefined" ? window.location.hostname : "server",
-})
+  const publishableKey = shouldUseLive
+    ? process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE
+    : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 
-console.log("🌍 Stripe client environment:", {
-  isProduction,
-  hasKey: !!stripePublishableKey,
-  keyPrefix: stripePublishableKey?.substring(0, 7),
-  domain: typeof window !== "undefined" ? window.location.hostname : "server",
-  nodeEnv: process.env.NODE_ENV,  // ✅ AÑADIR
-  publicEnv: process.env.NEXT_PUBLIC_ENVIRONMENT,  // ✅ AÑADIR
-})
+  console.log("🔍 Stripe client config:", {
+    nodeEnv,
+    publicEnv,
+    shouldUseLive,
+    keyPrefix: publishableKey?.substring(0, 7),
+    keyExists: !!publishableKey,
+  })
 
-// ✅ CONFIGURACIÓN STRIPE SIMPLE
-const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null
+  return {
+    publishableKey,
+    isProduction: shouldUseLive,
+  }
+}
+
+const stripeConfig = getStripeConfig()
+const stripePromise = stripeConfig.publishableKey ? loadStripe(stripeConfig.publishableKey) : null
 
 interface PaymentOption {
   type: "full_payment" | "partial_payment"
@@ -82,6 +87,7 @@ function PaymentFormWithElements({
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [paymentProcessing, setPaymentProcessing] = useState(false)
   const [elementReady, setElementReady] = useState(false)
+  const [elementError, setElementError] = useState<string>("")
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -225,7 +231,9 @@ function PaymentFormWithElements({
       <Card className="w-full mx-auto">
         <CardHeader className="px-4 sm:px-6">
           <CardTitle>💳 Pago {paymentOption.type === "partial_payment" ? "Parcial" : "Completo"}</CardTitle>
-          <p className="text-sm text-gray-600">Procesado por Stripe</p>
+          <p className="text-sm text-gray-600">
+            Procesado por Stripe {stripeConfig.isProduction ? "(Producción)" : "(Test)"}
+          </p>
           {paymentOption.type === "partial_payment" && (
             <p className="text-xs text-blue-600">
               💰 Pagas €{paymentOption.onlineAmount} ahora, €{paymentOption.remainingAmount} en el sitio
@@ -236,16 +244,13 @@ function PaymentFormWithElements({
           )}
 
           {bookingData.manualDeposit && bookingData.manualDeposit > 0 && (
-            <p className="text-xs text-yellow-600">
-              🏷️ Fianza manual en sitio: €{bookingData.manualDeposit}
-            </p>
+            <p className="text-xs text-yellow-600">🏷️ Fianza manual en sitio: €{bookingData.manualDeposit}</p>
           )}
-
         </CardHeader>
         <CardContent className="px-4 sm:px-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="p-4 border border-gray-200 rounded-lg bg-white min-h-[300px] relative">
-              {!elementReady && (
+              {!elementReady && !elementError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-lg">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold mx-auto mb-2"></div>
@@ -254,32 +259,49 @@ function PaymentFormWithElements({
                 </div>
               )}
 
-              <PaymentElement
-                options={{
-                  layout: "tabs",
-                  defaultValues: {
-                    billingDetails: {
-                      email: bookingData.customerEmail || "",
+              {elementError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-red-50 rounded-lg border border-red-200">
+                  <div className="text-center p-4">
+                    <p className="text-red-600 font-semibold mb-2">Error cargando el formulario de pago</p>
+                    <p className="text-red-500 text-sm mb-4">{elementError}</p>
+                    <Button onClick={onRetry} variant="outline" size="sm">
+                      Reintentar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!elementError && (
+                <PaymentElement
+                  options={{
+                    layout: "tabs",
+                    defaultValues: {
+                      billingDetails: {
+                        email: bookingData.customerEmail || "",
+                      },
                     },
-                  },
-                }}
-                onReady={() => {
-                  console.log("✅ PaymentElement ready")
-                  setElementReady(true)
-                }}
-                onLoadError={(error) => {
-                  console.error("❌ PaymentElement load error:", error)
-                  setElementReady(true)
-                  onError("Error cargando el formulario de pago. Intenta recargar la página.")
-                }}
-              />
+                  }}
+                  onReady={() => {
+                    console.log("✅ PaymentElement ready")
+                    setElementReady(true)
+                    setElementError("")
+                  }}
+                  onLoadError={(error) => {
+                    console.error("❌ PaymentElement load error:", error)
+                    setElementReady(false)
+                    setElementError(
+                      error.error?.message || "Error cargando el formulario de pago. Intenta recargar la página.",
+                    )
+                  }}
+                />
+              )}
             </div>
 
             <div className="text-center text-sm text-gray-500">🔒 Pago seguro con cifrado SSL</div>
 
             <Button
               type="submit"
-              disabled={!stripe || !elementReady || loading}
+              disabled={!stripe || !elementReady || loading || !!elementError}
               className="w-full bg-gold text-black hover:bg-black hover:text-white transition-all duration-300 font-medium text-lg py-3"
             >
               {loading ? "Procesando pago..." : `Pagar €${paymentOption.onlineAmount}`}
@@ -303,7 +325,6 @@ function PaymentFormWithElements({
                 {bookingData.manualDeposit && bookingData.manualDeposit > 0 && (
                   <div>• Fianza en sitio: €{bookingData.manualDeposit} (manual)</div>
                 )}
-
               </div>
             </div>
           </form>
@@ -335,7 +356,7 @@ function PaymentFormWithElements({
   )
 }
 
-// Componente principal
+// Componente principal CON TODA LA FUNCIONALIDAD RESTAURADA
 function PaymentForm({
   amount,
   securityDeposit = 0,
@@ -676,6 +697,7 @@ export function StripePayment(props: StripePaymentProps): ReactElement {
           <div className="text-red-600">
             <p className="font-semibold">Error de configuración</p>
             <p className="text-sm">Stripe no está configurado correctamente</p>
+            <p className="text-xs mt-2">Clave pública: {stripeConfig.publishableKey ? "✅ Configurada" : "❌ Falta"}</p>
           </div>
         </CardContent>
       </Card>
