@@ -5,14 +5,15 @@ import type { NextRequest } from "next/server"
 import { createBooking } from "@/lib/db/queries"
 import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
 
-// ✅ FUNCIÓN GET EXISTENTE (mantener igual)
 export async function GET(request: NextRequest) {
   try {
     console.log("🔍 API: Fetching bookings...")
+    const { searchParams } = new URL(request.url)
+    const beachLocationId = searchParams.get("beachLocationId")
+    const hotelCode = searchParams.get("hotelCode") // ✅ NUEVO: Obtener hotelCode del searchParams
 
-    // Consulta SQL directa para asegurar que obtenemos todos los campos necesarios
-    const bookingsResult = await db.execute(sql`
-      SELECT 
+    let query = sql`
+      SELECT
         b.id,
         b.customer_name,
         b.customer_email,
@@ -41,16 +42,36 @@ export async function GET(request: NextRequest) {
         b.amount_pending,
         b.payment_location,
         b.payment_method,
+        b.hotel_code, -- ✅ NUEVO: Seleccionar hotel_code
         v.name as vehicle_current_name,
-        v.type as vehicle_current_type
+        v.type as vehicle_current_type,
+        l.name as beach_location_name,
+        l.id as beach_location_id
       FROM bookings b
       LEFT JOIN vehicles v ON b.vehicle_id = v.id
-      ORDER BY b.created_at DESC
-    `)
+      LEFT JOIN locations l ON b.beach_location_id = l.id
+    `
+    const conditions = []
 
+    if (beachLocationId && beachLocationId !== "all") {
+      conditions.push(sql`b.beach_location_id = ${beachLocationId}`)
+    }
+
+    if (hotelCode) {
+      // ✅ NUEVO: Añadir condición para filtrar por hotel_code
+      conditions.push(sql`LOWER(b.hotel_code) LIKE LOWER(${`%${hotelCode}%`})`)
+    }
+
+    if (conditions.length > 0) {
+      query = sql`${query} WHERE ${sql.join(conditions, sql` AND `)}`
+    }
+
+    query = sql`${query} ORDER BY b.created_at DESC`
+
+    const bookingsResult = (await db.execute(query)) as any[] // Cast to any[] for flexible access
     console.log(`✅ API: Found ${bookingsResult.length} bookings`)
 
-    // ✅ AÑADIDO: Debug específico para métodos de pago
+    // Debug específico para métodos de pago
     const paymentMethods = bookingsResult
       .filter((row) => row.is_manual_booking)
       .map((row) => ({
@@ -60,7 +81,6 @@ export async function GET(request: NextRequest) {
         rawValue: `"${row.payment_method}"`,
         type: typeof row.payment_method,
       }))
-
     if (paymentMethods.length > 0) {
       console.log("🔍 API: Payment methods in manual bookings:")
       console.table(paymentMethods)
@@ -92,14 +112,15 @@ export async function GET(request: NextRequest) {
         salesPerson: row.sales_person,
         vehicleName: row.vehicle_name || row.vehicle_current_name,
         vehicleType: row.vehicle_type || row.vehicle_current_type,
-
-        /* ✅ AÑADIDO: Campos de pago parcial */
         payment_type: row.payment_type,
         paymentType: row.payment_type, // Duplicado para compatibilidad
         amountPaid: row.amount_paid?.toString() || null,
         amountPending: row.amount_pending?.toString() || null,
         paymentLocation: row.payment_location,
-        paymentMethod: row.payment_method /* ✅ AÑADIDO: Campo para método de pago */,
+        paymentMethod: row.payment_method,
+        beachLocationId: row.beach_location_id, // Add beach location ID
+        beachLocationName: row.beach_location_name, // Add beach location name
+        hotelCode: row.hotel_code, // ✅ NUEVO: Incluir hotelCode
       },
       vehicle: row.vehicle_current_name
         ? {
@@ -116,7 +137,7 @@ export async function GET(request: NextRequest) {
       console.log(`   - Booking ${b.booking.id}: sales_person = ${b.booking.salesPerson || "no sales person"}`)
     })
 
-    // ✅ AÑADIDO: Debug para verificar pagos parciales
+    // Debug para verificar pagos parciales
     const partialPayments = transformedBookings.filter((b) => b.booking.payment_type === "partial_payment")
     console.log(`🔍 API: Partial payments found: ${partialPayments.length}`)
     partialPayments.forEach((b) => {
@@ -129,7 +150,6 @@ export async function GET(request: NextRequest) {
     console.log(
       `✅ API: Returning ${transformedBookings.length} bookings, ${withWaivers} with liability waivers, ${partialPayments.length} with partial payments`,
     )
-
     return NextResponse.json(transformedBookings)
   } catch (error) {
     console.error("❌ API Error fetching bookings:", error)
@@ -140,11 +160,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ✅ AÑADIR FUNCIÓN POST PARA CREAR RESERVAS
 export async function POST(request: NextRequest) {
   try {
     console.log("🔄 API: Creating new booking...")
-
     const bookingData = await request.json()
     console.log("📝 Received booking data:", {
       customerName: bookingData.customerName,
@@ -153,17 +171,14 @@ export async function POST(request: NextRequest) {
       paymentStatus: bookingData.paymentStatus,
       paymentType: bookingData.paymentType,
       hasDiscount: !!bookingData.discountCode,
+      hotelCode: bookingData.hotelCode, // ✅ NUEVO: Log hotelCode
     })
 
-    // ✅ CREAR LA RESERVA USANDO LA FUNCIÓN EXISTENTE
     const booking = await createBooking(bookingData)
     console.log("✅ Booking created successfully:", booking[0])
 
-    // ✅ ENVIAR EMAILS DE CONFIRMACIÓN (NO BLOQUEAR SI FALLAN)
     try {
-      // Obtener nombre del vehículo
       const vehicleName = bookingData.vehicleName || "Vehículo"
-
       const emailData = {
         bookingId: Number(booking[0].id),
         customerName: bookingData.customerName,
@@ -181,15 +196,11 @@ export async function POST(request: NextRequest) {
         paymentType: bookingData.paymentType || "full_payment",
         amountPaid: bookingData.amountPaid || bookingData.finalAmount || 0,
         amountPending: bookingData.amountPending || 0,
+        hotelCode: bookingData.hotelCode, // ✅ NUEVO: Incluir hotelCode en emailData
       }
-
       console.log("📧 Sending booking confirmation emails...")
-
-      // Enviar notificación al admin
       await sendAdminNotification(emailData)
       console.log("✅ Admin notification sent")
-
-      // Enviar confirmación al cliente
       await sendCustomerConfirmation(emailData)
       console.log("✅ Customer confirmation sent")
     } catch (emailError) {

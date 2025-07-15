@@ -25,8 +25,8 @@ interface Vehicle {
     price: number
     label: string
   }>
-  securityDeposit?: number
-  manualdeposit?: number
+  securityDeposit?: number | null // Allow null
+  manualDeposit?: number | null // Allow null
   stock?: number
 }
 
@@ -687,7 +687,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
           formData.customerEmail || `${formData.customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`
         }
         customerDni={formData.customerDni}
-        manualDeposit={vehicle?.manualdeposit || 0}
+        manualDeposit={vehicle?.manualDeposit || 0}
       />
     </>
   )

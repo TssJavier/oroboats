@@ -12,9 +12,23 @@ import { BookingManagement } from "./booking-management"
 import { SettingsManagement } from "./settings-management"
 import { AdminStats } from "./admin-stats"
 import { AdminHeader } from "./admin-header"
-import { DepositAlerts } from "./deposit-alerts"
+//import { DepositAlerts } from "./deposit-alerts"
 import { UserManagement } from "./user-management"
-import { Ship, Calendar, Settings, BarChart3, Shield, Percent, TrendingUp, ExternalLink, Users } from "lucide-react"
+import { BeachManagement } from "./beach-management" // ✅ Importar BeachManagement
+import { HotelManagement } from "./hotel-management" // ✅ NUEVO: Importar HotelManagement
+import {
+  Ship,
+  Calendar,
+  Settings,
+  BarChart3,
+  Shield,
+  Percent,
+  TrendingUp,
+  ExternalLink,
+  Users,
+  MapPin,
+  Hotel,
+} from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface User {
@@ -46,7 +60,7 @@ export function AdminDashboard() {
   }
 
   // ✅ COMPATIBILIDAD: Verificar admin usando isAdmin O role
-  const isAdmin = currentUser?.isAdmin === true || currentUser?.role === "admin"
+  //const isAdmin = currentUser?.isAdmin === true || currentUser?.role === "admin"
 
   const quickActions = [
     {
@@ -79,6 +93,8 @@ export function AdminDashboard() {
     { value: "stats", label: "Estadísticas", icon: BarChart3, allowedRoles: ["admin", "comercial"] },
     { value: "vehicles", label: "Productos", icon: Ship, allowedRoles: ["admin", "comercial"] },
     { value: "bookings", label: "Reservas", icon: Calendar, allowedRoles: ["admin", "comercial"] },
+    { value: "beaches", label: "Playas", icon: MapPin, allowedRoles: ["admin"] }, // ✅ NUEVO: Gestión de Playas
+    { value: "hotels", label: "Hoteles", icon: Hotel, allowedRoles: ["admin"] }, // ✅ NUEVO: Gestión de Hoteles
     { value: "users", label: "Comerciales", icon: Users, allowedRoles: ["admin"] }, // Solo admin
     { value: "settings", label: "Configuración", icon: Settings, allowedRoles: ["admin", "comercial"] },
   ]
@@ -107,10 +123,10 @@ export function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
         <AdminHeader />
 
-        {/* Alertas de fianzas pendientes */}
+        {/* Alertas de fianzas pendientes 
         <div className="mb-8">
           <DepositAlerts />
-        </div>
+        </div>*/}
 
         {/* Accesos Rápidos */}
         <div className="mb-8 md:mb-12">
@@ -142,10 +158,14 @@ export function AdminDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* Mobile: Dropdown selector */}
           <div className="md:hidden mb-8">
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              {" "}
+              {/* Changed background and border */}
               <label className="block text-sm font-medium text-gray-700 mb-2">Sección del Panel</label>
               <Select value={activeTab} onValueChange={setActiveTab}>
-                <SelectTrigger className="w-full h-12 text-left">
+                <SelectTrigger className="w-full h-12 text-left border-2 border-blue-500 shadow-md">
+                  {" "}
+                  {/* Added border and shadow */}
                   <div className="flex items-center">
                     {filteredTabOptions.find((tab) => tab.value === activeTab)?.icon && (
                       <div className="mr-3">
@@ -198,6 +218,16 @@ export function AdminDashboard() {
 
           <TabsContent value="bookings" className="mt-0">
             <BookingManagement />
+          </TabsContent>
+
+          {/* ✅ NUEVO: Contenido para la gestión de playas */}
+          <TabsContent value="beaches" className="mt-0">
+            <BeachManagement />
+          </TabsContent>
+
+          {/* ✅ NUEVO: Contenido para la gestión de hoteles */}
+          <TabsContent value="hotels" className="mt-0">
+            <HotelManagement />
           </TabsContent>
 
           <TabsContent value="users" className="mt-0">

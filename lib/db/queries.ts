@@ -124,7 +124,7 @@ export async function getBookings() {
     console.log("🔍 DB: Fetching bookings...")
     // ✅ MODIFICADO: Usar SQL directo para asegurar que obtenemos todos los campos
     const result = await db.execute(sql`
-      SELECT 
+      SELECT
         b.*,
         v.name as vehicle_name,
         v.type as vehicle_type
@@ -132,7 +132,6 @@ export async function getBookings() {
       LEFT JOIN vehicles v ON b.vehicle_id = v.id
       ORDER BY b.created_at DESC
     `)
-
     // Transformar el resultado al formato esperado por el frontend
     const transformedResult = (result as any[]).map((row: any) => ({
       booking: {
@@ -163,6 +162,7 @@ export async function getBookings() {
         amountPaid: row.amount_paid || row.total_price,
         amountPending: row.amount_pending || "0",
         paymentLocation: row.payment_location || "online",
+        hotelCode: row.hotel_code, // ✅ AÑADIDO: Incluir hotelCode
       },
       vehicle: row.vehicle_name
         ? {
@@ -171,12 +171,10 @@ export async function getBookings() {
           }
         : null,
     }))
-
     console.log(`✅ DB: Found ${transformedResult.length} bookings`)
     // Debug para ver si hay documentos firmados
     const withWaivers = transformedResult.filter((b) => b.booking.liabilityWaiverId).length
     console.log(`✅ DB: ${withWaivers} bookings have signed liability waivers`)
-
     return transformedResult
   } catch (error) {
     console.error("❌ DB Error fetching bookings:", error)
@@ -189,7 +187,6 @@ export async function getBookingsByDate(date: Date) {
   startOfDay.setHours(0, 0, 0, 0)
   const endOfDay = new Date(date)
   endOfDay.setHours(23, 59, 59, 999)
-
   return await db
     .select()
     .from(bookings)
@@ -200,13 +197,11 @@ export async function getBookingsByDate(date: Date) {
 export async function createBooking(bookingData: any) {
   try {
     console.log("🔍 DB: Creating booking with data:", JSON.stringify(bookingData, null, 2))
-
     // ✅ VERIFICAR QUE timeSlot EXISTE
     if (!bookingData.timeSlot) {
       console.log("⚠️ timeSlot missing, generating from start/end times...")
       bookingData.timeSlot = `${bookingData.startTime}-${bookingData.endTime}`
     }
-
     console.log("🔍 DB: timeSlot value:", bookingData.timeSlot)
 
     // ✅ VERIFICAR CAMPOS DE PAGO PARCIAL - NORMALIZAR NOMBRES
@@ -214,7 +209,6 @@ export async function createBooking(bookingData: any) {
     const amountPaid = bookingData.amount_paid || bookingData.amountPaid || bookingData.totalPrice
     const amountPending = bookingData.amount_pending || bookingData.amountPending || "0"
     const paymentLocation = bookingData.payment_location || bookingData.paymentLocation || "online"
-
     console.log("💰 Payment details for DB:", {
       paymentType,
       amountPaid,
@@ -231,45 +225,20 @@ export async function createBooking(bookingData: any) {
         discount_code, discount_amount, original_price, security_deposit,
         created_at, updated_at,
         payment_type, amount_paid, amount_pending, payment_location,
-        liability_waiver_id, is_test_booking
-      ) VALUES (
-        ${Number(bookingData.vehicleId)},
-        ${bookingData.customerName},
-        ${bookingData.customerEmail},
-        ${bookingData.customerPhone},
-        ${bookingData.bookingDate},
-        ${bookingData.timeSlot},
-        ${bookingData.startTime},
-        ${bookingData.endTime},
-        ${bookingData.duration},
-        ${String(bookingData.totalPrice)},
-        ${bookingData.status || "pending"},
-        ${bookingData.paymentStatus || "pending"},
-        ${bookingData.notes || null},
-        ${bookingData.discountCode || null},
-        ${String(bookingData.discountAmount || 0)},
-        ${String(bookingData.originalPrice || bookingData.totalPrice)},
-        ${String(bookingData.securityDeposit || 0)},
+        liability_waiver_id, is_test_booking, hotel_code -- ✅ AÑADIDO: hotel_code
+      ) VALUES (${Number(bookingData.vehicleId)},${bookingData.customerName},${bookingData.customerEmail},${bookingData.customerPhone},${bookingData.bookingDate},${bookingData.timeSlot},${bookingData.startTime},${bookingData.endTime},${bookingData.duration},${String(bookingData.totalPrice)},${bookingData.status || "pending"},${bookingData.paymentStatus || "pending"},${bookingData.notes || null},${bookingData.discountCode || null},${String(bookingData.discountAmount || 0)},${String(bookingData.originalPrice || bookingData.totalPrice)},${String(bookingData.securityDeposit || 0)},
         NOW(),
-        NOW(),
-        ${paymentType},
-        ${String(amountPaid)},
-        ${String(amountPending)},
-        ${paymentLocation},
-        ${bookingData.liability_waiver_id || bookingData.liabilityWaiverId || null},
-        ${bookingData.isTestBooking || false}
+        NOW(),${paymentType},${String(amountPaid)},${String(amountPending)},${paymentLocation},${bookingData.liability_waiver_id || bookingData.liabilityWaiverId || null},${bookingData.isTestBooking || false},${bookingData.hotelCode || null} -- ✅ AÑADIDO: Valor para hotel_code
       ) RETURNING *;
     `)
-
     console.log("✅ DB: Booking created successfully")
-
     // ✅ VERIFICAR QUE SE GUARDÓ CORRECTAMENTE
     if (result && result.length > 0) {
       console.log("✅ DB: Payment type saved as:", result[0].payment_type)
       console.log("✅ DB: Amount paid saved as:", result[0].amount_paid)
       console.log("✅ DB: Amount pending saved as:", result[0].amount_pending)
+      console.log("✅ DB: Hotel Code saved as:", result[0].hotel_code) // ✅ NUEVO: Log para hotel_code
     }
-
     return result // ✅ CORREGIDO: Devolver las filas del resultado
   } catch (error) {
     console.error("❌ DB Error creating booking:", error)
@@ -312,7 +281,6 @@ export async function getAdminStats() {
     }, 0)
     const pendingBookings = totalBookings.filter((b) => b.status === "pending").length
     const todayBookings = await getBookingsByDate(new Date())
-
     return {
       totalBookings: totalBookings.length || 0,
       totalRevenue: totalRevenue || 0,
@@ -336,9 +304,7 @@ export async function getAdminStats() {
 export async function removeDuplicateVehicles() {
   try {
     console.log("🧹 DB: Removing duplicate vehicles...")
-
     const allVehicles = await db.select().from(vehicles).orderBy(vehicles.id)
-
     const vehicleGroups = allVehicles.reduce(
       (groups, vehicle) => {
         const key = vehicle.name.toLowerCase().trim()
@@ -350,7 +316,6 @@ export async function removeDuplicateVehicles() {
       },
       {} as Record<string, typeof allVehicles>,
     )
-
     let deletedCount = 0
     for (const [name, vehiclesList] of Object.entries(vehicleGroups)) {
       if (vehiclesList.length > 1) {
@@ -362,7 +327,6 @@ export async function removeDuplicateVehicles() {
         }
       }
     }
-
     console.log(`✅ DB: Removed ${deletedCount} duplicate vehicles`)
     return deletedCount
   } catch (error) {

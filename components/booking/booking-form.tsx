@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { CalendarPicker } from "./calendar-picker"
 import { TimePicker } from "./time-picker"
 import { LiabilityWaiver } from "./liability-waiver"
-import { ArrowLeft, Ship, Zap, Users, Calendar, CreditCard, FileText, Share2, Copy, Check } from "lucide-react"
+import { ArrowLeft, Ship, Zap, Users, Calendar, CreditCard, FileText, Share2, Copy, Check, Hotel } from "lucide-react" // ✅ NUEVO: Importar Hotel icon
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
@@ -38,6 +38,7 @@ interface BookingData {
   notes: string
   securityDeposit?: number
   liabilityWaiverId?: number
+  hotelCode?: string // ✅ NUEVO: Añadir hotelCode
 }
 
 const translations = {
@@ -57,6 +58,8 @@ const translations = {
     phone: "Teléfono",
     notes: "Notas adicionales (opcional)",
     notesPlaceholder: "Alguna petición especial...",
+    hotelCode: "Código de Hotel (opcional)",
+    hotelCodePlaceholder: "Introduce el código", // ✅ MODIFICADO: Nuevo placeholder
     summary: "Resumen de la reserva",
     total: "Total",
     payNow: "Confirmar Reserva",
@@ -94,6 +97,8 @@ const translations = {
     phone: "Phone",
     notes: "Additional notes (optional)",
     notesPlaceholder: "Any special requests...",
+    hotelCode: "Hotel Code (optional)",
+    hotelCodePlaceholder: "Enter the code", // ✅ MODIFICADO: Nuevo placeholder
     summary: "Booking summary",
     total: "Total",
     payNow: "Confirm Booking",
@@ -111,7 +116,7 @@ const translations = {
     shareDescription: "Share this link for the customer to complete the booking",
     linkCopied: "Link copied to clipboard",
     prefilledBooking: "Pre-configured booking",
-    prefilledDescription:"",
+    prefilledDescription: "",
     vehicleSelected: "Vehicle selected",
     dateTimeSelected: "Date and time selected",
   },
@@ -157,10 +162,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     notes: "",
     securityDeposit: securityDeposit,
     liabilityWaiverId: undefined,
+    hotelCode: "", // ✅ NUEVO: Inicializar hotelCode
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [navigationLoading, setNavigationLoading] = useState(false)
+  const [showHotelCodeInput, setShowHotelCodeInput] = useState(false) // ✅ NUEVO: Estado para mostrar/ocultar campo de hotel code
 
   // ✅ REFERENCIAS SIMPLES - Solo las necesarias
   const stepTitleRef = useRef<HTMLDivElement>(null)
@@ -610,6 +617,33 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                           className="bg-gray-50 border-gray-200"
                         />
                       </div>
+
+                      {/* ✅ MODIFICADO: Campo de código de hotel con icono de toggle */}
+                      <div className="space-y-2">
+                        {!showHotelCodeInput && (
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowHotelCodeInput(true)}
+                            className="w-12 h-12 p-0 flex items-center justify-center border-gray-300 text-gray-600 hover:text-black hover:bg-gray-100" // Botón solo con icono
+                            aria-label="Añadir código de hotel"
+                          >
+                            <Hotel className="h-5 w-5" />
+                          </Button>
+                        )}
+                        {showHotelCodeInput && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t.hotelCode}</label>
+                            <Input
+                              value={bookingData.hotelCode}
+                              onChange={(e) =>
+                                setBookingData((prev) => ({ ...prev, hotelCode: e.target.value.toUpperCase() }))
+                              } // Force uppercase
+                              placeholder={t.hotelCodePlaceholder} // ✅ MODIFICADO: Nuevo placeholder
+                              className="bg-gray-50 border-gray-200"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -668,62 +702,60 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
+                  {/* Navigation Buttons */}
+                  <div className="pt-6 border-t border-gray-200 space-y-4">
+                    {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
+                      // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
+                      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
+                        {/* ✅ MODIFICADO: Solo mostrar botón "Anterior" si no es deeplink en paso 2 */}
+                        {!(isDeeplink && currentStep === 2) && (
+                          <Button
+                            variant="outline"
+                            onClick={handlePrevStep}
+                            className="border-gray-300 w-full sm:w-auto order-2 sm:order-1 bg-transparent"
+                          >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Anterior
+                          </Button>
+                        )}
 
-{/* Navigation Buttons */}
-<div className="pt-6 border-t border-gray-200 space-y-4">
-  {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
-    // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
-    <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-      {/* ✅ MODIFICADO: Solo mostrar botón "Anterior" si no es deeplink en paso 2 */}
-      {!(isDeeplink && currentStep === 2) && (
-        <Button
-          variant="outline"
-          onClick={handlePrevStep}
-          className="border-gray-300 w-full sm:w-auto order-2 sm:order-1 bg-transparent"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Anterior
-        </Button>
-      )}
+                        <div className="order-1 sm:order-2">
+                          <Button
+                            ref={nextButtonRef}
+                            onClick={handleNextStep}
+                            className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+                          >
+                            Siguiente
+                            <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : currentStep === 1 ? (
+                      // Primer paso
+                      <div className="flex flex-col gap-4 sm:items-end">
+                        <Button
+                          ref={nextButtonRef}
+                          onClick={handleNextStep}
+                          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+                        >
+                          Siguiente
+                          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                        </Button>
 
-      <div className="order-1 sm:order-2">
-        <Button
-          ref={nextButtonRef}
-          onClick={handleNextStep}
-          className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
-        >
-          Siguiente
-          <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-        </Button>
-      </div>
-    </div>
-  ) : currentStep === 1 ? (
-    // Primer paso
-    <div className="flex flex-col gap-4 sm:items-end">
-      <Button
-        ref={nextButtonRef}
-        onClick={handleNextStep}
-        className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
-      >
-        Siguiente
-        <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-      </Button>
-
-      {/* ✅ Botón de compartir debajo del botón Siguiente */}
-      {selectedDate && selectedTime && !isDeeplink && (
-        <Button
-          variant="outline"
-          onClick={generateShareLink}
-          className="border-gold text-black hover:bg-gold hover:text-black bg-transparent w-full sm:w-auto"
-        >
-          <Share2 className="h-4 w-4 mr-2" />
-          {t.shareBooking}
-        </Button>
-      )}
-    </div>
-  ) : null}
-</div>
-
+                        {/* ✅ Botón de compartir debajo del botón Siguiente */}
+                        {selectedDate && selectedTime && !isDeeplink && (
+                          <Button
+                            variant="outline"
+                            onClick={generateShareLink}
+                            className="border-gold text-black hover:bg-gold hover:text-black bg-transparent w-full sm:w-auto"
+                          >
+                            <Share2 className="h-4 w-4 mr-2" />
+                            {t.shareBooking}
+                          </Button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
             </div>

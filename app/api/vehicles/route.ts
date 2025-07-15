@@ -1,90 +1,78 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
-import { sql } from "drizzle-orm"
+import { vehicles } from "@/lib/db/schema"
+import { eq, and } from "drizzle-orm"
 
 export async function GET(request: NextRequest) {
   try {
     console.log("🚗 API: Fetching vehicles...")
     const { searchParams } = new URL(request.url)
     const includeUnavailable = searchParams.get("all") === "true"
+    const beachLocationId = searchParams.get("beachLocationId")
 
-    console.log("🔍 DB: Fetching vehicles with STOCK field...")
-    
-    // ✅ ARREGLADO: Usar SQL directo para incluir stock
-    const vehicles = await db.execute(sql`
-      SELECT 
-        id, 
-        name, 
-        type, 
-        category, 
-        requires_license as "requiresLicense", 
-        capacity, 
-        pricing, 
-        available_durations as "availableDurations", 
-        includes, 
-        fuel_included as "fuelIncluded", 
-        description, 
-        image, 
-        available, 
-        created_at as "createdAt", 
-        updated_at as "updatedAt", 
-        custom_duration_enabled as "customDurationEnabled",
-        extra_features as "extraFeatures",
-        security_deposit as "securityDeposit",
-        manualDeposit as "manualdeposit",
-        stock  -- ✅ CAMPO STOCK INCLUIDO
-      FROM vehicles
-      ${!includeUnavailable ? sql`WHERE available = true` : sql``}
-      ORDER BY created_at DESC
-    `)
+    console.log("🔍 Filters applied:", { includeUnavailable, beachLocationId })
 
-    console.log(`✅ DB: Found ${vehicles.length} vehicles`)
+    // ✅ Build conditions array properly
+    const conditions = []
 
-    // ✅ ARREGLADO: Procesar datos incluyendo stock
-    const processedVehicles = vehicles.map(vehicle => {
+    // Add availability condition if not including all
+    if (!includeUnavailable) {
+      conditions.push(eq(vehicles.available, true))
+    }
+
+    // Add beach location condition if specified
+    if (beachLocationId) {
+      console.log("🏖️ Filtering by beach:", beachLocationId)
+      conditions.push(eq(vehicles.beachLocationId, beachLocationId))
+    }
+
+    // ✅ Use Drizzle ORM with proper condition combining
+    let query = db.select().from(vehicles)
+
+    if (conditions.length > 0) {
+      query = query.where(conditions.length === 1 ? conditions[0] : and(...conditions))
+    }
+
+    const vehicleResults = await query.orderBy(vehicles.createdAt)
+
+    console.log(`✅ DB: Found ${vehicleResults.length} vehicles`)
+
+    // Process the results
+    const processedVehicles = vehicleResults.map((vehicle) => {
       try {
-        const processedVehicle = {
-          ...vehicle,
-          // Ensure name is always present
-          name: vehicle.name ?? "Unknown",
-          // Parsear campos JSON
-          pricing: typeof vehicle.pricing === 'string' ? JSON.parse(vehicle.pricing) : (vehicle.pricing || []),
-          availableDurations: typeof vehicle.availableDurations === 'string' ? JSON.parse(vehicle.availableDurations) : (vehicle.availableDurations || []),
-          includes: typeof vehicle.includes === 'string' ? JSON.parse(vehicle.includes) : (vehicle.includes || []),
-          extraFeatures: typeof vehicle.extraFeatures === 'string' ? JSON.parse(vehicle.extraFeatures) : (vehicle.extraFeatures || []),
-          // ✅ CRÍTICO: Asegurar que stock es un número
-          stock: vehicle.stock !== undefined && vehicle.stock !== null ? Number(vehicle.stock) : 1
-        }
-        
         return {
-          ...processedVehicle,
-          id: vehicle.id // Ensure id is always present
+          ...vehicle,
+          name: vehicle.name ?? "Unknown",
+          pricing: typeof vehicle.pricing === "string" ? JSON.parse(vehicle.pricing) : vehicle.pricing || [],
+          availableDurations:
+            typeof vehicle.availableDurations === "string"
+              ? JSON.parse(vehicle.availableDurations)
+              : vehicle.availableDurations || [],
+          includes: typeof vehicle.includes === "string" ? JSON.parse(vehicle.includes) : vehicle.includes || [],
+          extraFeatures:
+            typeof vehicle.extraFeatures === "string" ? JSON.parse(vehicle.extraFeatures) : vehicle.extraFeatures || [],
+          stock: vehicle.stock !== undefined && vehicle.stock !== null ? Number(vehicle.stock) : 1,
+          // ✅ CORREGIDO: Asegurar que securityDeposit y manualDeposit se parsean correctamente
+          securityDeposit: vehicle.securityDeposit !== null ? Number(vehicle.securityDeposit) : null,
+          manualDeposit: vehicle.manualDeposit !== null ? Number(vehicle.manualDeposit) : null,
         }
       } catch (error) {
         console.error(`❌ Error processing vehicle ${vehicle.id}:`, error)
-        // En caso de error, devolver el vehículo con stock por defecto
         return {
           ...vehicle,
-          id: vehicle.id, // Ensure id is always present
-          name: vehicle.name ?? "Unknown", // Ensure name is present
+          name: vehicle.name ?? "Unknown",
           stock: 1,
           pricing: [],
           availableDurations: [],
           includes: [],
-          extraFeatures: []
+          extraFeatures: [],
+          securityDeposit: null, // Default to null on error
+          manualDeposit: null, // Default to null on error
         }
       }
     })
 
-    console.log(`✅ API: Found ${processedVehicles.length} vehicles`)
-    
-    // ✅ NUEVO: Log para verificar que stock se incluye
-    if (processedVehicles.length > 0) {
-      console.log("📦 Sample vehicles with stock:")
-      processedVehicles.slice(0, 3).forEach(v => {
-        console.log(`   - ${v.name} (ID: ${v.id}): Stock = ${v.stock}`)
-      })
-    }
+    console.log(`✅ API: Returning ${processedVehicles.length} vehicles`)
 
     return NextResponse.json(processedVehicles)
   } catch (error) {
@@ -102,15 +90,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     console.log("🚗 API: Creating vehicle...")
-    
-    let body
-    try {
-      body = await request.json()
-      console.log("📝 Data received for creation:", body)
-    } catch (error) {
-      console.error("❌ Error parsing request body:", error)
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
-    }
+
+    const body = await request.json()
+    console.log("📝 Data received for creation (full body):", body) // ✅ AÑADIDO: Log completo del body
 
     const {
       name,
@@ -129,68 +111,63 @@ export async function POST(request: NextRequest) {
       extraFeatures,
       securityDeposit,
       manualDeposit,
-
-      stock  // ✅ AÑADIDO: Campo stock
+      stock,
+      beachLocationId,
     } = body
 
-    console.log("🔧 Creating vehicle with STOCK:", {
-      name,
-      stock: stock || 1,
-      type,
-      category
-    })
+    console.log("📝 Data received for creation (deposits):", { securityDeposit, manualDeposit }) // ✅ AÑADIDO: Log de fianzas
 
-    // ✅ ARREGLADO: Incluir stock en la creación
-    const result = await db.execute(sql`
-      INSERT INTO vehicles (
-        name, 
-        type, 
-        category, 
-        requires_license, 
-        capacity, 
-        pricing, 
-        available_durations, 
-        includes, 
-        fuel_included, 
-        description, 
-        image, 
-        available, 
-        custom_duration_enabled,
-        extra_features,
-        security_deposit,
-        manualDeposit,
-        stock,
-        created_at,
-        updated_at
-      ) 
-      VALUES (
-        ${name}, 
-        ${type}, 
-        ${category}, 
-        ${requiresLicense}, 
-        ${capacity}, 
-        ${JSON.stringify(pricing || [])}, 
-        ${JSON.stringify(availableDurations || [])}, 
-        ${JSON.stringify(includes || [])}, 
-        ${fuelIncluded}, 
-        ${description}, 
-        ${image}, 
-        ${available !== undefined ? available : true}, 
-        ${customDurationEnabled || false},
-        ${JSON.stringify(extraFeatures || [])},
-        ${Number(securityDeposit) || 0},
-        ${Number(manualDeposit) || 0},
-        ${Number(stock) || 1},
-        NOW(),
-        NOW()
+    // ✅ VALIDATION: Ensure required fields are present
+    if (!name || !type || !beachLocationId) {
+      console.error("❌ Missing required fields:", {
+        name: !!name,
+        type: !!type,
+        beachLocationId: !!beachLocationId,
+      })
+      return NextResponse.json(
+        {
+          error: "Missing required fields: name, type, and beachLocationId are required",
+          received: { name: !!name, type: !!type, beachLocationId: !!beachLocationId },
+        },
+        { status: 400 },
       )
-      RETURNING *
-    `)
+    }
 
-    const newVehicle = Array.isArray(result) ? result[0] : result
-    console.log("✅ Vehicle created successfully:", newVehicle?.id)
-    console.log("📦 Stock saved as:", newVehicle?.stock)
-    
+    console.log("🔧 Creating vehicle with beach location:", beachLocationId)
+
+    // ✅ Use Drizzle ORM insert
+    const result = await db
+      .insert(vehicles)
+      .values({
+        name,
+        type,
+        category,
+        requiresLicense: requiresLicense || false,
+        capacity: capacity || 2,
+        pricing: JSON.stringify(pricing || []),
+        availableDurations: JSON.stringify(availableDurations || []),
+        includes: JSON.stringify(includes || []),
+        fuelIncluded: fuelIncluded !== undefined ? fuelIncluded : true,
+        description: description || "",
+        image: image || "",
+        available: available !== undefined ? available : true,
+        customDurationEnabled: customDurationEnabled || false,
+        extraFeatures: JSON.stringify(extraFeatures || []),
+        // ✅ CORREGIDO: Guardar null si el valor es undefined o null, de lo contrario, el número
+        securityDeposit: securityDeposit === undefined || securityDeposit === null ? null : Number(securityDeposit),
+        manualDeposit: manualDeposit === undefined || manualDeposit === null ? null : Number(manualDeposit),
+        stock: Number(stock) || 1,
+        beachLocationId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning()
+
+    const newVehicle = result[0]
+    console.log("✅ Vehicle created successfully with beach:", newVehicle?.beachLocationId)
+    console.log("✅ Security Deposit saved as:", newVehicle?.securityDeposit) // ✅ AÑADIDO: Log de fianza guardada
+    console.log("✅ Manual Deposit saved as:", newVehicle?.manualDeposit) // ✅ AÑADIDO: Log de fianza manual guardada
+
     return NextResponse.json(newVehicle, { status: 201 })
   } catch (error) {
     console.error("❌ API Error creating vehicle:", error)

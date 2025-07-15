@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ImageUpload } from "./image-upload"
-import { ArrowLeft, Plus, Trash2, Save, Award, AlertCircle, Euro, Clock, Package } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Save, Award, AlertCircle, Euro, Clock, Package, MapPin } from "lucide-react"
+import { toast } from "sonner" // Importar toast de sonner
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select" // Importar Select de shadcn/ui
 
 interface PricingOption {
   duration: string
@@ -24,29 +26,36 @@ interface ExtraFeature {
   price?: number
 }
 
+// ✅ ACTUALIZADO: Interfaz Vehicle para coincidir con el esquema de la base de datos
 interface Vehicle {
-  id?: number
+  id?: number // ID puede ser opcional para nuevos vehículos
   name: string
   type: string
-  category: string
-  requiresLicense: boolean
+  category?: string // Hacemos category opcional según el esquema
+  requiresLicense?: boolean // Hacemos opcional según el esquema
   capacity: number
   pricing: PricingOption[]
-  availableDurations: string[]
+  availableDurations?: string[] // Hacemos opcional según el esquema
   includes: string[]
   fuelIncluded: boolean
   description: string
   image: string
-  available: boolean
-  customDurationEnabled: boolean
+  available?: boolean // Hacemos opcional según el esquema
+  customDurationEnabled?: boolean // Hacemos opcional según el esquema
   extraFeatures?: ExtraFeature[]
-  securityDeposit?: number
-  manualDeposit?: number
+  securityDeposit?: number | null // Allow null for security deposit
+  manualDeposit?: number | null // Allow null for manual deposit
   stock?: number // Nuevo campo para stock/inventario
+  beachLocationId?: string // ✅ Campo de playa, hacemos opcional para nuevos vehículos
+}
+
+interface BeachLocation {
+  id: string
+  name: string
 }
 
 interface VehicleFormProps {
-  vehicle?: Vehicle | null
+  vehicle?: Vehicle
   onSuccess: () => void
   onCancel: () => void
 }
@@ -148,25 +157,49 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     available: true,
     customDurationEnabled: false,
     extraFeatures: AVAILABLE_EXTRA_FEATURES.map((f) => ({ ...f })),
-    securityDeposit: 0,
-    manualDeposit: 0,
+    securityDeposit: undefined, // Changed to undefined
+    manualDeposit: undefined, // Changed to undefined
     stock: 1, // ✅ NUEVO: Stock por defecto
+    beachLocationId: "", // ✅ Campo de playa
   })
   const [newInclude, setNewInclude] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [beachLocations, setBeachLocations] = useState<BeachLocation[]>([])
+  const [loadingLocations, setLoadingLocations] = useState(true)
 
   useEffect(() => {
     if (vehicle) {
       setFormData({
         ...vehicle,
         extraFeatures: vehicle.extraFeatures || AVAILABLE_EXTRA_FEATURES.map((f) => ({ ...f })),
-        securityDeposit: vehicle.securityDeposit || 0,
-        manualDeposit: vehicle.manualDeposit || 0,
+        securityDeposit: vehicle.securityDeposit ?? undefined, // Use nullish coalescing
+        manualDeposit: vehicle.manualDeposit ?? undefined, // Use nullish coalescing
         stock: vehicle.stock || 1, // ✅ NUEVO: Cargar stock existente
+        beachLocationId: vehicle.beachLocationId || "", // ✅ Cargar playa existente
       })
     }
   }, [vehicle])
+
+  useEffect(() => {
+    fetchBeachLocations()
+  }, [])
+
+  const fetchBeachLocations = async () => {
+    try {
+      setLoadingLocations(true)
+      const response = await fetch("/api/locations")
+      if (response.ok) {
+        const data = await response.json()
+        setBeachLocations(data)
+      }
+    } catch (error) {
+      console.error("Error fetching beach locations:", error)
+      toast.error("Error al cargar las ubicaciones de playa.")
+    } finally {
+      setLoadingLocations(false)
+    }
+  }
 
   // Actualizar categoría cuando cambia tipo o licencia
   useEffect(() => {
@@ -186,14 +219,30 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     setLoading(true)
     setError(null)
 
+    if (!formData.beachLocationId) {
+      setError("Debes seleccionar una playa de operación.")
+      setLoading(false)
+      return
+    }
+
     try {
       // Preparar datos para envío
       const dataToSend = {
         ...formData,
-        availableDurations: formData.pricing.map((p) => p.duration),
+        // Asegurarse de que los campos opcionales que son arrays no sean undefined si están vacíos
+        availableDurations: formData.availableDurations || [],
         extraFeatures: formData.extraFeatures || [],
-        securityDeposit: formData.securityDeposit || 0,
-        manualDeposit: formData.manualDeposit || 0,
+        includes: formData.includes || [],
+        pricing: formData.pricing || [],
+        // ✅ CORREGIDO: Enviar null si el campo está vacío, de lo contrario, parsear a float
+        securityDeposit:
+          formData.securityDeposit === undefined || formData.securityDeposit === null
+            ? null
+            : Number.parseFloat(String(formData.securityDeposit)),
+        manualDeposit:
+          formData.manualDeposit === undefined || formData.manualDeposit === null
+            ? null
+            : Number.parseFloat(String(formData.manualDeposit)),
         stock: formData.stock || 1, // ✅ NUEVO: Incluir stock
       }
 
@@ -215,10 +264,12 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         const errorData = await response.json().catch(() => ({ error: "Error desconocido" }))
         console.error("❌ Server error:", errorData)
         setError(`Error ${response.status}: ${errorData.error || "Error desconocido"}`)
+        toast.error(`Error ${response.status}: ${errorData.error || "Error desconocido"}`)
       }
     } catch (error) {
       console.error("❌ Connection error:", error)
       setError("Error de conexión: " + (error instanceof Error ? error.message : "Error desconocido"))
+      toast.error("Error de conexión: " + (error instanceof Error ? error.message : "Error desconocido"))
     } finally {
       setLoading(false)
     }
@@ -290,7 +341,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={onCancel} className="border-gray-300">
+        <Button variant="outline" onClick={onCancel} className="border-gray-300 bg-transparent">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
@@ -574,7 +625,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 <Clock className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500 mb-4">No hay franjas horarias configuradas</p>
                 <p className="text-sm text-gray-400">
-                  Haz clic en "Generar Franjas" para crear las franjas automáticamente
+                  Haz clic en &quot;Generar Franjas&quot; para crear las franjas automáticamente
                 </p>
               </div>
             )}
@@ -583,7 +634,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
               type="button"
               variant="outline"
               onClick={addCustomPricing}
-              className="w-full border-gray-300 hover:border-gold hover:text-gold"
+              className="w-full border-gray-300 hover:border-gold hover:text-gold bg-transparent"
             >
               <Plus className="h-4 w-4 mr-2" />
               Añadir franja personalizada
@@ -650,8 +701,13 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 <label className="block text-sm font-medium text-gray-700 mb-2">Importe de la fianza (€)</label>
                 <Input
                   type="number"
-                  value={formData.securityDeposit}
-                  onChange={(e) => setFormData({ ...formData, securityDeposit: Number.parseFloat(e.target.value) })}
+                  value={formData.securityDeposit ?? ""} // Display empty string if undefined/null
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      securityDeposit: e.target.value === "" ? undefined : Number.parseFloat(e.target.value),
+                    })
+                  }
                   min="0"
                   step="0.01"
                   placeholder="0.00"
@@ -666,8 +722,13 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 <label className="block text-sm font-medium text-gray-700 mb-2">Fianza manual en sitio (€)</label>
                 <Input
                   type="number"
-                  value={formData.manualDeposit}
-                  onChange={(e) => setFormData({ ...formData, manualDeposit: Number.parseFloat(e.target.value) })}
+                  value={formData.manualDeposit ?? ""} // Display empty string if undefined/null
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      manualDeposit: e.target.value === "" ? undefined : Number.parseFloat(e.target.value),
+                    })
+                  }
                   min="0"
                   step="0.01"
                   placeholder="0.00"
@@ -677,7 +738,6 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                   Esta fianza se paga en el sitio y no se incluye en el precio online
                 </p>
               </div>
-
             </CardContent>
           </Card>
 
@@ -696,7 +756,7 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                   className="bg-gray-50 border-gray-200"
                   onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addInclude())}
                 />
-                <Button type="button" onClick={addInclude} variant="outline" className="border-gray-300">
+                <Button type="button" onClick={addInclude} variant="outline" className="border-gray-300 bg-transparent">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -717,9 +777,46 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
           </Card>
         </div>
 
+        {/* ✅ ACTUALIZADO: Selección de playa con shadcn/ui Select */}
+        <Card className="bg-white border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-black flex items-center">
+              <MapPin className="h-5 w-5 text-gold mr-3" />
+              Playa de Operación
+            </CardTitle>
+            <CardDescription>Selecciona en qué playa estará disponible este producto</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingLocations ? (
+              <div className="text-center py-4 text-gray-500">Cargando ubicaciones...</div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Playa *</label>
+                <Select
+                  value={formData.beachLocationId}
+                  onValueChange={(value) => setFormData({ ...formData, beachLocationId: value })}
+                  required
+                >
+                  <SelectTrigger className="w-full p-3 border border-gray-200 rounded-md bg-gray-50">
+                    <SelectValue placeholder="Selecciona una playa..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {beachLocations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!formData.beachLocationId && <p className="text-xs text-red-500 mt-1">Este campo es obligatorio</p>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Botones */}
         <div className="flex gap-4 justify-end">
-          <Button type="button" variant="outline" onClick={onCancel} className="border-gray-300">
+          <Button type="button" variant="outline" onClick={onCancel} className="border-gray-300 bg-transparent">
             Cancelar
           </Button>
           <Button
@@ -735,5 +832,3 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
     </div>
   )
 }
-
-export default VehicleForm

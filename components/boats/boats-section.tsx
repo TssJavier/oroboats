@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import type React from "react"
+
 import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SimpleDateFilter } from "./simple-date-filter"
 import {
   Ship,
@@ -32,6 +34,10 @@ import {
   Package,
   Filter,
   Anchor,
+  MapPin,
+  ArrowLeft,
+  ChevronDown,
+  Check,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -41,7 +47,6 @@ import { OroLoading, useNavigationLoading } from "@/components/ui/oro-loading"
 // Función para validar URLs de imágenes
 function isValidImageUrl(url: string): boolean {
   if (!url) return false
-
   try {
     new URL(url)
     return true
@@ -64,6 +69,7 @@ interface ExtraFeature {
   price?: number
 }
 
+// ✅ ACTUALIZADO: Interfaz Vehicle para coincidir con el esquema de la base de datos
 interface Vehicle {
   id: number
   name: string
@@ -74,13 +80,19 @@ interface Vehicle {
   fuelIncluded: boolean
   description: string
   type: string
-  category: string
-  requiresLicense: boolean
-  available: boolean
+  category?: string // Hacemos category opcional según el esquema
+  requiresLicense?: boolean // Hacemos opcional según el esquema
+  available?: boolean // Hacemos opcional según el esquema
   extraFeatures?: ExtraFeature[]
-  securityDeposit?: number
-  manualDeposit?: number
+  securityDeposit?: number | null // Allow null
+  manualDeposit?: number | null // Allow null
   isAvailable?: boolean
+  beachLocationId?: string // Hacemos opcional
+}
+
+interface BeachLocation {
+  id: string
+  name: string
 }
 
 interface Translations {
@@ -139,6 +151,13 @@ interface Translations {
   adjustFilters: string
   boatsAndJetskis: string
   availableForDate: string
+  selectBeach: string
+  selectBeachDescription: string
+  allBeaches: string
+  backToBeaches: string
+  productsAvailable: string
+  changeBeach: string
+  currentBeach: string
 }
 
 const translations = {
@@ -199,6 +218,13 @@ const translations = {
     adjustFilters: "Intenta seleccionar otra fecha",
     boatsAndJetskis: "barcos y motos",
     availableForDate: "disponibles para la fecha seleccionada",
+    selectBeach: "Selecciona tu Playa",
+    selectBeachDescription: "Elige la ubicación donde quieres alquilar tu embarcación",
+    allBeaches: "Todas las Playas",
+    backToBeaches: "Volver a Playas",
+    productsAvailable: "vehículos disponibles",
+    changeBeach: "Cambiar Playa",
+    currentBeach: "Playa Actual",
   },
   en: {
     title: "Our Fleet",
@@ -257,6 +283,13 @@ const translations = {
     adjustFilters: "Try selecting another date",
     boatsAndJetskis: "boats and jet skis",
     availableForDate: "available for selected date",
+    selectBeach: "Select Your Beach",
+    selectBeachDescription: "Choose the location where you want to rent your boat",
+    allBeaches: "All Beaches",
+    backToBeaches: "Back to Beaches",
+    productsAvailable: "vehicles available",
+    changeBeach: "Change Beach",
+    currentBeach: "Current Beach",
   },
 }
 
@@ -307,6 +340,226 @@ function getExtraIcon(featureId: string) {
     default:
       return <Star className="h-4 w-4 text-gray-600" />
   }
+}
+
+// ✅ FIXED: Componente BeachSelector con mejor manejo de eventos táctiles
+function BeachSelector({
+  beachLocations,
+  selectedBeachId,
+  selectedBeachName,
+  onBeachSelect,
+  onBackToSelection,
+  t,
+}: {
+  beachLocations: BeachLocation[]
+  selectedBeachId: string | null
+  selectedBeachName: string
+  onBeachSelect: (id: string, name: string) => void
+  onBackToSelection: () => void
+  t: Translations
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({})
+
+  // Cargar conteos de vehículos para cada playa
+  useEffect(() => {
+    const loadVehicleCounts = async () => {
+      const counts: Record<string, number> = {}
+      for (const location of beachLocations) {
+        try {
+          const response = await fetch(`/api/vehicles?beachLocationId=${location.id}`)
+          if (response.ok) {
+            const data = await response.json()
+            counts[location.id] = Array.isArray(data) ? data.filter((v) => v.available).length : 0
+          }
+        } catch {
+          counts[location.id] = 0
+        }
+      }
+      setVehicleCounts(counts)
+    }
+
+    if (beachLocations.length > 0) {
+      loadVehicleCounts()
+    }
+  }, [beachLocations])
+
+  // ✅ FIXED: Simplificado manejo de eventos
+  const handleBeachChange = (beach: BeachLocation) => {
+    onBeachSelect(beach.id, beach.name)
+    setIsOpen(false)
+  }
+
+  // ✅ FIXED: Simplificado manejo del botón "Volver a Playas"
+  const handleBackToBeaches = () => {
+    onBackToSelection()
+    setIsOpen(false)
+  }
+
+  // ✅ FIXED: Toggle del dropdown con delay para evitar cierre inmediato
+  const toggleDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsOpen(!isOpen)
+  }
+
+  // ✅ FIXED: Cerrar dropdown solo cuando se hace click fuera
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsOpen(false)
+  }
+
+  return (
+    <div className="mb-8">
+      {/* Versión Desktop */}
+      <div className="hidden sm:block">
+        <div className="bg-gradient-to-r from-gold/10 via-yellow-50 to-gold/10 border-2 border-gold/30 rounded-2xl p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-gold p-3 rounded-full shadow-md">
+                <MapPin className="h-6 w-6 text-black" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{t.currentBeach}</h3>
+                <p className="text-2xl font-bold text-gold">{selectedBeachName}</p>
+                <p className="text-sm text-gray-600">
+                  {vehicleCounts[selectedBeachId || ""] || 0} {t.productsAvailable}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              {beachLocations.length > 1 && (
+                <div className="relative">
+                  <button
+                    onClick={toggleDropdown}
+                    className="flex items-center space-x-2 bg-white hover:bg-gray-50 border-2 border-gold/30 hover:border-gold text-gray-700 px-4 py-3 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <span className="font-medium">{t.changeBeach}</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {isOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-white border-2 border-gold/20 rounded-xl shadow-xl z-50 overflow-hidden">
+                      <div className="p-2">
+                        {beachLocations.map((beach) => (
+                          <button
+                            key={beach.id}
+                            onClick={() => handleBeachChange(beach)}
+                            className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                              beach.id === selectedBeachId
+                                ? "bg-gold/20 text-gold border border-gold/30"
+                                : "hover:bg-gray-50 text-gray-700"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <MapPin
+                                className={`h-5 w-5 ${beach.id === selectedBeachId ? "text-gold" : "text-gray-400"}`}
+                              />
+                              <div className="text-left">
+                                <p className="font-medium">{beach.name}</p>
+                                <p className="text-xs text-gray-500">{vehicleCounts[beach.id] || 0} vehículos</p>
+                              </div>
+                            </div>
+                            {beach.id === selectedBeachId && <Check className="h-5 w-5 text-gold" />}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="border-t border-gray-100 p-2">
+                        <button
+                          onClick={handleBackToBeaches}
+                          className="w-full flex items-center justify-center space-x-2 p-3 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                          <span className="text-sm">{t.backToBeaches}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Versión Mobile - ✅ FIXED */}
+      <div className="block sm:hidden">
+        <div className="bg-gradient-to-r from-gold/10 via-yellow-50 to-gold/10 border-2 border-gold/30 rounded-xl p-4 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gold p-2 rounded-full">
+                <MapPin className="h-5 w-5 text-black" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">{t.currentBeach}</p>
+                <p className="text-lg font-bold text-gold">{selectedBeachName}</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              {vehicleCounts[selectedBeachId || ""] || 0} {t.productsAvailable}
+            </p>
+            {beachLocations.length > 1 && (
+              <button
+                onClick={toggleDropdown}
+                className="flex items-center space-x-2 bg-white hover:bg-gray-50 active:bg-gray-100 border border-gold/30 text-gray-700 px-3 py-2 rounded-lg text-sm transition-all"
+                style={{ WebkitTapHighlightColor: "transparent" }}
+              >
+                <span>{t.changeBeach}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+            )}
+          </div>
+
+          {/* Dropdown Mobile - ✅ FIXED */}
+          {isOpen && (
+            <div className="mt-4 bg-white border border-gold/20 rounded-lg shadow-lg overflow-hidden relative z-50">
+              {beachLocations.map((beach) => (
+                <button
+                  key={beach.id}
+                  onClick={() => handleBeachChange(beach)}
+                  className={`w-full flex items-center justify-between p-3 transition-all ${
+                    beach.id === selectedBeachId
+                      ? "bg-gold/20 text-gold"
+                      : "hover:bg-gray-50 active:bg-gray-100 text-gray-700 border-b border-gray-100 last:border-b-0"
+                  }`}
+                  style={{ WebkitTapHighlightColor: "transparent" }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <MapPin className={`h-4 w-4 ${beach.id === selectedBeachId ? "text-gold" : "text-gray-400"}`} />
+                    <div className="text-left">
+                      <p className="font-medium text-sm">{beach.name}</p>
+                      <p className="text-xs text-gray-500">{vehicleCounts[beach.id] || 0} vehículos</p>
+                    </div>
+                  </div>
+                  {beach.id === selectedBeachId && <Check className="h-4 w-4 text-gold" />}
+                </button>
+              ))}
+              <button
+                onClick={handleBackToBeaches}
+                className="w-full flex items-center justify-center space-x-2 p-3 text-gray-600 hover:bg-gray-50 active:bg-gray-100 border-t border-gray-100 transition-colors"
+                style={{ WebkitTapHighlightColor: "transparent" }}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="text-sm">{t.backToBeaches}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ✅ FIXED: Overlay mejorado que solo se activa con un pequeño delay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 sm:hidden"
+          onClick={handleOverlayClick}
+          style={{
+            backgroundColor: "transparent",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        />
+      )}
+    </div>
+  )
 }
 
 // Modal de advertencia de licencia
@@ -360,7 +613,6 @@ function LicenseWarningModal({
           {/* Warning Message */}
           <div className="space-y-4 mb-6">
             <p className="text-gray-700">{t.licenseWarningMessage}</p>
-
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-start">
                 <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
@@ -371,12 +623,12 @@ function LicenseWarningModal({
             </div>
           </div>
 
-          {/* Buttons - ARREGLADO PARA MÓVIL */}
+          {/* Buttons */}
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               variant="outline"
               onClick={onClose}
-              className="w-full sm:flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 py-3"
+              className="w-full sm:flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 py-3 bg-transparent"
             >
               {t.cancel}
             </Button>
@@ -420,14 +672,13 @@ function FloatingContactWidget({ t }: { t: Translations }) {
           aria-label={t.needHelp}
         >
           <HelpCircle className="h-6 w-6 sm:h-8 sm:w-8" />
-
           {/* Tooltip solo en desktop */}
           <div className="absolute right-full mr-3 top-1/2 transform -translate-y-1/2 bg-black text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none hidden sm:block">
             {t.needHelp}
           </div>
         </button>
       ) : (
-        <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-72 sm:w-80 animate-in slide-in-from-bottom-5 duration-300">
+        <div className="bg-white rounded-2xl shadow-2xl border-2 border-gray-200 w-72 sm:w-80 animate-in slide-in-from-bottom-5 duration-300">
           <div className="p-4 sm:p-6">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
@@ -461,7 +712,6 @@ function FloatingContactWidget({ t }: { t: Translations }) {
                   <div className="text-xs sm:text-sm opacity-90">+34 655 52 79 88</div>
                 </div>
               </button>
-
               <button
                 onClick={handleWhatsApp}
                 className="w-full flex items-center bg-green-500 hover:bg-green-600 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg transition-colors duration-200"
@@ -472,7 +722,6 @@ function FloatingContactWidget({ t }: { t: Translations }) {
                   <div className="text-xs sm:text-sm opacity-90">+34 643 44 23 64</div>
                 </div>
               </button>
-
               <button
                 onClick={handleEmail}
                 className="w-full flex items-center bg-gray-600 hover:bg-gray-700 text-white py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg transition-colors duration-200"
@@ -506,27 +755,72 @@ export function BoatsSection() {
   const [hasSearched, setHasSearched] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string>("")
 
-  // ✅ NUEVO: Hook para manejar el estado de carga durante la navegación
+  // ✅ NUEVO: Estados para manejo de playas
+  const [selectedBeachId, setSelectedBeachId] = useState<string | null>(null)
+  const [beachLocations, setBeachLocations] = useState<BeachLocation[]>([])
+  const [fetchingLocations, setFetchingLocations] = useState(true)
+  const [selectedBeachName, setSelectedBeachName] = useState<string>("")
+
   const { isLoading: navigationLoading, startLoading, stopLoading } = useNavigationLoading()
 
   useEffect(() => {
-    fetchVehicles()
+    fetchBeachLocations()
   }, [])
 
-  const fetchVehicles = async () => {
+  // ✅ NUEVO: Función para obtener ubicaciones de playa
+  const fetchBeachLocations = async () => {
     try {
-      setError(null)
-      const response = await fetch("/api/vehicles")
+      setFetchingLocations(true)
+      console.log("🏖️ Fetching beach locations...")
+      const response = await fetch("/api/locations")
+      if (!response.ok) {
+        throw new Error("Error al cargar las ubicaciones de playa.")
+      }
+      const data = await response.json()
+      console.log("🏖️ Beach locations received:", data)
+      if (Array.isArray(data)) {
+        setBeachLocations(data)
+        // Si solo hay una playa, seleccionarla automáticamente
+        if (data.length === 1) {
+          setSelectedBeachId(data[0].id)
+          setSelectedBeachName(data[0].name)
+          await fetchVehicles(data[0].id)
+        } else {
+          setLoading(false)
+        }
+      } else {
+        setError("Error: Datos de ubicaciones no válidos.")
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error("Error fetching beach locations:", err)
+      setError(err instanceof Error ? err.message : "Error al cargar las ubicaciones de playa.")
+      setLoading(false)
+    } finally {
+      setFetchingLocations(false)
+    }
+  }
 
+  // ✅ MODIFICADO: Función para obtener vehículos filtrados por playa
+  const fetchVehicles = async (locationId?: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      console.log("🚗 Fetching vehicles for location:", locationId)
+      // ✅ FIXED: Construct URL properly with beachLocationId parameter
+      const url = locationId ? `/api/vehicles?beachLocationId=${locationId}` : "/api/vehicles"
+      console.log("🔗 API URL:", url)
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-
       const data = await response.json()
-
+      console.log("🚗 Vehicles received:", data)
+      console.log("🔍 Number of vehicles:", data.length)
       if (Array.isArray(data)) {
         setVehicles(data)
         setFilteredVehicles(data)
+        console.log("✅ Vehicles set successfully")
       } else {
         console.error("API returned non-array data:", data)
         setVehicles([])
@@ -541,56 +835,63 @@ export function BoatsSection() {
     }
   }
 
-  // ✅ NUEVA FUNCIÓN PARA FILTRAR POR LICENCIA (BARCOS Y MOTOS JUNTOS)
   const getVehiclesByLicense = (hasLicense: boolean) => {
     const targetCategories = hasLicense
       ? ["boat_with_license", "jetski_with_license"]
       : ["boat_no_license", "jetski_no_license"]
 
-    return filteredVehicles.filter((v) => targetCategories.includes(v.category))
+    console.log("🔍 Filtering vehicles by license:", { hasLicense, targetCategories })
+    console.log("🔍 Available vehicles:", filteredVehicles.length)
+    console.log("🔍 Selected beach:", selectedBeachId)
+
+    const filtered = filteredVehicles.filter((v) => {
+      const matchesCategory = v.category ? targetCategories.includes(v.category) : false // Handle optional category
+      const matchesBeach = selectedBeachId === null || v.beachLocationId === selectedBeachId
+      console.log(`🔍 Vehicle ${v.name}:`, {
+        category: v.category,
+        matchesCategory,
+        beachLocationId: v.beachLocationId,
+        matchesBeach,
+        included: matchesCategory && matchesBeach,
+      })
+      return matchesCategory && matchesBeach
+    })
+
+    console.log("✅ Filtered vehicles:", filtered.length)
+    return filtered
   }
 
-  // ✅ FUNCIÓN PARA BUSCAR POR FECHA MEJORADA
   const handleDateSelect = async (date: string) => {
     setSelectedDate(date)
     setSearchLoading(true)
     setHasSearched(true)
-
     try {
       console.log("🔍 Searching for date:", date)
-
-      // Buscar disponibilidad para la fecha seleccionada
       const response = await fetch("/api/vehicles/availability", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: date,
           vehicleIds: vehicles.map((v) => v.id),
+          beachLocationId: selectedBeachId,
         }),
       })
 
       if (response.ok) {
         const availabilityData = await response.json()
         console.log("📊 Availability data:", availabilityData)
-
-        // Actualizar vehículos con información de disponibilidad
-        const updatedVehicles = availabilityData.map((item: any) => ({
+        const updatedVehicles = availabilityData.map((item: Vehicle) => ({
           ...item,
           isAvailable: item.isAvailable,
         }))
-
-        // Filtrar solo los que tienen al menos un slot disponible
-        const availableVehicles = updatedVehicles.filter((v: any) => v.isAvailable)
-
+        const availableVehicles = updatedVehicles.filter((v: Vehicle) => v.isAvailable)
         setFilteredVehicles(availableVehicles)
       } else {
         console.warn("Availability API not available, showing all vehicles")
-        // ✅ FALLBACK: Si la API falla, mostrar todos los vehículos
         setFilteredVehicles(vehicles)
       }
     } catch (error) {
       console.warn("Error searching by date, showing all vehicles:", error)
-      // ✅ FALLBACK: Si hay error, mostrar todos los vehículos
       setFilteredVehicles(vehicles)
     } finally {
       setSearchLoading(false)
@@ -599,35 +900,22 @@ export function BoatsSection() {
 
   const currentVehicles = getVehiclesByLicense(activeLicense === "with")
 
-  // ✅ MODIFICADO: Actualizar handleReserveClick para mostrar el loading durante la navegación
   const handleReserveClick = (vehicle: Vehicle) => {
     if (vehicle.requiresLicense) {
       setSelectedVehicle(vehicle)
       setShowLicenseModal(true)
     } else {
-      // Iniciar el loading antes de navegar
       startLoading()
-
-      // Navegar a la página del producto
       router.push(`/reservar/${vehicle.id}`)
-
-      // Nota: No necesitamos stopLoading() aquí porque la página se recargará completamente
     }
   }
 
-  // ✅ MODIFICADO: Actualizar handleLicenseModalContinue para mostrar el loading durante la navegación
   const handleLicenseModalContinue = () => {
     if (selectedVehicle) {
       setShowLicenseModal(false)
-
-      // Iniciar el loading antes de navegar
       startLoading()
-
-      // Navegar a la página del producto
       router.push(`/reservar/${selectedVehicle.id}`)
       setSelectedVehicle(null)
-
-      // Nota: No necesitamos stopLoading() aquí porque la página se recargará completamente
     }
   }
 
@@ -636,7 +924,41 @@ export function BoatsSection() {
     setSelectedVehicle(null)
   }
 
-  // ✅ NUEVO: Mostrar OroLoading durante la carga inicial o la navegación
+  // ✅ NUEVO: Función para manejar selección de playa
+  const handleBeachSelect = async (beachId: string, beachName: string) => {
+    console.log("🏖️ Beach selected:", beachId, beachName)
+    setSelectedBeachId(beachId)
+    setSelectedBeachName(beachName)
+    // Limpiar búsquedas anteriores
+    setHasSearched(false)
+    setSelectedDate("")
+    await fetchVehicles(beachId)
+  }
+
+  // ✅ NUEVO: Función para volver a la selección de playas
+  const handleBackToBeaches = () => {
+    setSelectedBeachId(null)
+    setSelectedBeachName("")
+    setVehicles([])
+    setFilteredVehicles([])
+    setHasSearched(false)
+    setSelectedDate("")
+  }
+
+  // ✅ NUEVO: Función para contar vehículos por playa
+  const getVehicleCountForBeach = async (beachId: string): Promise<number> => {
+    try {
+      const response = await fetch(`/api/vehicles?beachLocationId=${beachId}`)
+      if (response.ok) {
+        const data = await response.json()
+        return Array.isArray(data) ? data.filter((v) => v.available).length : 0
+      }
+      return 0
+    } catch {
+      return 0
+    }
+  }
+
   if (loading) {
     return <OroLoading />
   }
@@ -654,7 +976,7 @@ export function BoatsSection() {
               <CardContent className="text-center py-12">
                 <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
-                <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
+                <Button onClick={() => fetchBeachLocations()} className="bg-red-600 text-white hover:bg-red-700">
                   Reintentar
                 </Button>
               </CardContent>
@@ -668,9 +990,7 @@ export function BoatsSection() {
 
   return (
     <>
-      {/* ✅ NUEVO: Mostrar OroLoading durante la navegación */}
       {navigationLoading && <OroLoading />}
-
       <section className="py-24 bg-white min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -678,138 +998,185 @@ export function BoatsSection() {
             <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
           </div>
 
-          {/* ✅ FILTRO SIMPLE DE FECHA */}
-          <SimpleDateFilter onDateSelect={handleDateSelect} isLoading={searchLoading} language={language} />
-
-          {/* 🎯 SELECTOR DE PESTAÑAS OPTIMIZADO PARA MÓVILES */}
-          <div className="flex justify-center mb-12 px-2 sm:px-4">
-            <div className="w-full max-w-5xl">
-              <div className="flex rounded-2xl overflow-hidden shadow-lg border-2 border-gray-200">
-                {/* Pestaña Sin Licencia */}
-                <button
-                  onClick={() => setActiveLicense("without")}
-                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${activeLicense === "without"
-                      ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-r-2 border-gold shadow-xl"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-r border-gray-300"
-                    }`}
-                >
-                  <div className="flex items-center justify-center">
-                    <div className="text-left">
-                      <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withoutLicense}</h3>
-                      <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withoutLicenseDesc}</p>
-                    </div>
-                  </div>
-
-                  {/* Indicador dorado para pestaña activa */}
-                  {activeLicense === "without" && (
-                    <>
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
-                      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gold p-1 sm:p-2 rounded-full">
-                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
-                      </div>
-                    </>
-                  )}
-                </button>
-
-                {/* Pestaña Con Licencia */}
-                <button
-                  onClick={() => setActiveLicense("with")}
-                  className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${activeLicense === "with"
-                      ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-l-2 border-gold shadow-xl"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-l border-gray-300"
-                    }`}
-                >
-                  <div className="flex items-center justify-center">
-                    <div className="text-left">
-                      <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withLicense}</h3>
-                      <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withLicenseDesc}</p>
-                    </div>
-                  </div>
-
-                  {/* Indicador dorado para pestaña activa */}
-                  {activeLicense === "with" && (
-                    <>
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
-                      <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gold p-1 sm:p-2 rounded-full">
-                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
-                      </div>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Indicador adicional móvil - Más compacto */}
-              <div className="mt-3 text-center sm:hidden">
-                <div
-                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
-                    }`}
-                >
-                  {activeLicense === "without" ? (
-                    <>
-                      <Waves className="h-3 w-3 mr-1.5" />
-                      {t.withoutLicense}
-                    </>
-                  ) : (
-                    <>
-                      <Anchor className="h-3 w-3 mr-1.5" />
-                      {t.withLicense}
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ✅ INDICADOR DE RESULTADOS */}
-          {hasSearched && selectedDate && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center">
-                  <Filter className="h-5 w-5 text-blue-600 mr-2" />
-                  <span className="text-blue-800 font-medium">
-                    {t.showingResults} {currentVehicles.length} {t.boatsAndJetskis} {t.availableForDate}
-                  </span>
-                </div>
-                {searchLoading && (
-                  <div className="flex items-center text-blue-600">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    Buscando...
-                  </div>
+          {/* ✅ ACTUALIZADO: Selección de playa (se muestra si no hay playa seleccionada) */}
+          {selectedBeachId === null && beachLocations.length > 0 && (
+            <div className="mb-12 text-center">
+              <h2 className="text-3xl font-bold text-black mb-4 flex items-center justify-center">
+                <MapPin className="h-7 w-7 mr-3 text-gold" />
+                {t.selectBeach}
+              </h2>
+              <p className="text-lg text-gray-600 mb-8">{t.selectBeachDescription}</p>
+              {/* ✅ CENTRADO DE PLAYAS: Añadido justify-center y gap-6 */}
+              <div className="flex flex-wrap justify-center gap-6 max-w-4xl mx-auto">
+                {fetchingLocations ? (
+                  <Card className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] animate-pulse">
+                    <CardContent className="py-12 text-center min-h-[180px] flex items-center justify-center">
+                      Cargando ubicaciones...
+                    </CardContent>
+                  </Card>
+                ) : (
+                  beachLocations.map((location) => (
+                    <BeachCard
+                      key={location.id}
+                      location={location}
+                      onSelect={handleBeachSelect}
+                      getVehicleCount={getVehicleCountForBeach}
+                      t={t}
+                    />
+                  ))
                 )}
               </div>
             </div>
           )}
 
-          {/* ✅ LISTA DE VEHÍCULOS */}
-          <div className="max-w-6xl mx-auto" id="products-section">
-            {currentVehicles.length > 0 ? (
-              <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {currentVehicles.map((vehicle) => (
-                  <VehicleCard key={vehicle.id} vehicle={vehicle} t={t} onReserveClick={handleReserveClick} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                {hasSearched && selectedDate ? (
-                  <>
-                    <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 text-lg">{t.noResultsFound}</p>
-                    <p className="text-gray-400 text-sm mt-2">{t.adjustFilters}</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-center mb-4">
-                      <Ship className="h-8 w-8 text-gray-300 mr-2" />
-                      <Zap className="h-8 w-8 text-gray-300" />
+          {/* ✅ CONTENIDO PRINCIPAL (solo si se ha seleccionado una playa) */}
+          {selectedBeachId !== null && (
+            <>
+              {/* ✅ NUEVO: Selector de playa elegante */}
+              <BeachSelector
+                beachLocations={beachLocations}
+                selectedBeachId={selectedBeachId}
+                selectedBeachName={selectedBeachName}
+                onBeachSelect={handleBeachSelect}
+                onBackToSelection={handleBackToBeaches}
+                t={t}
+              />
+
+              {/* ✅ FILTRO SIMPLE DE FECHA */}
+              <SimpleDateFilter onDateSelect={handleDateSelect} isLoading={searchLoading} language={language} />
+
+              {/* 🎯 SELECTOR DE PESTAÑAS OPTIMIZADO PARA MÓVILES */}
+              <div className="flex justify-center mb-12 px-2 sm:px-4">
+                <div className="w-full max-w-5xl">
+                  <div className="flex rounded-2xl overflow-hidden shadow-lg border-2 border-gray-200">
+                    {/* Pestaña Sin Licencia */}
+                    <button
+                      onClick={() => setActiveLicense("without")}
+                      className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${
+                        activeLicense === "without"
+                          ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-r-2 border-gold shadow-xl"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-r border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center">
+                        <div className="text-left">
+                          <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withoutLicense}</h3>
+                          <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withoutLicenseDesc}</p>
+                        </div>
+                      </div>
+                      {/* Indicador dorado para pestaña activa */}
+                      {activeLicense === "without" && (
+                        <>
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                          <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gold p-1 sm:p-2 rounded-full">
+                            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
+                          </div>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Pestaña Con Licencia */}
+                    <button
+                      onClick={() => setActiveLicense("with")}
+                      className={`flex-1 p-3 sm:p-6 transition-all duration-300 relative ${
+                        activeLicense === "with"
+                          ? "bg-gradient-to-r from-black via-gray-900 to-black text-white border-l-2 border-gold shadow-xl"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-l border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-center">
+                        <div className="text-left">
+                          <h3 className="text-sm sm:text-lg font-bold leading-tight">{t.withLicense}</h3>
+                          <p className="text-xs opacity-80 mt-1 hidden lg:block">{t.withLicenseDesc}</p>
+                        </div>
+                      </div>
+                      {/* Indicador dorado para pestaña activa */}
+                      {activeLicense === "with" && (
+                        <>
+                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-gold via-yellow-400 to-gold"></div>
+                          <div className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gold p-1 sm:p-2 rounded-full">
+                            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-black" />
+                          </div>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Indicador adicional móvil - Más compacto */}
+                  <div className="mt-3 text-center sm:hidden">
+                    <div
+                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
+                        activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
+                      }`}
+                    >
+                      {activeLicense === "without" ? (
+                        <>
+                          <Waves className="h-3 w-3 mr-1.5" />
+                          {t.withoutLicense}
+                        </>
+                      ) : (
+                        <>
+                          <Anchor className="h-3 w-3 mr-1.5" />
+                          {t.withLicense}
+                        </>
+                      )}
                     </div>
-                    <p className="text-gray-500 text-lg">{t.noVehicles}</p>
-                  </>
+                  </div>
+                </div>
+              </div>
+
+              {/* ✅ INDICADOR DE RESULTADOS */}
+              {hasSearched && selectedDate && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                      <Filter className="h-5 w-5 text-blue-600 mr-2" />
+                      <span className="text-blue-800 font-medium">
+                        {t.showingResults} {currentVehicles.length} {t.boatsAndJetskis} {t.availableForDate}
+                      </span>
+                    </div>
+                    {searchLoading && (
+                      <div className="flex items-center text-blue-600">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        Buscando...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ LISTA DE VEHÍCULOS */}
+              <div className="max-w-6xl mx-auto" id="products-section">
+                {currentVehicles.length > 0 ? (
+                  <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    {currentVehicles.map((vehicle) => (
+                      <VehicleCard key={vehicle.id} vehicle={vehicle} t={t} onReserveClick={handleReserveClick} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    {hasSearched && selectedDate ? (
+                      <>
+                        <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-500 text-lg">{t.noResultsFound}</p>
+                        <p className="text-gray-400 text-sm mt-2">{t.adjustFilters}</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-center mb-4">
+                          <Ship className="h-8 w-8 text-gray-300 mr-2" />
+                          <Zap className="h-8 w-8 text-gray-300" />
+                        </div>
+                        <p className="text-gray-500 text-lg">{t.noVehicles}</p>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -830,6 +1197,40 @@ export function BoatsSection() {
   )
 }
 
+// ✅ NUEVO: Componente para tarjeta de playa
+function BeachCard({
+  location,
+  onSelect,
+  getVehicleCount,
+  t,
+}: {
+  location: BeachLocation
+  onSelect: (id: string, name: string) => void
+  getVehicleCount: (id: string) => Promise<number>
+  t: Translations
+}) {
+  const [vehicleCount, setVehicleCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    getVehicleCount(location.id).then(setVehicleCount)
+  }, [location.id, getVehicleCount])
+
+  return (
+    <Card
+      className="cursor-pointer hover:shadow-xl transition-shadow duration-300 border-2 border-gray-200 hover:border-gold w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)]"
+      onClick={() => onSelect(location.id, location.name)}
+    >
+      <CardContent className="flex flex-col items-center justify-center p-6 min-h-[180px]">
+        <MapPin className="h-12 w-12 text-gold mb-4" />
+        <h3 className="text-xl font-bold text-black text-center">{location.name}</h3>
+        <p className="text-sm text-gray-600 mt-2">
+          {vehicleCount !== null ? `${vehicleCount} ${t.productsAvailable}` : "Cargando..."}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 function VehicleCard({
   vehicle,
   t,
@@ -843,16 +1244,19 @@ function VehicleCard({
     return Math.min(...vehicle.pricing.map((p) => p.price))
   }
 
-  // Obtener extras habilitados
+  // Obtener extras habilitados - FIXED
   const enabledExtras = (() => {
     if (!vehicle.extraFeatures || !Array.isArray(vehicle.extraFeatures)) {
       return []
     }
-
     return vehicle.extraFeatures.filter((extra) => {
+      // ✅ FIXED: Check for both 'enabled' and 'description' fields
       const isEnabled =
-        (typeof extra.enabled === "boolean" && extra.enabled === true) ||
-        (typeof extra.enabled === "string" && extra.enabled === "true")
+        extra.enabled === true ||
+        (typeof extra.enabled === "string" && extra.enabled === "true") ||
+        (typeof extra.description === "boolean" && extra.description === true) ||
+        (typeof extra.description === "string" && extra.description === "true")
+      console.log(`🔍 Extra ${extra.name}:`, { enabled: extra.enabled, description: extra.description, isEnabled })
       return isEnabled
     })
   })()
@@ -880,32 +1284,15 @@ function VehicleCard({
             }}
           />
         </div>
-
-        {/* ✅ BADGE DE TIPO DE VEHÍCULO */}
-        <Badge className="absolute top-4 right-4 bg-gray-800 text-white font-semibold">
-          {vehicle.type === "jetski" ? (
-            <div className="flex items-center">
-              <Zap className="h-3 w-3 mr-1" />
-              Moto
-            </div>
-          ) : (
-            <div className="flex items-center">
-              <Ship className="h-3 w-3 mr-1" />
-              Barco
-            </div>
-          )}
-        </Badge>
-
-        {/* ✅ ARREGLO: Badges horizontales en línea */}
         <div className="absolute top-4 left-4 flex gap-2">
           {/* Badge de licencia */}
           <Badge
-            className={`font-semibold ${vehicle.requiresLicense ? "bg-blue-600 text-white" : "bg-green-600 text-white"
-              }`}
+            className={`font-semibold ${
+              vehicle.requiresLicense ? "bg-blue-600 text-white" : "bg-green-600 text-white"
+            }`}
           >
             {vehicle.requiresLicense ? t.licenseRequired : t.noLicenseNeeded}
           </Badge>
-
           {/* Badge de gasolina */}
           {vehicle.fuelIncluded ? (
             <Badge className="bg-green-500 text-white font-semibold">
@@ -950,11 +1337,9 @@ function VehicleCard({
               {(() => {
                 // Agrupar precios por categoría
                 const groupedPricing = new Map()
-
                 vehicle.pricing.forEach((option) => {
                   let category = ""
                   let categoryLabel = ""
-
                   if (option.duration.startsWith("halfday")) {
                     category = "halfday"
                     categoryLabel = t.halfDay
@@ -1005,36 +1390,32 @@ function VehicleCard({
             </div>
           </div>
 
-          {/* ✅ EXTRAS CON ALTURA FIJA PARA EQUILIBRAR LAYOUT - TODOS VISIBLES EN FILAS DE 3 */}
-          <div className="min-h-[80px]">
-            {enabledExtras.length > 0 ? (
-              <div className="space-y-2">
-                <span className="text-gray-500 text-sm font-medium">Extras:</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {enabledExtras.map((extra, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-col items-center bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg px-2 py-2 hover:shadow-sm transition-shadow text-center"
-                      title={extra.description}
-                    >
-                      {getExtraIcon(extra.id)}
-                      <span className="text-xs text-purple-700 mt-1 font-medium leading-tight">
-                        {translateExtraName(extra.id, t)}
-                      </span>
-                      {extra.price && extra.price > 0 && (
-                        <span className="text-xs text-purple-600">(+{extra.price}€)</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+          {/* ✅ EXTRAS: Solo se muestra si hay extras habilitados */}
+          {enabledExtras.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-gray-500 text-sm font-medium">Extras:</span>
+              <div className="grid grid-cols-3 gap-2">
+                {enabledExtras.map((extra, index) => (
+                  <div
+                    key={index}
+                    className="flex flex-col items-center bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg px-2 py-2 hover:shadow-sm transition-shadow text-center"
+                    title={extra.description}
+                  >
+                    {getExtraIcon(extra.id)}
+                    <span className="text-xs text-purple-700 mt-1 font-medium leading-tight">
+                      {translateExtraName(extra.id, t)}
+                    </span>
+                    {extra.price && extra.price > 0 && (
+                      <span className="text-xs text-purple-600">(+{extra.price}€)</span>
+                    )}
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="h-[80px]"></div> // Espacio reservado para mantener altura consistente
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Fianza */}
-          {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
+          {vehicle.securityDeposit != null && vehicle.securityDeposit > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -1046,9 +1427,12 @@ function VehicleCard({
             </div>
           )}
 
-          {vehicle.manualDeposit && vehicle.manualDeposit > 0 && (
+          {/* ✅ FIANZA MANUAL: Solo se muestra si es mayor que 0 */}
+          {vehicle.manualDeposit != null && vehicle.manualDeposit > 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
-              <span className="text-sm text-yellow-800 font-medium">Fianza a dejar en el sitio: €{vehicle.manualDeposit}</span>
+              <span className="text-sm text-yellow-800 font-medium">
+                Fianza a dejar en el sitio: €{vehicle.manualDeposit}
+              </span>
             </div>
           )}
         </div>
@@ -1061,7 +1445,6 @@ function VehicleCard({
               <div className="text-3xl font-bold text-gold">€{getLowestPrice()}</div>
             </div>
           </div>
-
           <Button
             onClick={(e) => {
               e.stopPropagation() // Evitar que se propague al padre

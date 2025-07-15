@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { cancelBooking } from "@/lib/db/availability-queries"
+import { updateBookingStatus } from "@/lib/db/queries"
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { bookingId } = await request.json()
+    const bookingId = Number(params.id)
 
-    if (!bookingId) {
-      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 })
+    if (isNaN(bookingId)) {
+      return NextResponse.json({ error: "Invalid Booking ID" }, { status: 400 })
     }
 
-    await cancelBooking(bookingId)
+    await updateBookingStatus(bookingId, "cancelled")
 
     return NextResponse.json({
       success: true,

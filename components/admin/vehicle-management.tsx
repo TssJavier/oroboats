@@ -24,9 +24,11 @@ import {
   Package,
   PauseCircle,
   CheckCircle,
+  MapPin,
 } from "lucide-react"
 import Image from "next/image"
 import { toast } from "sonner"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion" // Importar componentes de acordeón
 
 interface PricingOption {
   duration: string
@@ -42,37 +44,52 @@ interface ExtraFeature {
   price?: number
 }
 
+// ✅ ACTUALIZADO: Interfaz Vehicle para coincidir con el esquema de la base de datos
 interface Vehicle {
   id: number
   name: string
   type: string
-  category: string
-  requiresLicense: boolean
+  category?: string // Hacemos category opcional según el esquema
+  requiresLicense: boolean // Ahora siempre boolean
   capacity: number
   pricing: PricingOption[]
-  availableDurations: string[]
+  availableDurations?: string[] // Hacemos opcional según el esquema
   includes: string[]
   fuelIncluded: boolean
   description: string
   image: string
-  available: boolean
-  customDurationEnabled: boolean
+  available?: boolean // Hacemos opcional según el esquema
+  customDurationEnabled?: boolean // Hacemos opcional según el esquema
   extraFeatures?: ExtraFeature[]
-  securityDeposit?: number
-  manualDeposit?: number
+  securityDeposit?: number | null // Allow null
+  manualDeposit?: number | null // Allow null
   stock?: number
+  beachLocationId?: string // ✅ Añadir beachLocationId, hacemos opcional
 }
 
-// ✅ NUEVO: Interfaz para grupos de vehículos
-interface VehicleGroups {
-  availableJetskis: Vehicle[]
-  availableBoats: Vehicle[]
-  unavailableJetskis: Vehicle[]
-  unavailableBoats: Vehicle[]
+interface BeachLocation {
+  id: string
+  name: string
+}
+
+// ✅ NUEVO: Interfaz para grupos de vehículos por playa
+interface GroupedVehiclesByBeach {
+  [beachId: string]: {
+    name: string
+    available: {
+      jetskis: Vehicle[]
+      boats: Vehicle[]
+    }
+    unavailable: {
+      jetskis: Vehicle[]
+      boats: Vehicle[]
+    }
+  }
 }
 
 export function VehicleManagement() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [beachLocations, setBeachLocations] = useState<BeachLocation[]>([]) // ✅ Nuevo estado para ubicaciones
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -84,33 +101,31 @@ export function VehicleManagement() {
   const [pausingAll, setPausingAll] = useState(false)
 
   useEffect(() => {
-    fetchVehicles()
+    fetchData() // ✅ Llamar a una función que carga todo
   }, [])
 
-  const fetchVehicles = async () => {
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      setError(null)
-      setLoading(true)
-
-      console.log("🚗 Fetching vehicles from API...")
-      const response = await fetch("/api/vehicles?all=true")
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      // Fetch locations first
+      const locationsResponse = await fetch("/api/locations")
+      if (!locationsResponse.ok) {
+        throw new Error("Error al cargar las ubicaciones de playa.")
       }
+      const locationsData: BeachLocation[] = await locationsResponse.json()
+      setBeachLocations(locationsData)
 
-      const data = await response.json()
-      console.log("✅ Vehicles fetched:", data)
-
-      if (Array.isArray(data)) {
-        setVehicles(data)
-      } else {
-        console.error("❌ API returned non-array data:", data)
-        setError("Error: Los datos recibidos no son válidos")
+      // Then fetch vehicles
+      const vehiclesResponse = await fetch("/api/vehicles?all=true")
+      if (!vehiclesResponse.ok) {
+        throw new Error(`HTTP error! status: ${vehiclesResponse.status}`)
       }
+      const vehiclesData: Vehicle[] = await vehiclesResponse.json()
+      setVehicles(vehiclesData)
     } catch (error) {
-      console.error("❌ Error fetching vehicles:", error)
-      setError("Error al cargar los vehículos. Verifica la conexión a la base de datos.")
+      console.error("❌ Error fetching data:", error)
+      setError("Error al cargar los datos. Verifica la conexión a la base de datos.")
     } finally {
       setLoading(false)
     }
@@ -163,7 +178,7 @@ export function VehicleManagement() {
       console.log("✅ Vehicle deleted successfully:", result)
 
       toast.success("Vehículo eliminado correctamente")
-      await fetchVehicles()
+      await fetchData() // ✅ Recargar todos los datos
     } catch (error) {
       console.error("❌ Error deleting vehicle:", error)
       const errorMessage = error instanceof Error ? error.message : "Error desconocido al eliminar el vehículo"
@@ -177,7 +192,7 @@ export function VehicleManagement() {
   const handleFormSuccess = () => {
     setShowForm(false)
     setEditingVehicle(null)
-    fetchVehicles()
+    fetchData() // ✅ Recargar todos los datos
     toast.success(editingVehicle ? "Vehículo actualizado correctamente" : "Vehículo creado correctamente")
   }
 
@@ -214,7 +229,7 @@ export function VehicleManagement() {
       }
 
       toast.success(`Vehículo ${!vehicle.available ? "activado" : "desactivado"} correctamente`)
-      fetchVehicles()
+      fetchData() // ✅ Recargar todos los datos
     } catch (error) {
       console.error("Error updating availability:", error)
       toast.error("Error al actualizar la disponibilidad")
@@ -262,7 +277,7 @@ export function VehicleManagement() {
         toast.success(`${successful} vehículos pausados correctamente`)
       }
 
-      fetchVehicles()
+      fetchData() // ✅ Recargar todos los datos
     } catch (error) {
       console.error("Error pausando todos los vehículos:", error)
       toast.error("Error al pausar los vehículos")
@@ -282,38 +297,61 @@ export function VehicleManagement() {
     }
   }
 
-  // ✅ NUEVO: Función para agrupar vehículos por disponibilidad y tipo
-  const groupVehicles = (vehicles: Vehicle[]): VehicleGroups => {
-    return vehicles.reduce(
-      (groups, vehicle) => {
-        const isJetski =
-          vehicle.type === "jetski" ||
-          vehicle.category?.toLowerCase().includes("jetski") ||
-          vehicle.name?.toLowerCase().includes("jetski") ||
-          vehicle.name?.toLowerCase().includes("moto")
+  // ✅ NUEVO: Función para agrupar vehículos por playa, disponibilidad y tipo
+  const groupVehicles = (allVehicles: Vehicle[], allLocations: BeachLocation[]): GroupedVehiclesByBeach => {
+    const grouped: GroupedVehiclesByBeach = {}
 
-        if (vehicle.available) {
-          if (isJetski) {
-            groups.availableJetskis.push(vehicle)
-          } else {
-            groups.availableBoats.push(vehicle)
-          }
-        } else {
-          if (isJetski) {
-            groups.unavailableJetskis.push(vehicle)
-          } else {
-            groups.unavailableBoats.push(vehicle)
-          }
+    // Initialize groups for all known beaches
+    allLocations.forEach((loc) => {
+      grouped[loc.id] = {
+        name: loc.name,
+        available: { jetskis: [], boats: [] },
+        unavailable: { jetskis: [], boats: [] },
+      }
+    })
+
+    allVehicles.forEach((vehicle) => {
+      // Usar un fallback si beachLocationId es undefined o null
+      const beachId = vehicle.beachLocationId || "unknown_location"
+      if (!grouped[beachId]) {
+        // Fallback for vehicles with unknown beachId (shouldn't happen if data is clean)
+        grouped[beachId] = {
+          name: "Ubicación Desconocida",
+          available: { jetskis: [], boats: [] },
+          unavailable: { jetskis: [], boats: [] },
         }
-        return groups
-      },
-      {
-        availableJetskis: [],
-        availableBoats: [],
-        unavailableJetskis: [],
-        unavailableBoats: [],
-      } as VehicleGroups,
-    )
+      }
+
+      const isJetski =
+        vehicle.type === "jetski" ||
+        vehicle.category?.toLowerCase().includes("jetski") ||
+        vehicle.name?.toLowerCase().includes("jetski") ||
+        vehicle.name?.toLowerCase().includes("moto")
+
+      if (vehicle.available) {
+        if (isJetski) {
+          grouped[beachId].available.jetskis.push(vehicle)
+        } else {
+          grouped[beachId].available.boats.push(vehicle)
+        }
+      } else {
+        if (isJetski) {
+          grouped[beachId].unavailable.jetskis.push(vehicle)
+        } else {
+          grouped[beachId].unavailable.boats.push(vehicle)
+        }
+      }
+    })
+
+    // Sort vehicles within each group by name
+    Object.values(grouped).forEach((beachGroup) => {
+      beachGroup.available.jetskis.sort((a, b) => a.name.localeCompare(b.name))
+      beachGroup.available.boats.sort((a, b) => a.name.localeCompare(b.name))
+      beachGroup.unavailable.jetskis.sort((a, b) => a.name.localeCompare(b.name))
+      beachGroup.unavailable.boats.sort((a, b) => a.name.localeCompare(b.name))
+    })
+
+    return grouped
   }
 
   // ✅ NUEVO: Componente para renderizar un vehículo
@@ -392,18 +430,19 @@ export function VehicleManagement() {
           </div>
         )}
 
-        {vehicle.securityDeposit && vehicle.securityDeposit > 0 && (
+        {/* Only show if securityDeposit is not null/undefined AND greater than 0 */}
+        {vehicle.securityDeposit != null && vehicle.securityDeposit > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded p-2">
             <span className="text-sm text-blue-800 font-medium">Fianza: €{vehicle.securityDeposit}</span>
           </div>
         )}
 
-        {vehicle.manualDeposit && vehicle.manualDeposit > 0 && (
+        {/* Only show if manualDeposit is not null/undefined AND greater than 0 */}
+        {vehicle.manualDeposit != null && vehicle.manualDeposit > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
             <span className="text-sm text-yellow-800 font-medium">Fianza en sitio: €{vehicle.manualDeposit}</span>
           </div>
         )}
-
 
         {vehicle.stock && vehicle.stock > 1 && (
           <div className="bg-green-50 border border-green-200 rounded p-2">
@@ -439,10 +478,11 @@ export function VehicleManagement() {
             onClick={() => toggleAvailability(vehicle)}
             variant="outline"
             size="sm"
-            className={`border-gray-300 ${vehicle.available
+            className={`border-gray-300 ${
+              vehicle.available
                 ? "hover:border-gray-500 hover:text-gray-700"
                 : "hover:border-green-500 hover:text-green-600"
-              }`}
+            }`}
           >
             {vehicle.available ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
@@ -496,13 +536,19 @@ export function VehicleManagement() {
   }
 
   if (showForm) {
-    return <VehicleForm vehicle={editingVehicle} onSuccess={handleFormSuccess} onCancel={handleFormCancel} />
+    return (
+      <VehicleForm vehicle={editingVehicle ?? undefined} onSuccess={handleFormSuccess} onCancel={handleFormCancel} />
+    )
   }
 
   if (loading) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
+      <div className="space-y-8 px-4 sm:px-6 lg:px-8">
+        {" "}
+        {/* Added padding */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
+          {" "}
+          {/* Adjusted for mobile */}
           <div>
             <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
             <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
@@ -525,8 +571,12 @@ export function VehicleManagement() {
 
   if (error) {
     return (
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
+      <div className="space-y-8 px-4 sm:px-6 lg:px-8">
+        {" "}
+        {/* Added padding */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
+          {" "}
+          {/* Adjusted for mobile */}
           <div>
             <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
             <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
@@ -536,22 +586,18 @@ export function VehicleManagement() {
             Nuevo Producto
           </Button>
         </div>
-
         <Card className="bg-red-50 border border-red-200">
           <CardContent className="text-center py-12">
             <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-red-800 mb-2">Error al cargar productos</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <div className="flex gap-4 justify-center">
-              <Button onClick={fetchVehicles} className="bg-red-600 text-white hover:bg-red-700">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reintentar
-              </Button>
-              <Button onClick={() => setShowForm(true)} variant="outline" className="border-red-300 text-red-600">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir Producto
-              </Button>
-            </div>
+            <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
+            <Button onClick={fetchData} className="bg-red-600 text-white hover:bg-red-700">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reintentar
+            </Button>
+            <Button onClick={() => setShowForm(true)} variant="outline" className="border-red-300 text-red-600">
+              <Plus className="h-4 w-4 mr-2" />
+              Añadir Producto
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -559,19 +605,25 @@ export function VehicleManagement() {
   }
 
   // ✅ NUEVO: Agrupar vehículos
-  const vehicleGroups = groupVehicles(vehicles)
-  const availableVehiclesCount = vehicleGroups.availableJetskis.length + vehicleGroups.availableBoats.length
+  const groupedVehicles = groupVehicles(vehicles, beachLocations)
+  const totalAvailableVehiclesCount = vehicles.filter((v) => v.available).length
 
   return (
     <>
-      <div className="space-y-8">
-        <div className="flex items-center justify-between">
+      <div className="space-y-8 px-4 sm:px-6 lg:px-8">
+        {" "}
+        {/* Added padding */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
+          {" "}
+          {/* Adjusted for mobile */}
           <div>
             <h2 className="text-3xl font-bold text-black">Gestión de Productos</h2>
             <p className="text-gray-600">Administra tu flota de barcos y motos de agua</p>
           </div>
-          <div className="flex gap-2">
-            {availableVehiclesCount > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4 sm:mt-0 justify-end">
+            {" "}
+            {/* Added flex-wrap and justify-end for buttons */}
+            {totalAvailableVehiclesCount > 0 && (
               <Button
                 onClick={() => setShowPauseAllModal(true)}
                 variant="outline"
@@ -587,7 +639,6 @@ export function VehicleManagement() {
             </Button>
           </div>
         </div>
-
         {vehicles.length === 0 ? (
           <Card className="bg-gray-50 border border-gray-200">
             <CardContent className="text-center py-12">
@@ -601,59 +652,103 @@ export function VehicleManagement() {
             </CardContent>
           </Card>
         ) : (
-          <div>
-            {/* ✅ NUEVO: Sección de productos disponibles */}
-            {availableVehiclesCount > 0 && (
-              <div className="mb-12">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                  <h2 className="text-xl font-bold text-green-800 flex items-center">
-                    <CheckCircle className="h-5 w-5 mr-2" />
-                    Productos Disponibles ({availableVehiclesCount})
-                  </h2>
-                </div>
+          <div className="space-y-12">
+            {/* ✅ ACORDEÓN PARA CADA PLAYA */}
+            <Accordion type="multiple" className="w-full">
+              {Object.keys(groupedVehicles)
+                .sort((a, b) => groupedVehicles[a].name.localeCompare(groupedVehicles[b].name)) // Sort by beach name
+                .map((beachId) => {
+                  const beachGroup = groupedVehicles[beachId]
+                  const totalBeachVehicles =
+                    beachGroup.available.jetskis.length +
+                    beachGroup.available.boats.length +
+                    beachGroup.unavailable.jetskis.length +
+                    beachGroup.unavailable.boats.length
+                  const availableBeachVehicles = beachGroup.available.jetskis.length + beachGroup.available.boats.length
 
-                <VehicleSection
-                  title="Motos de Agua Disponibles"
-                  vehicles={vehicleGroups.availableJetskis}
-                  icon={<Zap className="h-5 w-5 text-blue-600" />}
-                  color="border-blue-200"
-                />
+                  if (totalBeachVehicles === 0) return null // Don't show empty beach sections
 
-                <VehicleSection
-                  title="Barcos Disponibles"
-                  vehicles={vehicleGroups.availableBoats}
-                  icon={<Ship className="h-5 w-5 text-blue-600" />}
-                  color="border-blue-200"
-                />
-              </div>
-            )}
+                  return (
+                    <AccordionItem
+                      key={beachId}
+                      value={beachId}
+                      className="border border-gray-200 rounded-lg mb-4 bg-white shadow-sm"
+                    >
+                      <AccordionTrigger className="p-4 flex justify-between items-center hover:no-underline flex-wrap">
+                        {" "}
+                        {/* Added flex-wrap */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {" "}
+                          {/* Added flex-wrap */}
+                          <MapPin className="h-6 w-6 text-gold flex-shrink-0" /> {/* Added flex-shrink-0 */}
+                          <h2 className="text-xl font-bold text-black break-words">{beachGroup.name}</h2>{" "}
+                          {/* Added break-words */}
+                          <Badge className="ml-2 bg-gray-200 text-gray-800 flex-shrink-0">
+                            {totalBeachVehicles} productos
+                          </Badge>{" "}
+                          {/* Added flex-shrink-0 */}
+                        </div>
+                        <div className="text-sm text-gray-600 flex-shrink-0">{availableBeachVehicles} disponibles</div>{" "}
+                        {/* Added flex-shrink-0 */}
+                      </AccordionTrigger>
+                      <AccordionContent className="p-6 pt-0">
+                        {/* Secciones de Disponibles */}
+                        {(beachGroup.available.jetskis.length > 0 || beachGroup.available.boats.length > 0) && (
+                          <div className="mb-8">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                              <h3 className="text-xl font-bold text-green-800 flex items-center">
+                                <CheckCircle className="h-5 w-5 mr-2" />
+                                Disponibles ({availableBeachVehicles})
+                              </h3>
+                            </div>
 
-            {/* ✅ NUEVO: Sección de productos no disponibles */}
-            {vehicleGroups.unavailableJetskis.length + vehicleGroups.unavailableBoats.length > 0 && (
-              <div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                  <h2 className="text-xl font-bold text-gray-700 flex items-center">
-                    <EyeOff className="h-5 w-5 mr-2" />
-                    Productos No Disponibles (
-                    {vehicleGroups.unavailableJetskis.length + vehicleGroups.unavailableBoats.length})
-                  </h2>
-                </div>
+                            <VehicleSection
+                              title="Motos de Agua"
+                              vehicles={beachGroup.available.jetskis}
+                              icon={<Zap className="h-5 w-5 text-blue-600" />}
+                              color="border-blue-200"
+                            />
 
-                <VehicleSection
-                  title="Motos de Agua No Disponibles"
-                  vehicles={vehicleGroups.unavailableJetskis}
-                  icon={<Zap className="h-5 w-5 text-gray-600" />}
-                  color="border-gray-200"
-                />
+                            <VehicleSection
+                              title="Barcos"
+                              vehicles={beachGroup.available.boats}
+                              icon={<Ship className="h-5 w-5 text-blue-600" />}
+                              color="border-blue-200"
+                            />
+                          </div>
+                        )}
 
-                <VehicleSection
-                  title="Barcos No Disponibles"
-                  vehicles={vehicleGroups.unavailableBoats}
-                  icon={<Ship className="h-5 w-5 text-gray-600" />}
-                  color="border-gray-200"
-                />
-              </div>
-            )}
+                        {/* Secciones de No Disponibles */}
+                        {(beachGroup.unavailable.jetskis.length > 0 || beachGroup.unavailable.boats.length > 0) && (
+                          <div>
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                              <h3 className="text-xl font-bold text-gray-700 flex items-center">
+                                <EyeOff className="h-5 w-5 mr-2" />
+                                No Disponibles (
+                                {beachGroup.unavailable.jetskis.length + beachGroup.unavailable.boats.length})
+                              </h3>
+                            </div>
+
+                            <VehicleSection
+                              title="Motos de Agua"
+                              vehicles={beachGroup.unavailable.jetskis}
+                              icon={<Zap className="h-5 w-5 text-gray-600" />}
+                              color="border-gray-200"
+                            />
+
+                            <VehicleSection
+                              title="Barcos"
+                              vehicles={beachGroup.unavailable.boats}
+                              icon={<Ship className="h-5 w-5 text-gray-600" />}
+                              color="border-gray-200"
+                            />
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )
+                })}
+            </Accordion>
           </div>
         )}
       </div>
@@ -672,7 +767,7 @@ export function VehicleManagement() {
           <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
             <h3 className="text-xl font-bold mb-4">Pausar todos los vehículos</h3>
             <p className="text-gray-700 mb-6">
-              Vas a poner todos los vehículos en "No disponibles", quitándolos de la tienda. ¿Estás seguro?
+              Vas a poner todos los vehículos en &quot;No disponibles&quot;, quitándolos de la tienda. ¿Estás seguro?
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setShowPauseAllModal(false)} disabled={pausingAll}>

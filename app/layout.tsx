@@ -156,7 +156,7 @@ const structuredData = {
     latitude: "36.7213028",
     longitude: "-3.4962736",
   },
-  openingHours: ["Mo-Su 09:00-21:00"],
+  openingHours: ["Mo-Su 10-21:00"],
   priceRange: "€€",
   currenciesAccepted: "EUR",
   paymentAccepted: "Cash, Credit Card, Bank Transfer",

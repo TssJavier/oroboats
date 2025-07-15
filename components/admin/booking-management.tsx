@@ -29,7 +29,11 @@ import {
   Settings,
   CreditCard,
   Banknote,
+  MapPin,
+  Hotel,
+  Search,
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface Booking {
   booking: {
@@ -63,11 +67,19 @@ interface Booking {
     paymentLocation?: string
     payment_type?: string
     paymentMethod?: "cash" | "card"
+    beachLocationId?: string
+    beachLocationName?: string
+    hotelCode?: string // ✅ NUEVO: Añadir hotelCode
   }
   vehicle: {
     name: string
     type: string
   } | null
+}
+
+interface BeachLocation {
+  id: string
+  name: string
 }
 
 type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual" | "partial" | "salesperson"
@@ -84,16 +96,54 @@ export function BookingManagement() {
   const [damageImages, setDamageImages] = useState<File[]>([])
   const [dateFilter, setDateFilter] = useState<DateFilter>("all")
   const [selectedSalesperson, setSelectedSalesperson] = useState<string>("")
-  const [debug, setDebug] = useState<any>(null)
+  const [beachLocations, setBeachLocations] = useState<BeachLocation[]>([])
+  const [selectedBeachFilterId, setSelectedBeachFilterId] = useState<string>("all")
+  const [hotelCodeSearchInput, setHotelCodeSearchInput] = useState<string>("") // ✅ NUEVO: Estado para el input del buscador
+  const [hotelCodeFilter, setHotelCodeFilter] = useState<string>("") // ✅ NUEVO: Estado para el filtro aplicado
 
   useEffect(() => {
-    fetchBookings()
+    fetchBeachLocations()
   }, [])
 
-  const fetchBookings = async () => {
+  useEffect(() => {
+    fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
+  }, [selectedBeachFilterId, hotelCodeFilter]) // ✅ MODIFICADO: Refetch bookings cuando hotelCodeFilter cambia
+
+  const fetchBeachLocations = async () => {
+    try {
+      const response = await fetch("/api/locations")
+      if (!response.ok) {
+        throw new Error("Error al cargar las ubicaciones de playa.")
+      }
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        setBeachLocations([{ id: "all", name: "Todas las Playas" }, ...data])
+      } else {
+        console.error("API returned non-array data for locations:", data)
+        setError("Error: Datos de ubicaciones no válidos.")
+      }
+    } catch (err) {
+      console.error("Error fetching beach locations:", err)
+      setError(err instanceof Error ? err.message : "Error al cargar las ubicaciones de playa.")
+    }
+  }
+
+  const fetchBookings = async (beachId = "all", hotelCode = "") => {
+    // ✅ MODIFICADO: Recibir hotelCode
     try {
       setError(null)
-      const response = await fetch("/api/bookings")
+      setLoading(true)
+      console.log(`🔍 Frontend: Fetching bookings for beach: ${beachId}, hotelCode: ${hotelCode}`)
+      const url = new URL("/api/bookings", window.location.origin)
+      if (beachId !== "all") {
+        url.searchParams.append("beachLocationId", beachId)
+      }
+      if (hotelCode) {
+        // ✅ NUEVO: Añadir hotelCode a los parámetros de búsqueda
+        url.searchParams.append("hotelCode", hotelCode)
+      }
+
+      const response = await fetch(url.toString())
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -103,43 +153,9 @@ export function BookingManagement() {
       console.log("🔍 Frontend: Bookings data received:", data)
 
       if (Array.isArray(data)) {
-        // Ordenar por fecha de creación, más recientes primero
         const sortedBookings = data.sort(
-          (a, b) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
+          (a: Booking, b: Booking) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
         )
-
-        // ✅ ARREGLO: DEBUG MEJORADO PARA WAIVERS
-        const withWaivers = sortedBookings.filter((b) => {
-          // ✅ VERIFICAR MÚLTIPLES CAMPOS POSIBLES
-          const waiverId = b.booking.liabilityWaiverId || b.booking.liability_waiver_id
-          const hasWaiver = waiverId && waiverId !== null && waiverId !== 0
-
-          console.log(`🔍 WAIVER DEBUG - Booking ${b.booking.id} (${b.booking.customerName}):`, {
-            liabilityWaiverId: b.booking.liabilityWaiverId,
-            liability_waiver_id: b.booking.liability_waiver_id,
-            waiverId,
-            hasWaiver,
-            rawBooking: b.booking,
-          })
-
-          return hasWaiver
-        }).length
-
-        const withPartialPayment = sortedBookings.filter((b) => b.booking.payment_type === "partial_payment").length
-
-        console.log(`✅ Frontend: Found ${withWaivers} bookings with signed liability waivers`)
-        console.log(`✅ Frontend: Found ${withPartialPayment} bookings with partial payment`)
-
-        setDebug({
-          totalBookings: sortedBookings.length,
-          withWaivers,
-          withPartialPayment,
-          sampleWaiverIds: sortedBookings
-            .filter((b) => b.booking.liabilityWaiverId || b.booking.liability_waiver_id)
-            .map((b) => b.booking.liabilityWaiverId || b.booking.liability_waiver_id)
-            .slice(0, 5),
-        })
-
         setBookings(sortedBookings)
       } else {
         console.error("API returned non-array data:", data)
@@ -153,6 +169,10 @@ export function BookingManagement() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearchByHotelCode = () => {
+    setHotelCodeFilter(hotelCodeSearchInput.toUpperCase()) // ✅ NUEVO: Aplicar el filtro al hacer clic
   }
 
   const completeAllBookings = async () => {
@@ -193,10 +213,9 @@ export function BookingManagement() {
     }
 
     alert(`Proceso completado:\n- ${successCount} reservas completadas exitosamente\n- ${errorCount} errores`)
-    fetchBookings()
+    fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
   }
 
-  // ✅ ARREGLO: FUNCIÓN MEJORADA PARA WAIVERS
   const viewWaiver = async (waiverId: number, customerName: string) => {
     try {
       console.log(`🔍 Opening waiver ${waiverId} for ${customerName}...`)
@@ -224,21 +243,30 @@ export function BookingManagement() {
   const getPaymentTypeDisplay = (booking: Booking) => {
     const isPartial =
       booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
+    const isManual = booking.booking.isManualBooking === true
 
     if (isPartial) {
       return {
         type: "partial",
         label: "Pago Parcial",
         description: `€${booking.booking.amountPaid} pagado / €${booking.booking.amountPending} pendiente`,
-        color: "bg-orange-600 text-white",
+        color: "bg-gray-600 text-white", // Gray for partial
         icon: Banknote,
+      }
+    } else if (isManual) {
+      return {
+        type: "manual",
+        label: "Pago Manual",
+        description: "Pagado en sitio (efectivo/tarjeta)",
+        color: "bg-orange-600 text-white", // Stronger orange for manual
+        icon: Settings,
       }
     } else {
       return {
-        type: "full",
-        label: "Pago Completo",
+        type: "full_online",
+        label: "Pago Completo Online",
         description: "Todo pagado online",
-        color: "bg-green-600 text-white",
+        color: "bg-blue-600 text-white", // Blue for full online
         icon: CreditCard,
       }
     }
@@ -263,45 +291,49 @@ export function BookingManagement() {
   }
 
   const getFilteredBookings = () => {
+    let currentBookings = bookings
+
+    // Filter by beach location first
+    if (selectedBeachFilterId !== "all") {
+      currentBookings = currentBookings.filter((booking) => booking.booking.beachLocationId === selectedBeachFilterId)
+    }
+
+    // Then apply date/type filters
     if (dateFilter === "test") {
-      return bookings.filter((booking) => booking.booking.isTestBooking === true)
-    }
-
-    if (dateFilter === "manual") {
-      return bookings.filter((booking) => booking.booking.isManualBooking === true)
-    }
-
-    if (dateFilter === "partial") {
-      return bookings.filter(
+      currentBookings = currentBookings.filter((booking) => booking.booking.isTestBooking === true)
+    } else if (dateFilter === "manual") {
+      currentBookings = currentBookings.filter((booking) => booking.booking.isManualBooking === true)
+    } else if (dateFilter === "partial") {
+      currentBookings = currentBookings.filter(
         (booking) =>
           booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment",
       )
-    }
-
-    if (dateFilter === "salesperson" && selectedSalesperson) {
-      return bookings.filter((booking) => booking.booking.salesPerson === selectedSalesperson)
-    }
-
-    if (dateFilter === "all") return bookings
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    return bookings.filter((booking) => {
-      const bookingDate = new Date(booking.booking.bookingDate)
-      bookingDate.setHours(0, 0, 0, 0)
-
-      if (dateFilter === "today") {
+    } else if (dateFilter === "salesperson" && selectedSalesperson) {
+      currentBookings = currentBookings.filter((booking) => booking.booking.salesPerson === selectedSalesperson)
+    } else if (dateFilter === "today") {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      currentBookings = currentBookings.filter((booking) => {
+        const bookingDate = new Date(booking.booking.bookingDate)
+        bookingDate.setHours(0, 0, 0, 0)
         return bookingDate.getTime() === today.getTime()
-      } else if (dateFilter === "tomorrow") {
+      })
+    } else if (dateFilter === "tomorrow") {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+      currentBookings = currentBookings.filter((booking) => {
+        const bookingDate = new Date(booking.booking.bookingDate)
+        bookingDate.setHours(0, 0, 0, 0)
         return bookingDate.getTime() === tomorrow.getTime()
-      }
+      })
+    }
+    // No need to filter by beachLocationId here, as it's already handled by fetchBookings
 
-      return true
-    })
+    // The hotelCodeFilter is now applied directly in fetchBookings via API call,
+    // so no need for client-side filtering here based on hotelCodeFilter state.
+
+    return currentBookings
   }
 
   const getSalespersonStats = () => {
@@ -338,7 +370,7 @@ export function BookingManagement() {
         })
 
         if (response.ok) {
-          fetchBookings()
+          fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
         } else {
           setError("Error al cancelar la reserva")
         }
@@ -350,7 +382,7 @@ export function BookingManagement() {
         })
 
         if (response.ok) {
-          fetchBookings()
+          fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
         } else {
           setError("Error al actualizar la reserva")
         }
@@ -399,7 +431,7 @@ export function BookingManagement() {
         setShowDepositModal(false)
         setSelectedBooking(null)
         setDepositAction(null)
-        fetchBookings()
+        fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
 
         alert(result.message || "Fianza procesada correctamente")
       } else {
@@ -425,9 +457,9 @@ export function BookingManagement() {
       case "pending":
         return "bg-yellow-600 text-white"
       case "cancelled":
-        return "bg-red-600 text-white"
+        return "bg-red-700 text-white" // Stronger red for cancelled status badge
       case "completed":
-        return "bg-blue-600 text-white"
+        return "bg-green-700 text-white" // Stronger green for completed status badge
       default:
         return "bg-gray-600 text-white"
     }
@@ -436,7 +468,7 @@ export function BookingManagement() {
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-600 text-white"
+        return "bg-green-700 text-white" // Stronger green for paymentStatus completed badge
       case "pending":
         return "bg-yellow-600 text-white"
       case "failed":
@@ -444,7 +476,9 @@ export function BookingManagement() {
       case "free_booking":
         return "bg-purple-600 text-white"
       case "manual":
-        return "bg-orange-600 text-white"
+        return "bg-orange-600 text-white" // Stronger orange for manual payment badge
+      case "partial_payment":
+        return "bg-gray-600 text-white" // Gray for partial payment badge
       default:
         return "bg-gray-600 text-white"
     }
@@ -476,7 +510,10 @@ export function BookingManagement() {
             <div className="text-red-600 mb-4">⚠️ Error de Conexión</div>
             <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
             <p className="text-red-600 mb-6">Verifica que la base de datos esté conectada y que las tablas existan.</p>
-            <Button onClick={fetchBookings} className="bg-red-600 text-white hover:bg-red-700">
+            <Button
+              onClick={() => fetchBookings(selectedBeachFilterId, hotelCodeFilter)} // ✅ MODIFICADO: Pasar hotelCodeFilter
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
               Reintentar
             </Button>
           </CardContent>
@@ -521,23 +558,6 @@ export function BookingManagement() {
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
 
-      {/* Debug info */}
-      {debug && (
-        <Card className="bg-yellow-50 border border-yellow-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center text-yellow-800">🔍 Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-yellow-800">
-              <div>Total bookings: {debug.totalBookings}</div>
-              <div>With waivers: {debug.withWaivers}</div>
-              <div>With partial payment: {debug.withPartialPayment}</div>
-              <div>Sample waiver IDs: {debug.sampleWaiverIds.join(", ")}</div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Leyenda de Estados */}
       <Card className="bg-gray-50 border border-gray-200">
         <CardHeader className="pb-3">
@@ -560,11 +580,11 @@ export function BookingManagement() {
                   <span className="text-sm">Confirmada y lista</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-blue-600 text-white">completed</Badge>
+                  <Badge className="bg-green-700 text-white">completed</Badge> {/* Stronger green */}
                   <span className="text-sm">Completada exitosamente</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-red-600 text-white">cancelled</Badge>
+                  <Badge className="bg-red-700 text-white">cancelled</Badge> {/* Stronger red */}
                   <span className="text-sm">Cancelada</span>
                 </div>
               </div>
@@ -574,16 +594,20 @@ export function BookingManagement() {
               <h4 className="font-semibold text-gray-700 mb-3">Estados de Pago</h4>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-green-600 text-white">completed</Badge>
-                  <span className="text-sm">Pago completado</span>
+                  <Badge className="bg-blue-600 text-white">completed</Badge> {/* Blue for full online */}
+                  <span className="text-sm">Pago completado (online)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="bg-yellow-600 text-white">pending</Badge>
-                  <span className="text-sm">Pago pendiente</span>
+                  <span className="text-sm">Pago pendiente (online)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-orange-600 text-white">manual</Badge>
-                  <span className="text-sm">Pago manual/efectivo</span>
+                  <Badge className="bg-gray-600 text-white">partial</Badge> {/* Gray for partial */}
+                  <span className="text-sm">Pago parcial (online)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-orange-600 text-white">manual</Badge> {/* Stronger orange for manual */}
+                  <span className="text-sm">Pago manual (en sitio)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="bg-red-600 text-white">failed</Badge>
@@ -613,15 +637,63 @@ export function BookingManagement() {
         </CardContent>
       </Card>
 
-      {/* Filtros de fecha */}
+      {/* Filtros de fecha y playa */}
       <Card className="bg-white border border-gray-200">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center text-gray-800">
             <CalendarDays className="h-5 w-5 mr-2" />
-            Filtrar por Fecha
+            Filtrar Reservas
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Filtro por playa */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Playa</label>
+              <Select value={selectedBeachFilterId} onValueChange={setSelectedBeachFilterId}>
+                <SelectTrigger className="w-full p-3 border border-gray-200 rounded-md bg-gray-50">
+                  <SelectValue placeholder="Todas las playas" />
+                </SelectTrigger>
+                <SelectContent>
+                  {beachLocations.map((beach) => (
+                    <SelectItem key={beach.id} value={beach.id}>
+                      {beach.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* ✅ MODIFICADO: Filtro por Código de Hotel con botón de búsqueda */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar por Código de Hotel</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type="text"
+                    value={hotelCodeSearchInput}
+                    onChange={(e) => setHotelCodeSearchInput(e.target.value)} // Actualiza el input, no el filtro
+                    placeholder="Introduce el código"
+                    className="pr-10 w-full p-3 border border-gray-200 rounded-md bg-gray-50"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSearchByHotelCode()
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleSearchByHotelCode}
+                    className="absolute right-0 top-0 h-full w-10 text-gray-500 hover:bg-transparent"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-3">
             <Button
               variant={dateFilter === "all" ? "default" : "outline"}
@@ -687,7 +759,7 @@ export function BookingManagement() {
             <Button
               variant={dateFilter === "partial" ? "default" : "outline"}
               onClick={() => setDateFilter("partial")}
-              className={dateFilter === "partial" ? "bg-orange-600 text-white hover:bg-orange-700" : ""}
+              className={dateFilter === "partial" ? "bg-gray-600 text-white hover:bg-gray-700" : ""}
             >
               <Banknote className="h-4 w-4 mr-2" />
               Pago Parcial ({partialPaymentBookingsCount})
@@ -738,7 +810,6 @@ export function BookingManagement() {
       {Array.isArray(filteredBookings) && filteredBookings.length > 0 ? (
         <div className="space-y-6">
           {filteredBookings.map((booking) => {
-            // ✅ ARREGLO: DETECCIÓN MEJORADA DE WAIVERS
             const waiverId = booking.booking.liabilityWaiverId || booking.booking.liability_waiver_id
             const hasWaiver = waiverId && waiverId !== null && waiverId !== 0
 
@@ -749,19 +820,25 @@ export function BookingManagement() {
             const paymentTypeInfo = getPaymentTypeDisplay(booking)
             const paymentMethodInfo = getPaymentMethodDisplay(booking)
 
+            let cardBackgroundColorClass = "bg-white border-gray-200" // Default white
+            if (booking.booking.status === "cancelled") {
+              cardBackgroundColorClass = "bg-red-100 border-red-300" // Stronger red for cancelled booking
+            } else if (booking.booking.status === "completed") {
+              cardBackgroundColorClass = "bg-green-100 border-green-300" // Stronger green for completed booking
+            } else if (isPartialPayment) {
+              cardBackgroundColorClass = "bg-gray-100 border-gray-300" // Gray for partial payment
+            } else if (isManual) {
+              cardBackgroundColorClass = "bg-orange-100 border-orange-300" // Stronger orange for manual payment
+            } else {
+              // This 'else' now covers 'full online payment' when not cancelled, completed, partial, or manual
+              cardBackgroundColorClass = "bg-blue-100 border-blue-300" // Blue for full online payment
+            }
+
             return (
               <Card
                 key={booking.booking.id}
-                className={`border border-gray-200 hover:shadow-lg transition-all ${
-                  booking.booking.status === "completed" ? "bg-green-50 border-green-200" : "bg-white"
-                } ${
-                  booking.booking.isTestBooking
-                    ? "border-l-4 border-l-purple-500"
-                    : isManual
-                      ? "border-l-4 border-l-orange-500"
-                      : isPartialPayment
-                        ? "border-l-4 border-l-orange-500"
-                        : "border-l-4 border-l-green-500"
+                className={`border hover:shadow-lg transition-all ${cardBackgroundColorClass} ${
+                  booking.booking.isTestBooking ? "border-l-4 border-l-purple-500" : ""
                 }`}
               >
                 <CardHeader>
@@ -769,10 +846,8 @@ export function BookingManagement() {
                     <div className="flex-1">
                       <CardTitle className="text-lg sm:text-xl font-bold text-black flex flex-wrap items-center gap-2">
                         <User className="h-5 w-5 text-gold flex-shrink-0" />
-                        {booking.booking.customerDni && (  // ✅ AÑADIR ESTE BLOQUE (OPCIONAL)
-                          <span className="text-sm font-normal text-gray-600">
-                            ({booking.booking.customerDni})
-                          </span>
+                        {booking.booking.customerDni && (
+                          <span className="text-sm font-normal text-gray-600">({booking.booking.customerDni})</span>
                         )}
                         <span className="break-words">{booking.booking.customerName}</span>
                         {booking.booking.isTestBooking && (
@@ -797,6 +872,11 @@ export function BookingManagement() {
                             {paymentMethodInfo.label}
                           </Badge>
                         )}
+                        {/* ✅ MODIFICADO: Mostrar código de hotel */}
+                        <Badge className="bg-gray-700 text-white text-xs">
+                          <Hotel className="h-3 w-3 mr-1" />
+                          Hotel: {booking.booking.hotelCode || "sin código"}
+                        </Badge>
                       </CardTitle>
                       <CardDescription className="flex items-center mt-1">
                         <Ship className="h-4 w-4 mr-1 flex-shrink-0" />
@@ -808,6 +888,12 @@ export function BookingManagement() {
                             </span>
                           )}
                         </span>
+                        {booking.booking.beachLocationName && (
+                          <Badge className="ml-2 bg-gray-200 text-gray-800 text-xs">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {booking.booking.beachLocationName}
+                          </Badge>
+                        )}
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap gap-1 sm:gap-2">
@@ -848,7 +934,7 @@ export function BookingManagement() {
                           <Phone className="h-3 w-3 mr-2 flex-shrink-0" />
                           <span>{booking.booking.customerPhone}</span>
                         </div>
-                        {booking.booking.customerDni && ( 
+                        {booking.booking.customerDni && (
                           <div className="flex items-center text-gray-600">
                             <UserCheck className="h-3 w-3 mr-2 flex-shrink-0" />
                             <span>DNI: {booking.booking.customerDni}</span>
@@ -984,7 +1070,7 @@ export function BookingManagement() {
                             <Button
                               size="sm"
                               onClick={() => updateBookingStatus(booking.booking.id, "completed")}
-                              className="bg-blue-600 text-white hover:bg-blue-700 text-xs"
+                              className="bg-green-700 text-white hover:bg-green-800 text-xs" // Stronger green for the button
                             >
                               Completar Reserva
                             </Button>
@@ -1030,11 +1116,16 @@ export function BookingManagement() {
                     Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
                     {isManual && salesPersonName && <span className="ml-2">• Comercial: {salesPersonName}</span>}
                     {isPartialPayment && (
-                      <span className="ml-2 font-medium text-orange-600">• {paymentTypeInfo.description}</span>
+                      <span className="ml-2 font-medium text-gray-600">• {paymentTypeInfo.description}</span>
                     )}
                     {isManual && paymentMethodInfo && (
                       <span className={`ml-2 font-medium ${paymentMethodInfo.color}`}>
                         • Pagado con {paymentMethodInfo.label.toLowerCase()}
+                      </span>
+                    )}
+                    {booking.booking.hotelCode && (
+                      <span className="ml-2 font-medium text-gray-600">
+                        • Código Hotel: {booking.booking.hotelCode}
                       </span>
                     )}
                   </div>
