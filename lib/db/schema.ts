@@ -5,13 +5,13 @@ import {
   integer,
   boolean,
   timestamp,
-  numeric, // Usar numeric para precisión decimal
+  numeric,
   jsonb,
   date,
   time,
   varchar,
 } from "drizzle-orm/pg-core"
-import { relations } from "drizzle-orm" // Importar relations
+import { relations } from "drizzle-orm"
 
 // Tabla de ubicaciones de playa
 export const locations = pgTable("locations", {
@@ -126,6 +126,29 @@ export const hotels = pgTable("hotels", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: varchar("code", { length: 50 }).unique().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+})
+
+// ✅ NUEVA TABLA: Posts del blog
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  slug: text("slug").unique().notNull(), // URL amigable
+  excerpt: text("excerpt").notNull(), // Resumen corto
+  content: text("content").notNull(), // Contenido completo en markdown/HTML
+  featuredImage: text("featured_image"), // URL de imagen destacada
+  language: varchar("language", { length: 2 }).notNull().default("es"), // 'es' | 'en'
+  isFeatured: boolean("is_featured").default(false), // Solo uno puede ser featured por idioma
+  isPublished: boolean("is_published").default(false),
+  publishedAt: timestamp("published_at"),
+  metaTitle: text("meta_title"), // SEO
+  metaDescription: text("meta_description"), // SEO
+  tags: jsonb("tags").default([]), // Array de tags
+  readingTime: integer("reading_time").default(5), // Tiempo estimado de lectura en minutos
+  views: integer("views").default(0), // Contador de vistas
+  authorName: text("author_name").default("Oro Boats"),
+  authorEmail: text("author_email"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })
@@ -280,6 +303,11 @@ export const hotelsRelations = relations(hotels, ({ many }) => ({
   // Si en el futuro se quisiera vincular bookings a hoteles, se haría aquí
 }))
 
+// ✅ NUEVA RELACIÓN: Blog Posts
+export const blogPostsRelations = relations(blogPosts, ({ many }) => ({
+  // Futuras relaciones con comentarios o categorías
+}))
+
 export const vehicleAvailabilityRelations = relations(vehicleAvailability, ({ one }) => ({
   vehicle: one(vehicles, {
     fields: [vehicleAvailability.vehicleId],
@@ -335,6 +363,11 @@ export type PricingRule = typeof pricingRules.$inferSelect
 export type NewPricingRule = typeof pricingRules.$inferInsert
 export type Location = typeof locations.$inferSelect
 export type NewLocation = typeof locations.$inferInsert
+
 // ✅ NUEVO TIPO: Hotel
 export type Hotel = typeof hotels.$inferSelect
 export type NewHotel = typeof hotels.$inferInsert
+
+// ✅ NUEVO TIPO: Blog Post
+export type BlogPost = typeof blogPosts.$inferSelect
+export type NewBlogPost = typeof blogPosts.$inferInsert

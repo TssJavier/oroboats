@@ -12,6 +12,7 @@ import { BookingManagement } from "./booking-management"
 import { SettingsManagement } from "./settings-management"
 import { AdminStats } from "./admin-stats"
 import { AdminHeader } from "./admin-header"
+import { BlogManagement } from "./blog-management" // ✅ NUEVO: Importar BlogManagement
 //import { DepositAlerts } from "./deposit-alerts"
 import { UserManagement } from "./user-management"
 import { BeachManagement } from "./beach-management" // ✅ Importar BeachManagement
@@ -28,6 +29,7 @@ import {
   Users,
   MapPin,
   Hotel,
+  FileText,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -93,6 +95,7 @@ export function AdminDashboard() {
     { value: "stats", label: "Estadísticas", icon: BarChart3, allowedRoles: ["admin", "comercial"] },
     { value: "vehicles", label: "Productos", icon: Ship, allowedRoles: ["admin", "comercial"] },
     { value: "bookings", label: "Reservas", icon: Calendar, allowedRoles: ["admin", "comercial"] },
+    { value: "blog", label: "Blog", icon: FileText, allowedRoles: ["admin", "comercial"] }, // ✅ NUEVO: Gestión del Blog
     { value: "beaches", label: "Playas", icon: MapPin, allowedRoles: ["admin"] }, // ✅ NUEVO: Gestión de Playas
     { value: "hotels", label: "Hoteles", icon: Hotel, allowedRoles: ["admin"] }, // ✅ NUEVO: Gestión de Hoteles
     { value: "users", label: "Comerciales", icon: Users, allowedRoles: ["admin"] }, // Solo admin
@@ -218,6 +221,11 @@ export function AdminDashboard() {
 
           <TabsContent value="bookings" className="mt-0">
             <BookingManagement />
+          </TabsContent>
+
+          {/* ✅ NUEVO: Contenido para la gestión del blog */}
+          <TabsContent value="blog" className="mt-0">
+            <BlogManagement />
           </TabsContent>
 
           {/* ✅ NUEVO: Contenido para la gestión de playas */}

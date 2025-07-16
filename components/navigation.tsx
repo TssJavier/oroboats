@@ -12,10 +12,12 @@ const translations = {
   es: {
     home: "Inicio",
     boats: "Flota",
+    blog: "Blog", // ✅ NUEVO: Traducción para Blog
   },
   en: {
     home: "Home",
     boats: "Fleet",
+    blog: "Blog", // ✅ NUEVO: Traducción para Blog
   },
 }
 
@@ -96,6 +98,13 @@ export function Navigation() {
             >
               {t.boats}
             </button>
+            {/* ✅ NUEVO: Enlace al Blog */}
+            <button
+              onClick={() => handleNavigation("/blog")}
+              className="text-black hover:text-gold transition-colors duration-300 font-medium"
+            >
+              {t.blog}
+            </button>
 
             {/* Language Selector */}
             <DropdownMenu>
@@ -139,6 +148,13 @@ export function Navigation() {
                 className="block w-full text-left px-3 py-2 text-black hover:text-gold transition-colors"
               >
                 {t.boats}
+              </button>
+              {/* ✅ NUEVO: Enlace al Blog en móvil */}
+              <button
+                onClick={() => handleNavigation("/blog")}
+                className="block w-full text-left px-3 py-2 text-black hover:text-gold transition-colors"
+              >
+                {t.blog}
               </button>
 
               {/* Language selector for mobile */}
