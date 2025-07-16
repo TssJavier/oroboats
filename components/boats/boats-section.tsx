@@ -38,6 +38,7 @@ import {
   ArrowLeft,
   ChevronDown,
   Check,
+  RollerCoaster,
 } from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
@@ -178,7 +179,7 @@ const translations = {
     licenseRequired: "LICENCIA REQUERIDA",
     noLicenseNeeded: "SIN LICENCIA",
     restrictedHours: "Horario restringido",
-    restrictedInfo: "Motos sin licencia: No disponible de 14:00 a 16:00 (descanso del personal)",
+    restrictedInfo: "Vehículo sin licencia: No disponible de 14:00 a 16:00 (descanso del personal)",
     licenseWarningTitle: "Licencia de Navegación Requerida",
     licenseWarningMessage: "Has seleccionado un vehículo que requiere licencia de navegación.",
     licenseWarningRequirements:
@@ -197,7 +198,7 @@ const translations = {
     people: "personas",
     photoSession: "Sesión de fotos",
     bluetoothMusic: "Música Bluetooth",
-    safetyRing: "Rosco de seguridad",
+    safetyRing: "Donut flotador",
     champagne: "Champán",
     snorkelingGear: "Equipo de snorkel",
     coolerDrinks: "Nevera con bebidas",
@@ -243,7 +244,7 @@ const translations = {
     licenseRequired: "LICENSE REQUIRED",
     noLicenseNeeded: "NO LICENSE NEEDED",
     restrictedHours: "Restricted hours",
-    restrictedInfo: "Jet skis without license: Not available from 14:00 to 16:00 (staff break)",
+    restrictedInfo: "Vehicle without license: Not available from 14:00 to 16:00 (staff break)",
     licenseWarningTitle: "Navigation License Required",
     licenseWarningMessage: "You have selected a vehicle that requires a navigation license.",
     licenseWarningRequirements:
@@ -321,7 +322,7 @@ function getExtraIcon(featureId: string) {
     case "bluetooth_music":
       return <Music className="h-4 w-4 text-blue-600" />
     case "safety_ring":
-      return <Shield className="h-4 w-4 text-green-600" />
+      return <RollerCoaster className="h-4 w-4 text-green-600" />
     case "champagne":
       return <Wine className="h-4 w-4 text-purple-600" />
     case "snorkeling_gear":

@@ -114,8 +114,8 @@ const AVAILABLE_EXTRA_FEATURES: ExtraFeature[] = [
   },
   {
     id: "safety_ring",
-    name: "Rosco de seguridad",
-    description: "Rosco inflable para mayor seguridad",
+    name: "Donut flotador",
+    description: "Rosco para divertirse en el agua",
     enabled: false,
   },
   {
