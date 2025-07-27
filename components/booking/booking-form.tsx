@@ -39,6 +39,7 @@ interface BookingData {
   securityDeposit?: number
   liabilityWaiverId?: number
   hotelCode?: string // ✅ NUEVO: Añadir hotelCode
+  beachLocationId?: string
 }
 
 const translations = {
@@ -163,6 +164,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     securityDeposit: securityDeposit,
     liabilityWaiverId: undefined,
     hotelCode: "", // ✅ NUEVO: Inicializar hotelCode
+    beachLocationId: vehicle.beachLocationId ?? undefined,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -217,9 +219,10 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         duration: selectedTime.duration,
         totalPrice: selectedTime.price,
         securityDeposit: securityDeposit,
+        beachLocationId: vehicle.beachLocationId ?? undefined,
       }))
     }
-  }, [selectedDate, selectedTime, securityDeposit])
+  }, [selectedDate, selectedTime, securityDeposit, vehicle.beachLocationId])
 
   // Efecto para hacer scroll al cambiar de paso
   useEffect(() => {

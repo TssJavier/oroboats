@@ -220,7 +220,7 @@ export function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="bookings" className="mt-0">
-            <BookingManagement />
+            <BookingManagement/>
           </TabsContent>
 
           {/* ✅ NUEVO: Contenido para la gestión del blog */}

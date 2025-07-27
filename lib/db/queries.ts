@@ -225,10 +225,35 @@ export async function createBooking(bookingData: any) {
         discount_code, discount_amount, original_price, security_deposit,
         created_at, updated_at,
         payment_type, amount_paid, amount_pending, payment_location,
-        liability_waiver_id, is_test_booking, hotel_code -- ✅ AÑADIDO: hotel_code
-      ) VALUES (${Number(bookingData.vehicleId)},${bookingData.customerName},${bookingData.customerEmail},${bookingData.customerPhone},${bookingData.bookingDate},${bookingData.timeSlot},${bookingData.startTime},${bookingData.endTime},${bookingData.duration},${String(bookingData.totalPrice)},${bookingData.status || "pending"},${bookingData.paymentStatus || "pending"},${bookingData.notes || null},${bookingData.discountCode || null},${String(bookingData.discountAmount || 0)},${String(bookingData.originalPrice || bookingData.totalPrice)},${String(bookingData.securityDeposit || 0)},
+        liability_waiver_id, is_test_booking, hotel_code, beach_location_id
+      ) VALUES (
+        ${Number(bookingData.vehicleId)},
+        ${bookingData.customerName},
+        ${bookingData.customerEmail},
+        ${bookingData.customerPhone},
+        ${bookingData.bookingDate},
+        ${bookingData.timeSlot},
+        ${bookingData.startTime},
+        ${bookingData.endTime},
+        ${bookingData.duration},
+        ${String(bookingData.totalPrice)},
+        ${bookingData.status || "pending"},
+        ${bookingData.paymentStatus || "pending"},
+        ${bookingData.notes || null},
+        ${bookingData.discountCode || null},
+        ${String(bookingData.discountAmount || 0)},
+        ${String(bookingData.originalPrice || bookingData.totalPrice)},
+        ${String(bookingData.securityDeposit || 0)},
         NOW(),
-        NOW(),${paymentType},${String(amountPaid)},${String(amountPending)},${paymentLocation},${bookingData.liability_waiver_id || bookingData.liabilityWaiverId || null},${bookingData.isTestBooking || false},${bookingData.hotelCode || null} -- ✅ AÑADIDO: Valor para hotel_code
+        NOW(),
+        ${paymentType},
+        ${String(amountPaid)},
+        ${String(amountPending)},
+        ${paymentLocation},
+        ${bookingData.liability_waiver_id || bookingData.liabilityWaiverId || null},
+        ${bookingData.isTestBooking || false},
+        ${bookingData.hotelCode || null},
+        ${bookingData.beachLocationId || null}
       ) RETURNING *;
     `)
     console.log("✅ DB: Booking created successfully")

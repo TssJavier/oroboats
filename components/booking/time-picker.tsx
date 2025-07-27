@@ -72,12 +72,12 @@ const translations = {
     halfDay: "Medio día",
     halfHour: "30 minutos",
     oneHour: "1 hora",
-    twoHours: "2 horas",
+    twoHours: "2 horas", // Añadido
     fourHours: "4 horas",
     options: "opciones",
     quickFun: "Diversión rápida",
     completeExperience: "Experiencia completa",
-    extendedAdventure: "Aventura extendida",
+    extendedAdventure: "Aventura extendida", // Añadido
     halfDayFun: "Medio día de diversión",
     hoursOfAdventure: "horas de aventura",
     fullDayFun: "Día completo de diversión",
@@ -106,12 +106,12 @@ const translations = {
     halfDay: "Half day",
     halfHour: "30 minutes",
     oneHour: "1 hour",
-    twoHours: "2 horas",
+    twoHours: "2 hours", // Añadido
     fourHours: "4 hours",
     options: "options",
     quickFun: "Quick fun",
     completeExperience: "Complete experience",
-    extendedAdventure: "Extended adventure",
+    extendedAdventure: "Extended adventure", // Añadido
     halfDayFun: "Half day of fun",
     hoursOfAdventure: "hours of adventure",
     fullDayFun: "Full day of fun",
@@ -242,11 +242,12 @@ export function TimePicker({
 
       if (!isSelectedDateToday) return true
 
-      const [slotHours, slotMinutes] = slot.time.split(":").map(Number)
-      const slotStartTimeInMinutes = slotHours * 60 + slotMinutes
+      const [slotEndHours, slotEndMinutes] = slot.endTime.split(":").map(Number)
+      const slotEndTimeInMinutes = slotEndHours * 60 + slotEndMinutes
       const currentTimeInMinutes = spainTime.getHours() * 60 + spainTime.getMinutes()
 
-      return slotStartTimeInMinutes >= currentTimeInMinutes
+      // ✅ CAMBIO CRÍTICO: Ahora se compara la hora de FINALIZACIÓN del slot
+      return slotEndTimeInMinutes > currentTimeInMinutes
     })
   }
 
@@ -258,6 +259,7 @@ export function TimePicker({
     if (vehicle.type === "boat") {
       const halfdayOptions = pricingOptions.filter((p) => p.duration.startsWith("halfday"))
       const fulldayOptions = pricingOptions.filter((p) => p.duration.startsWith("fullday"))
+      const twoHourOptions = pricingOptions.filter((p) => p.duration === "2hour") // Filtrar por "2hour"
 
       if (halfdayOptions.length > 0) {
         const minPrice = Math.min(...halfdayOptions.map((o) => o.price))
@@ -265,6 +267,17 @@ export function TimePicker({
           key: "halfday",
           label: t.halfDay,
           description: `${halfdayOptions.length} ${t.options}`,
+          price: minPrice,
+        })
+      }
+
+      // ✅ NUEVO: Añadir opción de 2 horas para barcos
+      if (twoHourOptions.length > 0) {
+        const minPrice = Math.min(...twoHourOptions.map((o) => o.price))
+        options.push({
+          key: "2hour",
+          label: t.twoHours,
+          description: t.extendedAdventure, // Usar la traducción para "Aventura extendida"
           price: minPrice,
         })
       }
@@ -402,7 +415,7 @@ export function TimePicker({
                 <Button
                   onClick={fetchAvailableSlots}
                   variant="outline"
-                  className="mt-4 border-red-300 text-red-600 hover:bg-red-50"
+                  className="mt-4 border-red-300 text-red-600 hover:bg-red-50 bg-transparent"
                 >
                   {t.retry}
                 </Button>
@@ -412,12 +425,17 @@ export function TimePicker({
                 {getFilteredSlots().length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {getFilteredSlots().map((slot, index) => {
-                      const isSelected = selectedTime?.start === slot.time && selectedTime?.duration === slot.duration
+                      // ✅ CAMBIO: Clave más única para evitar duplicados visuales y problemas de selección
+                      const uniqueKey = `${slot.time}-${slot.endTime}-${slot.duration}-${index}`
+                      const isSelected =
+                        selectedTime?.start === slot.time &&
+                        selectedTime?.duration === slot.duration &&
+                        selectedTime?.end === slot.endTime
                       const stockInfo = getStockInfo(slot)
 
                       return (
                         <Button
-                          key={`${slot.time}-${index}`}
+                          key={uniqueKey} // Usar la clave única
                           variant={isSelected ? "default" : "outline"}
                           onClick={() => handleTimeSlotClick(slot)}
                           className={`

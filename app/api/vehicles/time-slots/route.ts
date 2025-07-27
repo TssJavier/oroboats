@@ -7,6 +7,8 @@ interface PricingOption {
   duration: string
   label?: string
   price?: number
+  startTime?: string // Añadido para compatibilidad con halfday/fullday específicos
+  endTime?: string // Añadido para compatibilidad con halfday/fullday específicos
 }
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest) {
     console.log("✅ [ADMIN] Vehicle found:", vehicle.name, "Requires license:", vehicle.requires_license)
 
     // Parsear pricing
-    let pricing = []
+    let pricing: PricingOption[] = []
     if (typeof vehicle.pricing === "string") {
       try {
         pricing = JSON.parse(vehicle.pricing)
@@ -193,7 +195,7 @@ function checkSlotConflicts(
 }
 
 function generateAdminSlots(
-  pricing: any[],
+  pricing: PricingOption[], // Usar el tipo PricingOption
   existingBookings: any[],
   date: string,
   vehicleStock: number,
@@ -204,7 +206,7 @@ function generateAdminSlots(
   const workStart = 10 * 60 // 10:00
   const workEnd = 21 * 60 // 21:00
 
-  // ✅ RESTRICCIÓN HORARIA: Motos sin licencia solo de 14:00 a 16:00
+  // ✅ RESTRICCIÓN HORARIA: Motos sin licencia NO pueden de 14:00 a 16:00
   const restrictedStart = 14 * 60 // 14:00
   const restrictedEnd = 16 * 60 // 16:00
 
@@ -219,46 +221,31 @@ function generateAdminSlots(
     // ✅ CORREGIDO: Manejo especial para medio día y día completo
     if (option.duration.startsWith("halfday_") || option.duration === "halfday") {
       // Extraer horarios específicos para medio día
-      let startHour = 10
-      let endHour = 14
+      const startTime = option.startTime || "10:00"
+      const endTime = option.endTime || "14:00"
 
-      // Si es un formato específico como halfday_10_14, extraer las horas
-      if (option.duration.startsWith("halfday_")) {
-        const match = option.duration.match(/halfday_(\d+)_(\d+)/)
-        if (match) {
-          startHour = Number.parseInt(match[1])
-          endHour = Number.parseInt(match[2])
-        }
-      }
-
-      const startTime = `${startHour.toString().padStart(2, "0")}:00`
-      const endTime = `${endHour.toString().padStart(2, "0")}:00`
-
-      // ✅ VERIFICAR RESTRICCIONES DE LICENCIA
-      const slotStartMinutes = startHour * 60
-      const slotEndMinutes = endHour * 60
+      const slotStartMinutes = timeToMinutes(startTime)
+      const slotEndMinutes = timeToMinutes(endTime)
 
       let isAllowed = true
-      if (vehicleType === "jetski" && requiresLicense) {
-        // Motos CON licencia NO pueden alquilarse de 14:00 a 16:00
-        if (slotStartMinutes < restrictedEnd && slotEndMinutes > restrictedStart) {
-          isAllowed = false
-          console.log(`🚫 [ADMIN] Slot ${startTime}-${endTime} bloqueado para jetski con licencia (horas restringidas)`)
-        }
-      } else if (vehicleType === "jetski" && !requiresLicense) {
-        // Motos SIN licencia SOLO pueden alquilarse de 14:00 a 16:00
-        if (slotStartMinutes < restrictedStart || slotEndMinutes > restrictedEnd) {
-          isAllowed = false
-          console.log(
-            `🚫 [ADMIN] Slot ${startTime}-${endTime} bloqueado para jetski sin licencia (fuera de horas permitidas)`,
-          )
+      if (vehicleType === "jetski") {
+        if (requiresLicense) {
+          // ✅ Motos CON licencia: NO tienen restricciones horarias.
+          console.log(`✅ [ADMIN] Jetski con licencia: Sin restricciones horarias para ${startTime}-${endTime}.`)
+        } else {
+          // ✅ Motos SIN licencia: NO pueden alquilarse si solapan con 14:00 a 16:00
+          if (slotStartMinutes < restrictedEnd && slotEndMinutes > restrictedStart) {
+            isAllowed = false
+            console.log(
+              `🚫 [ADMIN] Slot ${startTime}-${endTime} bloqueado para jetski sin licencia (solapa con horas restringidas 14:00-16:00)`,
+            )
+          }
         }
       }
 
-      // ✅ VERIFICAR DISPONIBILIDAD CON DETECCIÓN ESTRICTA DE SOLAPAMIENTOS
-      const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
-
-      if (!isInPast(startHour * 60, date) && isAllowed) {
+      // Solo añadir si no es pasado y está permitido
+      if (!isInPast(slotEndMinutes, date) && isAllowed) {
+        const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
         slots.push({
           startTime: startTime,
           endTime: endTime,
@@ -275,25 +262,32 @@ function generateAdminSlots(
       }
     } else if (option.duration.startsWith("fullday_") || option.duration === "fullday") {
       // Para día completo, siempre es de 10:00 a 21:00
-      const startTime = "10:00"
-      const endTime = "21:00"
+      const startTime = option.startTime || "10:00"
+      const endTime = option.endTime || "21:00"
 
-      // ✅ VERIFICAR RESTRICCIONES DE LICENCIA PARA DÍA COMPLETO
+      const slotStartMinutes = timeToMinutes(startTime)
+      const slotEndMinutes = timeToMinutes(endTime)
+
       let isAllowed = true
-      if (vehicleType === "jetski" && requiresLicense) {
-        // Motos CON licencia NO pueden hacer día completo (incluye horas restringidas)
-        isAllowed = false
-        console.log(`🚫 [ADMIN] Día completo bloqueado para jetski con licencia (incluye horas restringidas)`)
-      } else if (vehicleType === "jetski" && !requiresLicense) {
-        // Motos SIN licencia NO pueden hacer día completo (solo 14:00-16:00)
-        isAllowed = false
-        console.log(`🚫 [ADMIN] Día completo bloqueado para jetski sin licencia (fuera de horas permitidas)`)
+      if (vehicleType === "jetski") {
+        if (requiresLicense) {
+          // ✅ Motos CON licencia: NO tienen restricciones horarias.
+          console.log(`✅ [ADMIN] Jetski con licencia: Sin restricciones horarias para ${startTime}-${endTime}.`)
+        } else {
+          // ✅ Motos SIN licencia: NO pueden alquilarse si solapan con 14:00 a 16:00
+          // Un día completo (10:00-21:00) siempre solapa con 14:00-16:00, así que siempre se bloqueará.
+          if (slotStartMinutes < restrictedEnd && slotEndMinutes > restrictedStart) {
+            isAllowed = false
+            console.log(
+              `🚫 [ADMIN] Día completo bloqueado para jetski sin licencia (solapa con horas restringidas 14:00-16:00)`,
+            )
+          }
+        }
       }
 
-      // ✅ VERIFICAR DISPONIBILIDAD CON DETECCIÓN ESTRICTA DE SOLAPAMIENTOS
-      const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
-
-      if (!isInPast(10 * 60, date) && isAllowed) {
+      // Solo añadir si no es pasado y está permitido
+      if (!isInPast(slotEndMinutes, date) && isAllowed) {
+        const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
         slots.push({
           startTime: startTime,
           endTime: endTime,
@@ -318,24 +312,22 @@ function generateAdminSlots(
         const startTime = minutesToTime(start)
         const endTime = minutesToTime(end)
 
-        // ✅ VERIFICAR RESTRICCIONES DE LICENCIA
         let isAllowed = true
-        if (vehicleType === "jetski" && requiresLicense) {
-          // Motos CON licencia NO pueden alquilarse de 14:00 a 16:00
-          if (start < restrictedEnd && end > restrictedStart) {
-            isAllowed = false
-          }
-        } else if (vehicleType === "jetski" && !requiresLicense) {
-          // Motos SIN licencia SOLO pueden alquilarse de 14:00 a 16:00
-          if (start < restrictedStart || end > restrictedEnd) {
-            isAllowed = false
+        if (vehicleType === "jetski") {
+          if (requiresLicense) {
+            // ✅ Motos CON licencia: NO tienen restricciones horarias.
+            console.log(`✅ [ADMIN] Jetski con licencia: Sin restricciones horarias para ${startTime}-${endTime}.`)
+          } else {
+            // ✅ Motos SIN licencia: NO pueden alquilarse si solapan con 14:00 a 16:00
+            if (start < restrictedEnd && end > restrictedStart) {
+              isAllowed = false
+            }
           }
         }
 
-        // ✅ VERIFICAR DISPONIBILIDAD CON DETECCIÓN ESTRICTA DE SOLAPAMIENTOS
-        const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
-
-        if (!isInPast(start, date) && isAllowed) {
+        // Solo añadir si no es pasado y está permitido
+        if (!isInPast(end, date) && isAllowed) {
+          const availability = checkSlotConflicts(startTime, endTime, existingBookings, vehicleStock)
           slots.push({
             startTime: startTime,
             endTime: endTime,
@@ -354,7 +346,31 @@ function generateAdminSlots(
     }
   }
 
-  return slots.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+  // Deduplicar slots antes de ordenar
+  const uniqueSlotsMap = new Map<string, any>()
+  for (const slot of slots) {
+    // La clave debe ser única para cada combinación de inicio, fin y duración
+    const key = `${slot.startTime}-${slot.endTime}-${slot.duration}`
+    if (!uniqueSlotsMap.has(key)) {
+      uniqueSlotsMap.set(key, slot)
+    }
+  }
+
+  const uniqueAndSortedSlots = Array.from(uniqueSlotsMap.values()).sort(
+    (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime),
+  )
+
+  console.log("✅ [ADMIN] SLOTS FINALES DISPONIBLES (deduplicados y ordenados):", uniqueAndSortedSlots.length)
+  uniqueAndSortedSlots.forEach((slot, index) => {
+    console.log(
+      `  ${index + 1}. ${slot.startTime}-${slot.endTime} (${slot.duration}) - €${slot.price} - Stock: ${slot.availableUnits}/${slot.totalUnits}`,
+    )
+    if (slot.conflictDetails && slot.conflictDetails.length > 0) {
+      console.log(`      Conflictos detectados: ${slot.conflictDetails.join(", ")}`)
+    }
+  })
+
+  return uniqueAndSortedSlots
 }
 
 function getDurationLabel(duration: string): string {
@@ -398,14 +414,35 @@ function getDuration(duration: string): number {
   return durationMap[duration] || 60
 }
 
-function isInPast(slotStart: number, date: string): boolean {
+// ✅ FUNCIÓN isInPast CORREGIDA: Ahora compara los tiempos en UTC para evitar problemas de zona horaria
+function isInPast(slotEndMinutes: number, date: string): boolean {
   try {
-    const now = new Date()
-    const slotDate = new Date(date)
-    if (slotDate.toDateString() !== now.toDateString()) return false
-    const currentMinutes = now.getHours() * 60 + now.getMinutes()
-    return slotStart <= currentMinutes
-  } catch {
+    // Obtener la hora actual en UTC
+    const nowUtc = new Date()
+
+    // Asumimos que los slots están definidos para la zona horaria de España (GMT+2 en verano, GMT+1 en invierno).
+    // Para simplificar y basándonos en tu "2 horas menos", usaremos un desfase fijo de +2 horas respecto a UTC.
+    // Esto significa que 16:00 en España es 14:00 UTC.
+    const TARGET_TIMEZONE_OFFSET_HOURS = 2 // Desfase de la zona horaria de los slots respecto a UTC
+
+    // Construir la fecha y hora de fin del slot en UTC
+    const [year, month, day] = date.split("-").map(Number)
+    // Creamos una fecha UTC para el inicio del día del slot
+    const slotEndDateTimeUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+
+    // Convertir los minutos de fin del slot (que están en la zona horaria objetivo) a su equivalente UTC.
+    // Ejemplo: Si slotEndMinutes es 16:00 (960 minutos) y el offset es +2 horas (120 minutos),
+    // entonces 16:00 CEST es 14:00 UTC.
+    // 960 (CEST) - 120 (offset) = 840 (UTC)
+    const slotEndMinutesAdjustedToUtc = slotEndMinutes - TARGET_TIMEZONE_OFFSET_HOURS * 60
+
+    // Establecer la hora y minutos UTC en el objeto Date del slot
+    slotEndDateTimeUtc.setUTCHours(Math.floor(slotEndMinutesAdjustedToUtc / 60), slotEndMinutesAdjustedToUtc % 60, 0, 0)
+
+    // Comparar el timestamp UTC del fin del slot con el timestamp UTC actual
+    return slotEndDateTimeUtc.getTime() <= nowUtc.getTime()
+  } catch (e) {
+    console.error("Error in isInPast:", e)
     return false
   }
 }

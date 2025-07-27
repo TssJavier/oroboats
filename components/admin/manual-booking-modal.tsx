@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react" // Importar useMemo
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,8 +34,8 @@ interface TimeSlot {
   startTime: string
   endTime: string
   duration: string
-  label: string
-  price: number
+  label: string // ✅ Añadido
+  price: number // ✅ Añadido
   available: boolean
   availableUnits: number
   totalUnits: number
@@ -53,7 +53,32 @@ const SALES_STAFF = [
   { id: "manuel", name: "Manuel" },
   { id: "fermin", name: "Fermín" },
   { id: "javier", name: "Javier" },
+  { id: "parse", name: "Parse" },
+  { id: "cristina", name: "Cristina" },
+  { id: "fresin", name: "Fresin" },
 ]
+
+// Helper para convertir tiempo a minutos (copiado del backend para consistencia)
+function timeToMinutes(timeStr: string): number {
+  if (!timeStr) return 0
+  const [hours, minutes] = timeStr.split(":").map(Number)
+  return hours * 60 + minutes
+}
+
+// Helper para obtener la etiqueta del grupo de duración
+function getGroupLabel(duration: string): string {
+  if (duration === "30min") return "Horarios de 30 minutos"
+  if (duration === "1hour") return "Horarios de 1 hora"
+  if (duration === "2hour") return "Horarios de 2 horas"
+  if (duration === "3hour") return "Horarios de 3 horas"
+  if (duration === "4hour") return "Horarios de 4 horas"
+  if (duration.startsWith("halfday")) return "Horarios de Medio Día"
+  if (duration.startsWith("fullday")) return "Horarios de Día Completo"
+  return "Otros Horarios" // Fallback
+}
+
+// Orden preferido para mostrar los grupos de duración
+const DURATION_ORDER = ["30min", "1hour", "2hour", "3hour", "4hour", "halfday", "fullday"]
 
 export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: ManualBookingModalProps) {
   const [formData, setFormData] = useState({
@@ -176,7 +201,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
       return
     }
 
-    if (!formData.customerDni.trim()) { 
+    if (!formData.customerDni.trim()) {
       toast.error("El DNI del cliente es requerido")
       return
     }
@@ -306,6 +331,32 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
     return time.slice(0, 5) // HH:MM
   }
 
+  // ✅ NUEVO: Agrupar slots por duración usando useMemo para optimización
+  const groupedSlots = useMemo(() => {
+    const groups: Record<string, TimeSlot[]> = {}
+    availableSlots.forEach((slot) => {
+      let groupKey = slot.duration
+      // Normalizar las claves de grupo para halfday y fullday
+      if (slot.duration.startsWith("halfday")) {
+        groupKey = "halfday"
+      } else if (slot.duration.startsWith("fullday")) {
+        groupKey = "fullday"
+      }
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = []
+      }
+      groups[groupKey].push(slot)
+    })
+
+    // Ordenar los slots dentro de cada grupo por hora de inicio
+    for (const key in groups) {
+      groups[key].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))
+    }
+
+    return groups
+  }, [availableSlots])
+
   if (!vehicle) return null
 
   return (
@@ -344,7 +395,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                     <li>• Consentimiento de exención de responsabilidad firmado</li>
                     <li>• DNI o documento de identidad válido</li>
                     {vehicle.requiresLicense && <li>• Licencia náutica vigente</li>}
-                    {vehicle.securityDeposit && <li>• Fianza de €{vehicle.securityDeposit} (tarjeta/efectivo)</li>}
+                    {/*vehicle.securityDeposit && <li>• Fianza de €{vehicle.securityDeposit} (tarjeta/efectivo)</li>*/}
                   </ul>
                 </div>
               </div>
@@ -384,15 +435,15 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                 </div>
               </div>
 
-              <div> 
-                    <Label htmlFor="customerDni">DNI/NIE *</Label>
-                    <Input
-                      id="customerDni"
-                      value={formData.customerDni}
-                      onChange={(e) => handleInputChange("customerDni", e.target.value)}
-                      placeholder="12345678A"
-                      required
-                    />
+              <div>
+                <Label htmlFor="customerDni">DNI/NIE *</Label>
+                <Input
+                  id="customerDni"
+                  value={formData.customerDni}
+                  onChange={(e) => handleInputChange("customerDni", e.target.value)}
+                  placeholder="12345678A"
+                  required
+                />
               </div>
 
               <div>
@@ -513,7 +564,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                     <Button
                       type="button"
                       variant="outline"
-                      className="mt-3 text-red-600 border-red-300 hover:bg-red-50"
+                      className="mt-3 text-red-600 border-red-300 hover:bg-red-50 bg-transparent"
                       onClick={fetchAvailableSlots}
                     >
                       Reintentar
@@ -526,36 +577,57 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                     <p className="text-sm text-gray-500">Prueba con otra fecha</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {availableSlots.map((slot, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => handleSlotSelect(slot)}
-                        className={`p-4 rounded-lg border-2 transition-all text-left ${
-                          selectedSlot === slot
-                            ? "border-gold bg-gold/10 shadow-md"
-                            : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
-                        }`}
-                        disabled={!slot.available || slot.availableUnits < 1}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-gray-900">
-                            {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                          </span>
-                          <span className="text-lg font-bold text-gold">€{slot.price}</span>
+                  // ✅ CAMBIO CLAVE: Renderizar slots agrupados por duración
+                  <div className="space-y-6">
+                    {DURATION_ORDER.map((durationType) => {
+                      const slotsForDuration = groupedSlots[durationType]
+                      if (!slotsForDuration || slotsForDuration.length === 0) return null
+
+                      return (
+                        <div key={durationType} className="space-y-3">
+                          <h4 className="font-semibold text-lg text-gray-800">{getGroupLabel(durationType)}</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {slotsForDuration.map((slot, index) => {
+                              const uniqueKey = `${slot.startTime}-${slot.endTime}-${slot.duration}-${index}`
+                              const isSelected =
+                                selectedSlot?.startTime === slot.startTime &&
+                                selectedSlot?.endTime === slot.endTime &&
+                                selectedSlot?.duration === slot.duration
+
+                              return (
+                                <button
+                                  key={uniqueKey}
+                                  type="button"
+                                  onClick={() => handleSlotSelect(slot)}
+                                  className={`p-4 rounded-lg border-2 transition-all text-left ${
+                                    isSelected
+                                      ? "border-gold bg-gold/10 shadow-md"
+                                      : "border-gray-200 hover:border-gold/50 hover:bg-gray-50"
+                                  }`}
+                                  disabled={!slot.available || slot.availableUnits < 1}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="font-semibold text-gray-900">
+                                      {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                    </span>
+                                    <span className="text-lg font-bold text-gold">€{slot.price}</span>
+                                  </div>
+                                  <div className="text-sm text-gray-600">{slot.label}</div>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Duración: {slot.duration} •
+                                    {slot.availableUnits > 0 ? (
+                                      <span className="text-green-600"> {slot.availableUnits} disponible(s)</span>
+                                    ) : (
+                                      <span className="text-red-600"> No disponible</span>
+                                    )}
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600">{slot.label}</div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          Duración: {slot.duration} •
-                          {slot.availableUnits > 0 ? (
-                            <span className="text-green-600"> {slot.availableUnits} disponible(s)</span>
-                          ) : (
-                            <span className="text-red-600"> No disponible</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -602,7 +674,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="border-green-300 text-green-700 hover:bg-green-50"
+                      className="border-green-300 text-green-700 hover:bg-green-50 bg-transparent"
                       onClick={() => setShowWaiverModal(true)}
                     >
                       Volver a firmar
@@ -625,7 +697,7 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
+                      className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 bg-transparent"
                       onClick={() => setShowWaiverModal(true)}
                       disabled={!formData.customerName.trim()}
                     >
@@ -650,7 +722,13 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
 
             {/* Botones */}
             <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1 bg-transparent"
+                disabled={loading}
+              >
                 Cancelar
               </Button>
               <Button
@@ -675,10 +753,8 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
         </DialogContent>
       </Dialog>
 
-
       {/* 🆕 MODAL DE FIRMA */}
       <ManualWaiverModal
-      
         isOpen={showWaiverModal}
         onClose={() => setShowWaiverModal(false)}
         onWaiverSigned={handleWaiverSigned}

@@ -2,6 +2,51 @@ import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "drizzle-orm"
 import { db } from "@/lib/db"
 
+// Helper to convert "HH:MM" to minutes from midnight
+function timeToMinutes(time: string) {
+  const [hour, minute] = time.split(":")
+  return Number.parseInt(hour) * 60 + Number.parseInt(minute)
+}
+
+// Helper to convert minutes from midnight to "HH:MM"
+function minutesToTime(minutes: number) {
+  const hour = Math.floor(minutes / 60)
+  const minute = minutes % 60
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+}
+
+// ✅ FUNCIÓN MODIFICADA: Ahora verifica si la HORA DE FIN de la franja está en el pasado
+function isInPast(slotEndMinutes: number, date: string) {
+  const now = new Date()
+  const [year, month, day] = date.split("-").map(Number)
+  const slotEndDate = new Date(year, month - 1, day) // Month is 0-indexed
+
+  // Establece la fecha de fin de la franja a la hora de fin proporcionada en minutos
+  slotEndDate.setHours(Math.floor(slotEndMinutes / 60), slotEndMinutes % 60, 0, 0)
+
+  // Si la hora de fin de la franja es igual o anterior a la hora actual, se considera "en el pasado"
+  return slotEndDate <= now
+}
+
+function getDuration(durationString: string) {
+  if (durationString === "30min") {
+    return 30
+  } else if (durationString === "1hour") {
+    return 60
+  } else if (durationString === "2hour") {
+    return 120
+  } else if (durationString === "3hr") {
+    return 180
+  } else if (durationString === "4hour") {
+    return 240
+  } else if (durationString === "fullday") {
+    return 660 // 11 hours
+  } else if (durationString.startsWith("halfday")) {
+    return 240 // 4 hours
+  }
+  return 60 // Default to 1 hour
+}
+
 // ✅ FUNCIÓN CORREGIDA: Generar slots con verificación ESTRICTA de solapamientos entre TODAS las duraciones
 function generateSlotsWithStrictStock(
   pricing: any[],
@@ -53,6 +98,15 @@ function generateSlotsWithStrictStock(
       relevantPricing = pricing.filter((p) => p.duration.startsWith("fullday"))
     } else if (durationType === "30min") {
       relevantPricing = pricing.filter((p) => p.duration === "30min")
+    } else if (durationType === "1hour") {
+      // Asegurarse de que "1hour" se filtre correctamente
+      relevantPricing = pricing.filter((p) => p.duration === "1hour")
+    } else if (durationType === "2hour") {
+      // Asegurarse de que "2hour" se filtre correctamente
+      relevantPricing = pricing.filter((p) => p.duration === "2hour")
+    } else if (durationType === "4hour") {
+      // Asegurarse de que "4hour" se filtre correctamente
+      relevantPricing = pricing.filter((p) => p.duration === "4hour")
     } else if (durationType === "hourly") {
       relevantPricing = pricing.filter(
         (p) => p.duration !== "30min" && !p.duration.startsWith("halfday") && !p.duration.startsWith("fullday"),
@@ -121,21 +175,51 @@ function generateSlotsWithStrictStock(
     if (vehicleType === "boat") {
       if (option.duration.startsWith("halfday")) {
         // Extraer horario específico del duration (ej: "halfday_10_14" -> 10:00-14:00)
-        const match = option.duration.match(/halfday_(\d+)_(\d+)/)
-        if (match) {
-          const startHour = Number.parseInt(match[1])
-          const endHour = Number.parseInt(match[2])
-          const startTime = `${startHour.toString().padStart(2, "0")}:00`
-          const endTime = `${endHour.toString().padStart(2, "0")}:00`
+        // ✅ AHORA USAMOS startTime y endTime directamente de la opción
+        const startTime = option.startTime || "10:00" // Fallback si no está definido
+        const endTime = option.endTime || "14:00" // Fallback si no está definido
+        const startMinutes = timeToMinutes(startTime)
+        const endMinutes = timeToMinutes(endTime)
 
-          // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
+        // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
+        const availability = checkSlotAvailability(startTime, endTime)
+
+        console.log(`🚤 BARCO MEDIO DÍA: ${startTime}-${endTime}`)
+        console.log(`   Disponible: ${availability.available}, Unidades: ${availability.availableUnits}`)
+
+        // Solo añadir si no es pasado y hay unidades disponibles
+        if (!isInPast(endMinutes, date) && availability.available) {
+          slots.push({
+            time: startTime,
+            endTime: endTime,
+            duration: option.duration,
+            label: option.label,
+            price: option.price,
+            available: true,
+            availableUnits: availability.availableUnits,
+            totalUnits: vehicleStock,
+            type: "halfday",
+            conflicts: availability.conflicts,
+          })
+          console.log(
+            `✅ BARCO MEDIO DÍA AÑADIDO: ${startTime}-${endTime} - Disponible: ${availability.availableUnits}`,
+          )
+        } else {
+          console.log(
+            `❌ BARCO MEDIO DÍA BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(endMinutes, date)}, Disponible: ${availability.available}`,
+          )
+        }
+      } else if (option.duration === "2hour") {
+        // ✅ CAMBIO CRÍTICO: Usar directamente startTime y endTime de la opción de pricing
+        const startTime = option.startTime || "00:00" // Asegúrate de que estos campos existan en tu pricing
+        const endTime = option.endTime || "00:00" // Asegúrate de que estos campos existan en tu pricing
+
+        const startMinutes = timeToMinutes(startTime)
+        const endMinutes = timeToMinutes(endTime)
+
+        if (startMinutes >= workStart && endMinutes <= workEnd) {
           const availability = checkSlotAvailability(startTime, endTime)
-
-          console.log(`🚤 BARCO MEDIO DÍA: ${startTime}-${endTime}`)
-          console.log(`   Disponible: ${availability.available}, Unidades: ${availability.availableUnits}`)
-
-          // Solo añadir si no es pasado y hay unidades disponibles
-          if (!isInPast(startHour * 60, date) && availability.available) {
+          if (!isInPast(endMinutes, date) && availability.available) {
             slots.push({
               time: startTime,
               endTime: endTime,
@@ -145,22 +229,23 @@ function generateSlotsWithStrictStock(
               available: true,
               availableUnits: availability.availableUnits,
               totalUnits: vehicleStock,
-              type: "halfday",
+              type: "2hour",
               conflicts: availability.conflicts,
             })
             console.log(
-              `✅ BARCO MEDIO DÍA AÑADIDO: ${startTime}-${endTime} - Disponible: ${availability.availableUnits}`,
+              `✅ BARCO 2 HORAS AÑADIDO: ${startTime}-${endTime} - Disponible: ${availability.availableUnits}`,
             )
           } else {
             console.log(
-              `❌ BARCO MEDIO DÍA BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(startHour * 60, date)}, Disponible: ${availability.available}`,
+              `❌ BARCO 2 HORAS BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(endMinutes, date)}, Disponible: ${availability.available}`,
             )
           }
         }
       } else if (option.duration.startsWith("fullday")) {
         // ✅ CRÍTICO: Día completo 10:00-21:00
-        const startTime = "10:00"
-        const endTime = "21:00"
+        // ✅ AHORA USAMOS startTime y endTime directamente de la opción
+        const startTime = option.startTime || "10:00" // Fallback si no está definido
+        const endTime = option.endTime || "21:00" // Fallback si no está definido
 
         // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
         const availability = checkSlotAvailability(startTime, endTime)
@@ -168,7 +253,7 @@ function generateSlotsWithStrictStock(
         console.log(`🚤 BARCO DÍA COMPLETO: ${startTime}-${endTime}`)
         console.log(`   Disponible: ${availability.available}, Unidades: ${availability.availableUnits}`)
 
-        if (!isInPast(10 * 60, date) && availability.available) {
+        if (!isInPast(timeToMinutes(endTime), date) && availability.available) {
           slots.push({
             time: startTime,
             endTime: endTime,
@@ -186,7 +271,7 @@ function generateSlotsWithStrictStock(
           )
         } else {
           console.log(
-            `❌ BARCO DÍA COMPLETO BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(10 * 60, date)}, Disponible: ${availability.available}`,
+            `❌ BARCO DÍA COMPLETO BLOQUEADO: ${startTime}-${endTime} - Pasado: ${isInPast(timeToMinutes(endTime), date)}, Disponible: ${availability.available}`,
           )
         }
       }
@@ -194,26 +279,73 @@ function generateSlotsWithStrictStock(
       // Para motos de agua, generar slots cada 30 minutos
       console.log(`🏍️ Generando slots de jetski para ${option.duration} (${duration} min)`)
 
-      for (let start = workStart; start + duration <= workEnd; start += 30) {
-        const end = start + duration
-        const startTime = minutesToTime(start)
-        const endTime = minutesToTime(end)
+      // ✅ CAMBIO: Para jetskis, si la opción de pricing ya tiene startTime/endTime, úsalos.
+      // Si no, sigue generando cada 30 minutos como antes.
+      const currentStartTime = timeToMinutes(option.startTime || minutesToTime(workStart))
+      const currentEndTime = timeToMinutes(option.endTime || minutesToTime(workStart + duration))
 
-        // ✅ VERIFICACIÓN ESTRICTA DE DISPONIBILIDAD
+      // Si la duración es fija (ej. 30min, 1hour, 2hour, 4hour), iterar para generar todos los slots posibles
+      if (["30min", "1hour", "2hour", "4hour"].includes(option.duration)) {
+        for (let start = workStart; start + duration <= workEnd; start += 30) {
+          const end = start + duration
+          const startTime = minutesToTime(start)
+          const endTime = minutesToTime(end)
+
+          const availability = checkSlotAvailability(startTime, endTime)
+
+          let isRestricted = false
+          if (vehicleType === "jetski" && !requiresLicense) {
+            if (start < restrictedEnd && end > restrictedStart) {
+              isRestricted = true
+              console.log(`🚫 JETSKI SIN LICENCIA RESTRINGIDO: ${startTime}-${endTime} (solapa con 14:00-16:00)`)
+            }
+          }
+
+          if (!isInPast(end, date) && availability.available && !isRestricted) {
+            slots.push({
+              time: startTime,
+              endTime: endTime,
+              duration: option.duration,
+              label: option.label,
+              price: option.price,
+              available: true,
+              availableUnits: availability.availableUnits,
+              totalUnits: vehicleStock,
+              type: "regular",
+              conflicts: availability.conflicts,
+            })
+            console.log(
+              `✅ JETSKI SLOT AÑADIDO: ${startTime}-${endTime} (${option.duration}) - Disponible: ${availability.availableUnits}`,
+            )
+          } else {
+            const reason = isRestricted
+              ? "Horario restringido"
+              : isInPast(end, date)
+                ? "Hora pasada"
+                : "Sin stock disponible"
+            console.log(
+              `❌ JETSKI SLOT BLOQUEADO: ${startTime}-${endTime} - Razón: ${reason}, Disponible: ${availability.available}`,
+            )
+          }
+        }
+      } else {
+        // Para duraciones como 'halfday' o 'fullday' que son franjas fijas
+        const startTime = option.startTime || minutesToTime(workStart)
+        const endTime = option.endTime || minutesToTime(workEnd)
+
         const availability = checkSlotAvailability(startTime, endTime)
 
-        // ✅ RESTRICCIÓN para motos SIN licencia (no pueden reservar de 14:00 a 16:00)
         let isRestricted = false
         if (vehicleType === "jetski" && !requiresLicense) {
-          // Verificar si el slot se solapa con el horario restringido (14:00-16:00)
-          if (start < restrictedEnd && end > restrictedStart) {
+          const startMinutes = timeToMinutes(startTime)
+          const endMinutes = timeToMinutes(endTime)
+          if (startMinutes < restrictedEnd && endMinutes > restrictedStart) {
             isRestricted = true
             console.log(`🚫 JETSKI SIN LICENCIA RESTRINGIDO: ${startTime}-${endTime} (solapa con 14:00-16:00)`)
           }
         }
 
-        // Verificar si es pasado y si está disponible
-        if (!isInPast(start, date) && availability.available && !isRestricted) {
+        if (!isInPast(timeToMinutes(endTime), date) && availability.available && !isRestricted) {
           slots.push({
             time: startTime,
             endTime: endTime,
@@ -223,7 +355,7 @@ function generateSlotsWithStrictStock(
             available: true,
             availableUnits: availability.availableUnits,
             totalUnits: vehicleStock,
-            type: "regular",
+            type: option.duration, // Usar la duración como tipo
             conflicts: availability.conflicts,
           })
           console.log(
@@ -232,7 +364,7 @@ function generateSlotsWithStrictStock(
         } else {
           const reason = isRestricted
             ? "Horario restringido"
-            : isInPast(start, date)
+            : isInPast(timeToMinutes(endTime), date)
               ? "Hora pasada"
               : "Sin stock disponible"
           console.log(
@@ -259,56 +391,6 @@ function generateSlotsWithStrictStock(
   return slots
 }
 
-function minutesToTime(minutes: number) {
-  const hour = Math.floor(minutes / 60)
-  const minute = minutes % 60
-  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
-}
-
-function timeToMinutes(time: string) {
-  const [hour, minute] = time.split(":")
-  return Number.parseInt(hour) * 60 + Number.parseInt(minute)
-}
-
-function isInPast(timeInMinutes: number, date: string) {
-  const now = new Date()
-  const [year, month, day] = date.split("-").map(Number)
-  const bookingDate = new Date(year, month - 1, day) // Month is 0-indexed
-
-  // Set booking date to the time provided in minutes
-  bookingDate.setHours(Math.floor(timeInMinutes / 60), timeInMinutes % 60, 0, 0)
-
-  // If the booking date is in the past, return true
-  return bookingDate < now
-}
-
-function getDuration(durationString: string) {
-  if (durationString === "30min") {
-    return 30
-  } else if (durationString === "1hr") {
-    return 60
-  } else if (durationString === "2hr") {
-    return 120
-  } else if (durationString === "3hr") {
-    return 180
-  } else if (durationString === "4hr") {
-    return 240
-  } else if (durationString === "fullday") {
-    return 660 // 11 hours
-  } else if (durationString.startsWith("halfday")) {
-    return 240 // 4 hours
-  }
-  return 60 // Default to 1 hour
-}
-
-function normalizeTime(time: string) {
-  if (!time) return "00:00"
-  const [hour, minute] = time.split(":")
-  const normalizedHour = hour.padStart(2, "0")
-  const normalizedMinute = minute.padStart(2, "0")
-  return `${normalizedHour}:${normalizedMinute}`
-}
-
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     console.log("🚀 Availability API started with FIXED STOCK support")
@@ -317,7 +399,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const date = searchParams.get("date")
     const durationType = searchParams.get("durationType")
 
-    const vehicleId = (await params).id
+    const vehicleId = params.id // Acceder directamente a params.id
 
     if (!vehicleId || !date) {
       console.log("❌ Missing required parameters")
@@ -337,7 +419,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
       const vehicleQuery = await db.execute(sql`
         SELECT id, name, type, requires_license, pricing, available, stock
-        FROM vehicles 
+        FROM vehicles
         WHERE id = ${vehicleId}
         LIMIT 1
       `)
@@ -395,7 +477,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       console.log(`📅 Fetching CONFIRMED bookings for vehicle ${vehicleId} on ${date}...`)
 
       const bookingsQuery = await db.execute(sql`
-        SELECT 
+        SELECT
           id,
           customer_name,
           start_time,
@@ -405,8 +487,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           created_at,
           booking_date,
           time_slot
-        FROM bookings 
-        WHERE vehicle_id = ${vehicleId} 
+        FROM bookings
+        WHERE vehicle_id = ${vehicleId}
         AND booking_date = ${date}
         AND status IN ('confirmed', 'pending', 'completed')
         ORDER BY start_time ASC
@@ -450,13 +532,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     // ✅ ARREGLADO: Generar slots con restricciones de licencia
     const availableSlots = generateSlotsWithStrictStock(
-      (Array.isArray(vehicle.pricing)
+      Array.isArray(vehicle.pricing)
         ? vehicle.pricing
         : typeof vehicle.pricing === "string"
-        ? (() => { try { return JSON.parse(vehicle.pricing); } catch { return []; } })()
-        : vehicle.pricing && typeof vehicle.pricing === "object"
-        ? Object.values(vehicle.pricing)
-        : []),
+          ? (() => {
+              try {
+                return JSON.parse(vehicle.pricing)
+              } catch {
+                return []
+              }
+            })()
+          : vehicle.pricing && typeof vehicle.pricing === "object"
+            ? Object.values(vehicle.pricing)
+            : [],
       existingBookings,
       date,
       durationType,
