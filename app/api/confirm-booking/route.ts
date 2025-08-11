@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import stripe from "@/lib/stripe-config"
+import stripe from "@/lib/stripe-config" // Asumo que este es tu cliente Stripe configurado
 import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
 import { createClient } from "@supabase/supabase-js"
 
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!stripe) {
+      console.error("❌ Stripe configuration error: Stripe client is not initialized.")
       return NextResponse.json({ error: "Stripe configuration error" }, { status: 500 })
     }
 
@@ -43,12 +44,12 @@ export async function POST(request: NextRequest) {
 
     // ✅ VERIFICAR PAGO PRINCIPAL
     if (mainPaymentIntent.status !== "succeeded") {
+      console.error("❌ Main payment not completed. Status:", mainPaymentIntent.status)
       return NextResponse.json({ error: "Main payment not completed" }, { status: 400 })
     }
 
     // ✅ CONFIRMAR DEPOSIT PAYMENT INTENT (solo para pago completo)
     const securityDeposit = Number.parseFloat(mainPaymentIntent.metadata.securityDeposit || "0")
-
     if (
       depositPaymentIntentId &&
       securityDeposit > 0 &&
@@ -57,16 +58,13 @@ export async function POST(request: NextRequest) {
     ) {
       try {
         console.log("🛡️ Confirming deposit authorization:", depositPaymentIntentId)
-
         const depositIntent = await stripe.paymentIntents.retrieve(depositPaymentIntentId)
         console.log("🔍 Current deposit intent status:", depositIntent.status)
-
         if (depositIntent.status === "requires_payment_method") {
           const confirmedDepositIntent = await stripe.paymentIntents.confirm(depositPaymentIntentId, {
             payment_method: mainPaymentIntent.payment_method as string,
             return_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://oroboats.com"}/admin/bookings`,
           })
-
           console.log("✅ Deposit intent confirmed:", {
             id: confirmedDepositIntent.id,
             status: confirmedDepositIntent.status,
@@ -98,20 +96,70 @@ export async function POST(request: NextRequest) {
       securityDeposit,
     })
 
+    // --- NUEVA LÓGICA PARA OBTENER BEACH_LOCATION_ID Y NAME CON SUPABASE ---
+    let beachLocationId: string | null = null
+    let beachLocationName: string | null = null
+
+    const vehicleId = Number(metadata.vehicleId || "0") // Asegúrate de que vehicleId sea un número
+    console.log("🔍 Attempting to get beach location for vehicleId from metadata:", vehicleId)
+
+    if (vehicleId && vehicleId > 0) {
+      const { data: vehicleData, error: vehicleError } = await supabase
+        .from("vehicles")
+        .select("beach_location_id")
+        .eq("id", vehicleId)
+        .single()
+
+      console.log("🔍 Supabase vehicle lookup result:", vehicleData)
+      if (vehicleError) {
+        console.error("❌ Supabase error fetching vehicle:", vehicleError.message)
+      }
+
+      if (vehicleData && vehicleData.beach_location_id) {
+        beachLocationId = vehicleData.beach_location_id
+        console.log("🏖️ Found beachLocationId from vehicle:", beachLocationId)
+
+        const { data: locationData, error: locationError } = await supabase
+          .from("locations")
+          .select("name")
+          .eq("id", beachLocationId)
+          .single()
+
+        console.log("🔍 Supabase location lookup result:", locationData)
+        if (locationError) {
+          console.error("❌ Supabase error fetching location:", locationError.message)
+        }
+
+        if (locationData && locationData.name) {
+          beachLocationName = locationData.name
+          console.log("🏖️ Found beach location name:", beachLocationName)
+        } else {
+          console.warn("⚠️ Beach location name not found in 'locations' for ID:", beachLocationId)
+        }
+      } else {
+        console.warn("⚠️ Vehicle not found or beach_location_id is null for vehicleId:", vehicleId)
+      }
+    } else {
+      console.warn("⚠️ No valid vehicleId provided in payment metadata. Cannot fetch beach location.")
+    }
+    // --- FIN NUEVA LÓGICA ---
+
     const bookingData = {
       customer_name: metadata.customerName || "Unknown",
       customer_email: metadata.customerEmail || "unknown@email.com",
       customer_phone: metadata.customerPhone || "",
-      vehicle_id: Number.parseInt(metadata.vehicleId || "1"),
+      customer_dni: metadata.customerDni || null, // Asegúrate de que DNI se pase si existe
+      vehicle_id: vehicleId, // Usar el vehicleId numérico
       vehicle_name: metadata.vehicleName || "Unknown Vehicle",
+      vehicle_type: metadata.vehicleType || null, // Asegúrate de que vehicleType se pase si existe
       booking_date: metadata.bookingDate || new Date().toISOString().split("T")[0],
       time_slot: `${metadata.startTime || "10:00"}-${metadata.endTime || "14:00"}`,
       start_time: metadata.startTime || "10:00",
       end_time: metadata.endTime || "14:00",
-      duration: "4 horas",
+      duration: metadata.duration || "4 horas", // Asegúrate de que duration se pase si existe
       total_price: totalRentalAmount, // ✅ PRECIO TOTAL DEL ALQUILER
       security_deposit: metadata.securityDeposit || "0",
-      status: "confirmed",
+      status: "confirmed", // O el estado que corresponda
       payment_status: paymentType === "partial_payment" ? "partial_paid" : "completed",
       inspection_status: "pending",
       payment_id: paymentIntentId,
@@ -122,6 +170,9 @@ export async function POST(request: NextRequest) {
       liability_waiver_id: finalLiabilityWaiverId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      hotel_code: metadata.hotelCode || null, // Asegúrate de que hotelCode se pase si existe
+      beach_location_id: beachLocationId, // ✅ AÑADIDO
+      beach_location_name: beachLocationName, // ✅ AÑADIDO
     }
 
     // ✅ VALIDACIÓN DE DATOS CRÍTICOS
@@ -132,7 +183,6 @@ export async function POST(request: NextRequest) {
       "booking_date",
     ]
     const missingFields = requiredFields.filter((field) => !bookingData[field])
-
     if (missingFields.length > 0) {
       console.error("❌ Missing required booking data:", missingFields)
       return NextResponse.json(
@@ -144,12 +194,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("💾 Creating booking with CORRECTED amounts:", {
+    console.log("💾 Creating booking with CORRECTED amounts and beach info:", {
       totalPrice: bookingData.total_price,
       amountPaid: bookingData.amount_paid,
       amountPending: bookingData.amount_pending,
       paymentType: bookingData.payment_type,
       paymentStatus: bookingData.payment_status,
+      beachLocationId: bookingData.beach_location_id, // Log para verificar
+      beachLocationName: bookingData.beach_location_name, // Log para verificar
     })
 
     const { data: newBooking, error: newBookingError } = await supabase
@@ -159,7 +211,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (newBookingError) {
-      console.error("❌ Error creating booking:", newBookingError)
+      console.error("❌ Error creating booking:", newBookingError.message)
       return NextResponse.json({ error: "Failed to create booking" }, { status: 500 })
     }
 
@@ -169,9 +221,11 @@ export async function POST(request: NextRequest) {
       amountPaid: newBooking.amount_paid,
       amountPending: newBooking.amount_pending,
       paymentType: newBooking.payment_type,
+      beachLocationId: newBooking.beach_location_id, // Log para verificar
+      beachLocationName: newBooking.beach_location_name, // Log para verificar
     })
 
-    // ✅ ENVIAR EMAILS CON MONTOS CORRECTOS
+    // ✅ ENVIAR EMAILS CON MONTOS CORRECTOS Y DATOS DE PLAYA
     try {
       const emailData = {
         bookingId: Number(newBooking.id),
@@ -187,11 +241,14 @@ export async function POST(request: NextRequest) {
         paymentType: paymentType,
         amountPaid: Number(bookingData.amount_paid), // ✅ MONTO CORRECTO
         amountPending: Number(bookingData.amount_pending), // ✅ MONTO CORRECTO
+        hotelCode: bookingData.hotel_code, // Incluir hotelCode
+        beachLocationName: bookingData.beach_location_name, // ✅ AÑADIDO
       }
-
+      console.log("📧 Sending booking confirmation emails...")
       await sendAdminNotification(emailData)
+      console.log("✅ Admin notification sent")
       await sendCustomerConfirmation(emailData)
-      console.log("✅ Booking emails sent with correct amounts")
+      console.log("✅ Customer confirmation sent")
     } catch (emailError) {
       console.error("⚠️ Error sending emails:", emailError)
     }
@@ -199,7 +256,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       bookingId: newBooking.id,
-      message: "Reserva confirmada con montos correctos",
+      message: "Reserva confirmada con montos correctos y ubicación de playa",
       paymentInfo: {
         mainPaymentId: paymentIntentId,
         depositPaymentId: depositPaymentIntentId || null,

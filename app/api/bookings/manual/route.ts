@@ -2,13 +2,11 @@ import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { sql } from "drizzle-orm"
 import { jwtVerify } from "jose"
-// ❌ REMOVIDO: import { resend } from "@/lib/resend"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "@/lib/email-templates"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@oroboats.com"
 
-// ✅ NUEVO: Función para obtener Resend solo cuando se necesite
 function getResend() {
   if (!process.env.RESEND_API_KEY) {
     throw new Error("RESEND_API_KEY is not configured")
@@ -18,7 +16,6 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }
 
-// Función auxiliar para formatear fechas en español
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
   const options: Intl.DateTimeFormatOptions = {
@@ -34,7 +31,6 @@ export async function POST(request: NextRequest) {
   try {
     console.log("🛡️ Manual booking API started")
 
-    // Verificar autenticación de admin
     const token = request.cookies.get("admin-token")?.value
 
     if (!token) {
@@ -68,10 +64,9 @@ export async function POST(request: NextRequest) {
       vehicleName,
       vehicleType,
       liabilityWaiverId,
-      paymentMethod, // ✅ NUEVO: Método de pago (cash o card)
+      paymentMethod,
     } = body
 
-    // Validaciones básicas
     if (!vehicleId || !customerName || !customerPhone || !customerDni || !bookingDate || !timeSlot || !totalPrice) {
       return NextResponse.json({ error: "Faltan campos requeridos" }, { status: 400 })
     }
@@ -84,12 +79,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Faltan horarios de inicio y fin" }, { status: 400 })
     }
 
-    // ✅ NUEVO: Validar método de pago
     if (!paymentMethod || (paymentMethod !== "cash" && paymentMethod !== "card")) {
       return NextResponse.json({ error: "Método de pago inválido" }, { status: 400 })
     }
 
-    // 🆕 NUEVO: Validar que el documento de exención esté firmado (opcional pero recomendado)
     if (liabilityWaiverId) {
       console.log(`🔍 Verifying liability waiver ID: ${liabilityWaiverId}`)
 
@@ -109,11 +102,10 @@ export async function POST(request: NextRequest) {
       console.log("⚠️ No liability waiver provided - proceeding without waiver")
     }
 
-    // Verificar que el vehículo existe y obtener su información
     console.log(`🔍 Checking vehicle ${vehicleId}...`)
 
     const vehicleResult = await db.execute(sql`
-      SELECT id, name, type, stock, security_deposit, manualDeposit FROM vehicles WHERE id = ${vehicleId}
+      SELECT id, name, type, stock, security_deposit, manualDeposit, beach_location_id FROM vehicles WHERE id = ${vehicleId}
     `)
 
     if (!vehicleResult || vehicleResult.length === 0) {
@@ -123,10 +115,24 @@ export async function POST(request: NextRequest) {
     const vehicle = vehicleResult[0]
     const vehicleStock = typeof vehicle.stock === "number" ? vehicle.stock : 1
     const securityDeposit = vehicle.security_deposit || 0
+    const vehicleBeachLocationId = vehicle.beach_location_id || null // Obtener beach_location_id del vehículo
 
     console.log(`📊 Vehicle ${vehicleId} (${vehicle.name}) has stock: ${vehicleStock}`)
+    console.log(`🏖️ Vehicle beach_location_id: ${vehicleBeachLocationId}`)
 
-    // ✅ VERIFICAR DISPONIBILIDAD CON STOCK
+    let beachLocationName: string | null = null
+    if (vehicleBeachLocationId) {
+      const locationResult = await db.execute(sql`
+        SELECT name FROM locations WHERE id = ${vehicleBeachLocationId}
+      `)
+      if (locationResult && locationResult.length > 0) {
+        beachLocationName = locationResult[0].name
+        console.log(`🏖️ Found beach location name: ${beachLocationName}`)
+      } else {
+        console.warn(`⚠️ Beach location name not found for ID: ${vehicleBeachLocationId}`)
+      }
+    }
+
     console.log(`🔍 Checking availability for slot: ${timeSlot} on ${bookingDate}`)
 
     const existingBookingsResult = await db.execute(sql`
@@ -141,7 +147,6 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 Existing bookings for this slot: ${bookingsCount}/${vehicleStock}`)
 
-    // Si ya hay tantas reservas como stock disponible, rechazamos
     if (bookingsCount >= vehicleStock) {
       return NextResponse.json(
         {
@@ -152,8 +157,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ✅ CALCULAR DURACIÓN CORRECTAMENTE
-    let durationMinutes = 30 // Valor por defecto
+    let durationMinutes = 30
     let finalDuration = duration || "30min"
 
     try {
@@ -165,7 +169,6 @@ export async function POST(request: NextRequest) {
 
       durationMinutes = endMinutes - startMinutes
 
-      // Asignar duración basada en minutos calculados
       if (durationMinutes <= 30) {
         finalDuration = "30min"
       } else if (durationMinutes <= 60) {
@@ -184,14 +187,11 @@ export async function POST(request: NextRequest) {
       finalDuration = duration || "30min"
     }
 
-    // ✅ CREAR LA RESERVA MANUAL
     console.log("💾 Creating booking in database...")
 
     try {
-      // ✅ CORREGIDO: Usar texto literal para el método de pago
       const paymentMethodValue = paymentMethod === "card" ? "card" : "cash"
 
-      // ✅ CORREGIDO: Usar el método correcto para insertar el valor como texto
       const insertResult = await db.execute(sql`
         INSERT INTO bookings (
           vehicle_id,
@@ -216,6 +216,8 @@ export async function POST(request: NextRequest) {
           vehicle_type,
           liability_waiver_id,
           payment_method,
+          beach_location_id,
+          beach_location_name,
           created_at,
           updated_at
         ) VALUES (
@@ -240,7 +242,9 @@ export async function POST(request: NextRequest) {
           ${vehicleName || vehicle.name},
           ${vehicleType || vehicle.type},
           ${liabilityWaiverId || null},
-          ${paymentMethodValue}, /* ✅ CORREGIDO: Usar el valor como string */
+          ${paymentMethodValue},
+          ${vehicleBeachLocationId},
+          ${beachLocationName},
           NOW(),
           NOW()
         )
@@ -253,7 +257,6 @@ export async function POST(request: NextRequest) {
         throw new Error("No se pudo obtener el ID de la reserva creada")
       }
 
-      // 🆕 NUEVO: Si hay un waiver asociado, actualizar la relación bidireccional
       if (liabilityWaiverId) {
         try {
           await db.execute(sql`
@@ -264,22 +267,17 @@ export async function POST(request: NextRequest) {
           console.log(`✅ Updated liability waiver ${liabilityWaiverId} with booking ID ${bookingId}`)
         } catch (waiverUpdateError) {
           console.error("⚠️ Warning: Could not update waiver with booking ID:", waiverUpdateError)
-          // No fallar la reserva por esto, solo logear el warning
         }
       }
 
-      // ✅✅ NUEVO: ENVIAR EMAILS DE CONFIRMACIÓN
       try {
         console.log("📧 Sending confirmation emails for manual booking...")
 
-        // ✅ CAMBIO: Usar getResend() en lugar del import directo
         const resend = getResend()
 
-        // Formatear la fecha para mostrar en el email
         const formattedDate = formatDate(bookingDate)
         const finalEmail = customerEmail || `${customerName.replace(/\s+/g, "").toLowerCase()}@manual.booking`
 
-        // Datos para los emails
         const emailData = {
           bookingId: Number(bookingId),
           customerName: String(customerName),
@@ -291,11 +289,11 @@ export async function POST(request: NextRequest) {
           endTime: String(endTime),
           totalPrice: Number(totalPrice),
           securityDeposit: Number(securityDeposit),
-          paymentType: "full_payment", // Las reservas manuales son siempre de pago completo
-          paymentMethod: paymentMethodValue, // ✅ NUEVO: Incluir método de pago
+          paymentType: "full_payment",
+          paymentMethod: paymentMethodValue,
+          beachLocationName: beachLocationName, // Incluir nombre de la playa en el email
         }
 
-        // 1. Email al administrador
         const adminHtml = renderAdminBookingNotification(emailData)
         const adminEmailResult = await resend.emails.send({
           from: "OroBoats Granada <info@oroboats.com>",
@@ -306,7 +304,6 @@ export async function POST(request: NextRequest) {
 
         console.log("📧 Admin email result:", adminEmailResult.error ? "❌ Error" : "✅ Sent")
 
-        // 2. Email al cliente (solo si tiene email válido)
         let customerEmailResult = null
         if (finalEmail && !finalEmail.includes("@manual.booking")) {
           const customerHtml = renderCustomerBookingConfirmation(emailData)
@@ -322,14 +319,12 @@ export async function POST(request: NextRequest) {
           console.log("📧 No valid customer email, skipping customer notification")
         }
 
-        // Registrar resultados de envío de emails
         console.log("📧 Email sending complete:", {
           adminSent: !adminEmailResult.error,
           customerSent: customerEmailResult ? !customerEmailResult.error : false,
         })
       } catch (emailError) {
         console.error("❌ Error sending confirmation emails:", emailError)
-        // No fallamos la creación de la reserva si fallan los emails
       }
 
       console.log("✅ Manual booking created successfully!")
@@ -341,7 +336,9 @@ export async function POST(request: NextRequest) {
       console.log(`   - Time: ${timeSlot}`)
       console.log(`   - Duration: ${finalDuration} (${durationMinutes} min)`)
       console.log(`   - Price: €${totalPrice}`)
-      console.log(`   - Payment Method: ${paymentMethodValue}`) // ✅ NUEVO: Loguear método de pago
+      console.log(`   - Payment Method: ${paymentMethodValue}`)
+      console.log(`   - Beach Location ID: ${vehicleBeachLocationId}`)
+      console.log(`   - Beach Location Name: ${beachLocationName}`)
       console.log(`   - Liability Waiver: ${liabilityWaiverId ? `ID ${liabilityWaiverId}` : "None"}`)
       console.log(`   - Remaining stock: ${vehicleStock - bookingsCount - 1}`)
 
@@ -359,10 +356,12 @@ export async function POST(request: NextRequest) {
           duration: finalDuration,
           durationMinutes,
           totalPrice,
-          paymentMethod: paymentMethodValue, // ✅ NUEVO: Incluir método de pago en la respuesta
+          paymentMethod: paymentMethodValue,
+          beachLocationId: vehicleBeachLocationId,
+          beachLocationName: beachLocationName,
           availableStock: vehicleStock - bookingsCount - 1,
           totalStock: vehicleStock,
-          liabilityWaiverId: liabilityWaiverId || null, // 🆕 NUEVO: Incluir en la respuesta
+          liabilityWaiverId: liabilityWaiverId || null,
         },
       })
     } catch (dbError) {

@@ -1,7 +1,6 @@
 "use client"
 
 import React from "react"
-
 import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -10,13 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { VehicleManagement } from "./vehicle-management"
 import { BookingManagement } from "./booking-management"
 import { SettingsManagement } from "./settings-management"
-import { AdminStats } from "./admin-stats"
 import { AdminHeader } from "./admin-header"
-import { BlogManagement } from "./blog-management" // ✅ NUEVO: Importar BlogManagement
-//import { DepositAlerts } from "./deposit-alerts"
+import { BlogManagement } from "./blog-management"
 import { UserManagement } from "./user-management"
-import { BeachManagement } from "./beach-management" // ✅ Importar BeachManagement
-import { HotelManagement } from "./hotel-management" // ✅ NUEVO: Importar HotelManagement
+import { BeachManagement } from "./beach-management"
+import { HotelManagement } from "./hotel-management"
+import { AdminStatsDashboard } from "@/components/admin/admin-stats-dashboard" // ✅ Importación del nuevo componente para estadísticas de reservas
 import {
   Ship,
   Calendar,
@@ -54,20 +52,17 @@ export function AdminDashboard() {
       const response = await fetch("/api/auth/me")
       if (response.ok) {
         const data = await response.json()
-        setCurrentUser(data.user) // ✅ USAR data.user para mantener compatibilidad
+        setCurrentUser(data.user)
       }
     } catch (error) {
       console.error("Error fetching current user:", error)
     }
   }
 
-  // ✅ COMPATIBILIDAD: Verificar admin usando isAdmin O role
-  //const isAdmin = currentUser?.isAdmin === true || currentUser?.role === "admin"
-
   const quickActions = [
     {
       title: "Gestión de Fianzas",
-      description: "Administra fianzas de seguridad y inspecciones",
+      description: "Administra fianzas de seguridad e inspecciones",
       icon: Shield,
       href: "/admin/fianzas",
       color: "bg-blue-500 hover:bg-blue-600",
@@ -79,13 +74,13 @@ export function AdminDashboard() {
       icon: Percent,
       href: "/admin/codigos",
       color: "bg-green-500 hover:bg-green-600",
-      allowedRoles: ["admin"], // Solo admin
+      allowedRoles: ["admin"],
     },
     {
       title: "Analytics Avanzado",
       description: "Métricas detalladas y reportes",
       icon: TrendingUp,
-      href: "/admin/analytics",
+      href: "/admin/analytics", // ✅ Este sigue apuntando a la página de analíticas de visitas
       color: "bg-purple-500 hover:bg-purple-600",
       allowedRoles: ["admin", "comercial"],
     },
@@ -95,14 +90,13 @@ export function AdminDashboard() {
     { value: "stats", label: "Estadísticas", icon: BarChart3, allowedRoles: ["admin", "comercial"] },
     { value: "vehicles", label: "Productos", icon: Ship, allowedRoles: ["admin", "comercial"] },
     { value: "bookings", label: "Reservas", icon: Calendar, allowedRoles: ["admin", "comercial"] },
-    { value: "blog", label: "Blog", icon: FileText, allowedRoles: ["admin", "comercial"] }, // ✅ NUEVO: Gestión del Blog
-    { value: "beaches", label: "Playas", icon: MapPin, allowedRoles: ["admin"] }, // ✅ NUEVO: Gestión de Playas
-    { value: "hotels", label: "Hoteles", icon: Hotel, allowedRoles: ["admin"] }, // ✅ NUEVO: Gestión de Hoteles
-    { value: "users", label: "Comerciales", icon: Users, allowedRoles: ["admin"] }, // Solo admin
+    { value: "blog", label: "Blog", icon: FileText, allowedRoles: ["admin", "comercial"] },
+    { value: "beaches", label: "Playas", icon: MapPin, allowedRoles: ["admin"] },
+    { value: "hotels", label: "Hoteles", icon: Hotel, allowedRoles: ["admin"] },
+    { value: "users", label: "Comerciales", icon: Users, allowedRoles: ["admin"] },
     { value: "settings", label: "Configuración", icon: Settings, allowedRoles: ["admin", "comercial"] },
   ]
 
-  // ✅ FILTRAR SEGÚN PERMISOS
   const userRole = currentUser?.role || (currentUser?.isAdmin ? "admin" : "comercial")
 
   const filteredQuickActions = quickActions.filter((action) => action.allowedRoles.includes(userRole))
@@ -114,7 +108,6 @@ export function AdminDashboard() {
     return currentTab ? currentTab.label : "Seleccionar sección"
   }
 
-  // Si el tab actual no está permitido para el usuario, cambiar a stats
   useEffect(() => {
     if (currentUser && !filteredTabOptions.some((tab) => tab.value === activeTab)) {
       setActiveTab("stats")
@@ -125,11 +118,6 @@ export function AdminDashboard() {
     <section className="py-8 md:py-24 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
         <AdminHeader />
-
-        {/* Alertas de fianzas pendientes 
-        <div className="mb-8">
-          <DepositAlerts />
-        </div>*/}
 
         {/* Accesos Rápidos */}
         <div className="mb-8 md:mb-12">
@@ -212,7 +200,8 @@ export function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="stats" className="mt-0">
-            <AdminStats />
+            {/* ✅ AQUÍ ES DONDE SE RENDERIZA EL DASHBOARD DE ESTADÍSTICAS DE RESERVAS */}
+            <AdminStatsDashboard />
           </TabsContent>
 
           <TabsContent value="vehicles" className="mt-0">
@@ -220,20 +209,17 @@ export function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="bookings" className="mt-0">
-            <BookingManagement/>
+            <BookingManagement />
           </TabsContent>
 
-          {/* ✅ NUEVO: Contenido para la gestión del blog */}
           <TabsContent value="blog" className="mt-0">
             <BlogManagement />
           </TabsContent>
 
-          {/* ✅ NUEVO: Contenido para la gestión de playas */}
           <TabsContent value="beaches" className="mt-0">
             <BeachManagement />
           </TabsContent>
 
-          {/* ✅ NUEVO: Contenido para la gestión de hoteles */}
           <TabsContent value="hotels" className="mt-0">
             <HotelManagement />
           </TabsContent>

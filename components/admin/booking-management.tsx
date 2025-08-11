@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -82,7 +81,8 @@ interface BeachLocation {
   name: string
 }
 
-type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual" | "partial" | "salesperson"
+// MODIFICADO: Añadir 'specific_date' al tipo DateFilter
+type DateFilter = "all" | "today" | "tomorrow" | "test" | "manual" | "partial" | "salesperson" | "specific_date"
 
 export function BookingManagement() {
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -100,14 +100,29 @@ export function BookingManagement() {
   const [selectedBeachFilterId, setSelectedBeachFilterId] = useState<string>("all")
   const [hotelCodeSearchInput, setHotelCodeSearchInput] = useState<string>("") // ✅ NUEVO: Estado para el input del buscador
   const [hotelCodeFilter, setHotelCodeFilter] = useState<string>("") // ✅ NUEVO: Estado para el filtro aplicado
+  // NUEVO: Estado para el input de búsqueda de fecha
+  const [dateSearchInput, setDateSearchInput] = useState<string>("")
 
   useEffect(() => {
     fetchBeachLocations()
   }, [])
 
+  // MODIFICADO: El useEffect ahora calcula la fecha a enviar a la API
   useEffect(() => {
-    fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
-  }, [selectedBeachFilterId, hotelCodeFilter]) // ✅ MODIFICADO: Refetch bookings cuando hotelCodeFilter cambia
+    let dateToFetch: string | undefined
+
+    if (dateFilter === "today") {
+      dateToFetch = new Date().toISOString().split("T")[0]
+    } else if (dateFilter === "tomorrow") {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      dateToFetch = tomorrow.toISOString().split("T")[0]
+    } else if (dateFilter === "specific_date" && dateSearchInput) {
+      dateToFetch = dateSearchInput
+    }
+
+    fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
+  }, [selectedBeachFilterId, hotelCodeFilter, dateFilter, dateSearchInput]) // dateSearchInput es una dependencia para 'specific_date'
 
   const fetchBeachLocations = async () => {
     try {
@@ -128,30 +143,33 @@ export function BookingManagement() {
     }
   }
 
-  const fetchBookings = async (beachId = "all", hotelCode = "") => {
-    // ✅ MODIFICADO: Recibir hotelCode
+  // MODIFICADO: Añadir bookingDate como parámetro opcional
+  const fetchBookings = async (beachId = "all", hotelCode = "", bookingDate?: string) => {
     try {
       setError(null)
       setLoading(true)
-      console.log(`🔍 Frontend: Fetching bookings for beach: ${beachId}, hotelCode: ${hotelCode}`)
+      console.log(
+        `🔍 Frontend: Fetching bookings for beach: ${beachId}, hotelCode: ${hotelCode}, date: ${bookingDate || "all"}`,
+      )
       const url = new URL("/api/bookings", window.location.origin)
+
       if (beachId !== "all") {
         url.searchParams.append("beachLocationId", beachId)
       }
       if (hotelCode) {
-        // ✅ NUEVO: Añadir hotelCode a los parámetros de búsqueda
         url.searchParams.append("hotelCode", hotelCode)
+      }
+      // NUEVO: Añadir bookingDate a los parámetros de búsqueda si está presente
+      if (bookingDate) {
+        url.searchParams.append("bookingDate", bookingDate)
       }
 
       const response = await fetch(url.toString())
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-
       const data = await response.json()
       console.log("🔍 Frontend: Bookings data received:", data)
-
       if (Array.isArray(data)) {
         const sortedBookings = data.sort(
           (a: Booking, b: Booking) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
@@ -175,6 +193,18 @@ export function BookingManagement() {
     setHotelCodeFilter(hotelCodeSearchInput.toUpperCase()) // ✅ NUEVO: Aplicar el filtro al hacer clic
   }
 
+  // NUEVO: Handler para el cambio en el input de fecha
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateSearchInput(e.target.value)
+    // Si el usuario selecciona una fecha, activar el filtro de fecha específica
+    if (e.target.value) {
+      setDateFilter("specific_date")
+    } else {
+      // Si el input se vacía, volver al filtro "all" o al que estaba antes
+      setDateFilter("all")
+    }
+  }
+
   const completeAllBookings = async () => {
     if (
       !confirm(
@@ -183,13 +213,10 @@ export function BookingManagement() {
     ) {
       return
     }
-
     setLoading(true)
     let successCount = 0
     let errorCount = 0
-
     const bookingsToProcess = [...filteredBookings]
-
     for (const booking of bookingsToProcess) {
       if (booking.booking.status !== "completed" && booking.booking.status !== "cancelled") {
         try {
@@ -198,7 +225,6 @@ export function BookingManagement() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: "completed" }),
           })
-
           if (response.ok) {
             successCount++
           } else {
@@ -211,15 +237,24 @@ export function BookingManagement() {
         }
       }
     }
-
     alert(`Proceso completado:\n- ${successCount} reservas completadas exitosamente\n- ${errorCount} errores`)
-    fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
+    // MODIFICADO: Refrescar bookings con los filtros actuales
+    let dateToFetch: string | undefined
+    if (dateFilter === "today") {
+      dateToFetch = new Date().toISOString().split("T")[0]
+    } else if (dateFilter === "tomorrow") {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      dateToFetch = tomorrow.toISOString().split("T")[0]
+    } else if (dateFilter === "specific_date" && dateSearchInput) {
+      dateToFetch = dateSearchInput
+    }
+    fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
   }
 
   const viewWaiver = async (waiverId: number, customerName: string) => {
     try {
       console.log(`🔍 Opening waiver ${waiverId} for ${customerName}...`)
-
       const url = `/api/liability-waiver/${waiverId}/pdf`
       window.open(url, "_blank")
     } catch (error) {
@@ -230,13 +265,11 @@ export function BookingManagement() {
 
   const getSalesPersonName = (id?: string) => {
     if (!id) return null
-
     const salesPerson = {
       manuel: "Manuel",
       fermin: "Fermín",
       javier: "Javier",
     }[id]
-
     return salesPerson || id
   }
 
@@ -244,7 +277,6 @@ export function BookingManagement() {
     const isPartial =
       booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
     const isManual = booking.booking.isManualBooking === true
-
     if (isPartial) {
       return {
         type: "partial",
@@ -274,7 +306,6 @@ export function BookingManagement() {
 
   const getPaymentMethodDisplay = (booking: Booking) => {
     if (!booking.booking.isManualBooking) return null
-
     if (booking.booking.paymentMethod === "card") {
       return {
         label: "Tarjeta",
@@ -290,15 +321,11 @@ export function BookingManagement() {
     }
   }
 
+  // MODIFICADO: Simplificar getFilteredBookings ya que la API maneja el filtrado por fecha
   const getFilteredBookings = () => {
     let currentBookings = bookings
 
-    // Filter by beach location first
-    if (selectedBeachFilterId !== "all") {
-      currentBookings = currentBookings.filter((booking) => booking.booking.beachLocationId === selectedBeachFilterId)
-    }
-
-    // Then apply date/type filters
+    // Estos filtros se aplican client-side sobre los datos ya obtenidos de la API
     if (dateFilter === "test") {
       currentBookings = currentBookings.filter((booking) => booking.booking.isTestBooking === true)
     } else if (dateFilter === "manual") {
@@ -310,28 +337,7 @@ export function BookingManagement() {
       )
     } else if (dateFilter === "salesperson" && selectedSalesperson) {
       currentBookings = currentBookings.filter((booking) => booking.booking.salesPerson === selectedSalesperson)
-    } else if (dateFilter === "today") {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      currentBookings = currentBookings.filter((booking) => {
-        const bookingDate = new Date(booking.booking.bookingDate)
-        bookingDate.setHours(0, 0, 0, 0)
-        return bookingDate.getTime() === today.getTime()
-      })
-    } else if (dateFilter === "tomorrow") {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      tomorrow.setHours(0, 0, 0, 0)
-      currentBookings = currentBookings.filter((booking) => {
-        const bookingDate = new Date(booking.booking.bookingDate)
-        bookingDate.setHours(0, 0, 0, 0)
-        return bookingDate.getTime() === tomorrow.getTime()
-      })
     }
-    // No need to filter by beachLocationId here, as it's already handled by fetchBookings
-
-    // The hotelCodeFilter is now applied directly in fetchBookings via API call,
-    // so no need for client-side filtering here based on hotelCodeFilter state.
 
     return currentBookings
   }
@@ -342,13 +348,11 @@ export function BookingManagement() {
       const salesPersonBookings = bookings.filter(
         (b) => b.booking.salesPerson === id && !b.booking.isTestBooking && b.booking.isManualBooking,
       )
-
       const totalRevenue = salesPersonBookings.reduce((sum, b) => {
         const price = Number(b.booking.totalPrice) || 0
         const deposit = Number(b.booking.securityDeposit) || 0
         return sum + (price - deposit)
       }, 0)
-
       return {
         id,
         name: getSalesPersonName(id),
@@ -368,9 +372,19 @@ export function BookingManagement() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         })
-
         if (response.ok) {
-          fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
+          // MODIFICADO: Refrescar bookings con los filtros actuales
+          let dateToFetch: string | undefined
+          if (dateFilter === "today") {
+            dateToFetch = new Date().toISOString().split("T")[0]
+          } else if (dateFilter === "tomorrow") {
+            const tomorrow = new Date()
+            tomorrow.setDate(tomorrow.getDate() + 1)
+            dateToFetch = tomorrow.toISOString().split("T")[0]
+          } else if (dateFilter === "specific_date" && dateSearchInput) {
+            dateToFetch = dateSearchInput
+          }
+          fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
         } else {
           setError("Error al cancelar la reserva")
         }
@@ -380,9 +394,19 @@ export function BookingManagement() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
         })
-
         if (response.ok) {
-          fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
+          // MODIFICADO: Refrescar bookings con los filtros actuales
+          let dateToFetch: string | undefined
+          if (dateFilter === "today") {
+            dateToFetch = new Date().toISOString().split("T")[0]
+          } else if (dateFilter === "tomorrow") {
+            const tomorrow = new Date()
+            tomorrow.setDate(tomorrow.getDate() + 1)
+            dateToFetch = tomorrow.toISOString().split("T")[0]
+          } else if (dateFilter === "specific_date" && dateSearchInput) {
+            dateToFetch = dateSearchInput
+          }
+          fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
         } else {
           setError("Error al actualizar la reserva")
         }
@@ -404,7 +428,6 @@ export function BookingManagement() {
 
   const processDepositAction = async () => {
     if (!selectedBooking || !depositAction) return
-
     try {
       const requestBody = {
         action: depositAction,
@@ -413,9 +436,7 @@ export function BookingManagement() {
           damageCost,
         }),
       }
-
       console.log("🔄 Sending deposit request:", requestBody)
-
       const response = await fetch(`/api/bookings/${selectedBooking.booking.id}/deposit`, {
         method: "POST",
         headers: {
@@ -423,16 +444,24 @@ export function BookingManagement() {
         },
         body: JSON.stringify(requestBody),
       })
-
       const result = await response.json()
       console.log("📥 Deposit response:", result)
-
       if (response.ok) {
         setShowDepositModal(false)
         setSelectedBooking(null)
         setDepositAction(null)
-        fetchBookings(selectedBeachFilterId, hotelCodeFilter) // ✅ MODIFICADO: Pasar hotelCodeFilter
-
+        // MODIFICADO: Refrescar bookings con los filtros actuales
+        let dateToFetch: string | undefined
+        if (dateFilter === "today") {
+          dateToFetch = new Date().toISOString().split("T")[0]
+        } else if (dateFilter === "tomorrow") {
+          const tomorrow = new Date()
+          tomorrow.setDate(tomorrow.getDate() + 1)
+          dateToFetch = tomorrow.toISOString().split("T")[0]
+        } else if (dateFilter === "specific_date" && dateSearchInput) {
+          dateToFetch = dateSearchInput
+        }
+        fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
         alert(result.message || "Fianza procesada correctamente")
       } else {
         console.error("❌ Deposit processing failed:", result)
@@ -504,14 +533,26 @@ export function BookingManagement() {
           <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
           <p className="text-gray-600">Administra todas las reservas de clientes</p>
         </div>
-
         <Card className="bg-red-50 border border-red-200">
           <CardContent className="text-center py-12">
             <div className="text-red-600 mb-4">⚠️ Error de Conexión</div>
             <h3 className="text-xl font-semibold text-red-800 mb-2">{error}</h3>
             <p className="text-red-600 mb-6">Verifica que la base de datos esté conectada y que las tablas existan.</p>
             <Button
-              onClick={() => fetchBookings(selectedBeachFilterId, hotelCodeFilter)} // ✅ MODIFICADO: Pasar hotelCodeFilter
+              onClick={() => {
+                // MODIFICADO: Refrescar bookings con los filtros actuales
+                let dateToFetch: string | undefined
+                if (dateFilter === "today") {
+                  dateToFetch = new Date().toISOString().split("T")[0]
+                } else if (dateFilter === "tomorrow") {
+                  const tomorrow = new Date()
+                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  dateToFetch = tomorrow.toISOString().split("T")[0]
+                } else if (dateFilter === "specific_date" && dateSearchInput) {
+                  dateToFetch = dateSearchInput
+                }
+                fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
+              }}
               className="bg-red-600 text-white hover:bg-red-700"
             >
               Reintentar
@@ -557,7 +598,6 @@ export function BookingManagement() {
         <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
-
       {/* Leyenda de Estados */}
       <Card className="bg-gray-50 border border-gray-200">
         <CardHeader className="pb-3">
@@ -589,7 +629,6 @@ export function BookingManagement() {
                 </div>
               </div>
             </div>
-
             <div>
               <h4 className="font-semibold text-gray-700 mb-3">Estados de Pago</h4>
               <div className="space-y-2">
@@ -615,7 +654,6 @@ export function BookingManagement() {
                 </div>
               </div>
             </div>
-
             <div>
               <h4 className="font-semibold text-gray-700 mb-3">Estados de Fianza</h4>
               <div className="space-y-2">
@@ -636,7 +674,6 @@ export function BookingManagement() {
           </div>
         </CardContent>
       </Card>
-
       {/* Filtros de fecha y playa */}
       <Card className="bg-white border border-gray-200">
         <CardHeader className="pb-3">
@@ -663,7 +700,6 @@ export function BookingManagement() {
                 </SelectContent>
               </Select>
             </div>
-
             {/* ✅ MODIFICADO: Filtro por Código de Hotel con botón de búsqueda */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Buscar por Código de Hotel</label>
@@ -692,12 +728,39 @@ export function BookingManagement() {
                 </div>
               </div>
             </div>
+            {/* NUEVO: Buscador por Fecha */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar por Fecha</label>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={dateSearchInput}
+                  onChange={handleDateInputChange}
+                  className="flex-1 p-3 border border-gray-200 rounded-md bg-gray-50"
+                />
+                {dateSearchInput && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setDateSearchInput("")
+                      setDateFilter("all") // Limpiar el filtro de fecha específica
+                    }}
+                    className="text-gray-500 hover:bg-transparent"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
-
           <div className="flex flex-wrap gap-3">
             <Button
               variant={dateFilter === "all" ? "default" : "outline"}
-              onClick={() => setDateFilter("all")}
+              onClick={() => {
+                setDateFilter("all")
+                setDateSearchInput("") // Limpiar el input de fecha al seleccionar "Todas"
+              }}
               className={dateFilter === "all" ? "bg-black text-white" : ""}
             >
               <Calendar className="h-4 w-4 mr-2" />
@@ -705,7 +768,10 @@ export function BookingManagement() {
             </Button>
             <Button
               variant={dateFilter === "today" ? "default" : "outline"}
-              onClick={() => setDateFilter("today")}
+              onClick={() => {
+                setDateFilter("today")
+                setDateSearchInput("") // Limpiar el input de fecha al seleccionar "Hoy"
+              }}
               className={dateFilter === "today" ? "bg-green-600 text-white hover:bg-green-700" : ""}
             >
               <Clock className="h-4 w-4 mr-2" />
@@ -723,7 +789,10 @@ export function BookingManagement() {
             </Button>
             <Button
               variant={dateFilter === "tomorrow" ? "default" : "outline"}
-              onClick={() => setDateFilter("tomorrow")}
+              onClick={() => {
+                setDateFilter("tomorrow")
+                setDateSearchInput("") // Limpiar el input de fecha al seleccionar "Mañana"
+              }}
               className={dateFilter === "tomorrow" ? "bg-blue-600 text-white hover:bg-blue-700" : ""}
             >
               <CalendarDays className="h-4 w-4 mr-2" />
@@ -780,7 +849,9 @@ export function BookingManagement() {
                         ? " con pago parcial"
                         : dateFilter === "salesperson"
                           ? ` de ${getSalesPersonName(selectedSalesperson)}`
-                          : ""}
+                          : dateFilter === "specific_date" && dateSearchInput
+                            ? ` para el ${new Date(dateSearchInput).toLocaleDateString("es-ES")}`
+                            : ""}
             </div>
           )}
           {filteredBookings.length > 0 && (
@@ -805,21 +876,18 @@ export function BookingManagement() {
           </div>
         </CardContent>
       </Card>
-
       {/* Lista de reservas */}
       {Array.isArray(filteredBookings) && filteredBookings.length > 0 ? (
         <div className="space-y-6">
           {filteredBookings.map((booking) => {
             const waiverId = booking.booking.liabilityWaiverId || booking.booking.liability_waiver_id
             const hasWaiver = waiverId && waiverId !== null && waiverId !== 0
-
             const isManual = booking.booking.isManualBooking === true
             const isPartialPayment =
               booking.booking.payment_type === "partial_payment" || booking.booking.paymentType === "partial_payment"
             const salesPersonName = getSalesPersonName(booking.booking.salesPerson)
             const paymentTypeInfo = getPaymentTypeDisplay(booking)
             const paymentMethodInfo = getPaymentMethodDisplay(booking)
-
             let cardBackgroundColorClass = "bg-white border-gray-200" // Default white
             if (booking.booking.status === "cancelled") {
               cardBackgroundColorClass = "bg-red-100 border-red-300" // Stronger red for cancelled booking
@@ -833,7 +901,6 @@ export function BookingManagement() {
               // This 'else' now covers 'full online payment' when not cancelled, completed, partial, or manual
               cardBackgroundColorClass = "bg-blue-100 border-blue-300" // Blue for full online payment
             }
-
             return (
               <Card
                 key={booking.booking.id}
@@ -917,7 +984,6 @@ export function BookingManagement() {
                     </div>
                   </div>
                 </CardHeader>
-
                 <CardContent>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <div className="space-y-2">
@@ -948,7 +1014,6 @@ export function BookingManagement() {
                         )}
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <h4 className="font-semibold text-gray-700 flex items-center text-sm">
                         <Calendar className="h-4 w-4 mr-1" />
@@ -965,7 +1030,6 @@ export function BookingManagement() {
                         <div className="text-gray-600">Duración: {booking.booking.duration}</div>
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <h4 className="font-semibold text-gray-700 flex items-center text-sm">
                         <Euro className="h-4 w-4 mr-1" />
@@ -992,7 +1056,6 @@ export function BookingManagement() {
                           )}
                         </div>
                       )}
-
                       {isManual && paymentMethodInfo && (
                         <div className="mt-2 text-xs sm:text-sm">
                           <div className={`flex items-center font-medium ${paymentMethodInfo.color}`}>
@@ -1002,7 +1065,6 @@ export function BookingManagement() {
                         </div>
                       )}
                     </div>
-
                     <div className="space-y-2">
                       <h4 className="font-semibold text-gray-700 text-sm">Acciones</h4>
                       <div className="flex flex-col gap-2">
@@ -1016,7 +1078,6 @@ export function BookingManagement() {
                             Ver Documento
                           </Button>
                         )}
-
                         {isPartialPayment && Number(booking.booking.amountPending) > 0 && (
                           <div className="p-2 sm:p-3 bg-red-50 border-2 border-red-300 rounded-lg">
                             <div className="text-center">
@@ -1029,7 +1090,6 @@ export function BookingManagement() {
                             </div>
                           </div>
                         )}
-
                         {booking.booking.status === "pending" && (
                           <Button
                             size="sm"
@@ -1040,7 +1100,6 @@ export function BookingManagement() {
                             Auto-Confirmar
                           </Button>
                         )}
-
                         {booking.booking.status === "confirmed" &&
                           Number(booking.booking.securityDeposit) > 0 &&
                           booking.booking.inspectionStatus === "pending" && (
@@ -1063,7 +1122,6 @@ export function BookingManagement() {
                               </Button>
                             </>
                           )}
-
                         {booking.booking.status === "confirmed" &&
                           (Number(booking.booking.securityDeposit) === 0 ||
                             booking.booking.inspectionStatus === "approved") && (
@@ -1075,7 +1133,6 @@ export function BookingManagement() {
                               Completar Reserva
                             </Button>
                           )}
-
                         {booking.booking.status !== "cancelled" && booking.booking.status !== "completed" && (
                           <Button
                             size="sm"
@@ -1089,7 +1146,6 @@ export function BookingManagement() {
                       </div>
                     </div>
                   </div>
-
                   {booking.booking.damageDescription && (
                     <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                       <h5 className="font-semibold text-red-800 mb-1 flex items-center text-sm">
@@ -1104,14 +1160,12 @@ export function BookingManagement() {
                       )}
                     </div>
                   )}
-
                   {booking.booking.notes && (
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                       <h5 className="font-semibold text-gray-700 mb-1 text-sm">Notas:</h5>
                       <p className="text-gray-600 text-xs sm:text-sm">{booking.booking.notes}</p>
                     </div>
                   )}
-
                   <div className="mt-4 text-xs text-gray-500 break-words">
                     Reserva creada: {new Date(booking.booking.createdAt).toLocaleString("es-ES")}
                     {isManual && salesPersonName && <span className="ml-2">• Comercial: {salesPersonName}</span>}
@@ -1143,7 +1197,6 @@ export function BookingManagement() {
           </CardContent>
         </Card>
       )}
-
       {/* Modal para gestión de fianzas */}
       {showDepositModal && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -1156,7 +1209,6 @@ export function BookingManagement() {
                 Reserva #{selectedBooking.booking.id} - {selectedBooking.booking.customerName}
               </p>
             </div>
-
             <div className="p-6">
               {depositAction === "approve" ? (
                 <div className="text-center">
@@ -1175,7 +1227,6 @@ export function BookingManagement() {
                       Documenta los daños encontrados para justificar la retención de la fianza.
                     </p>
                   </div>
-
                   <div>
                     <div className="text-sm font-medium mb-1">Descripción de los daños *</div>
                     <Textarea
@@ -1186,7 +1237,6 @@ export function BookingManagement() {
                       rows={4}
                     />
                   </div>
-
                   <div>
                     <div className="text-sm font-medium mb-1">Coste de los daños (€)</div>
                     <Input
@@ -1199,7 +1249,6 @@ export function BookingManagement() {
                       step="0.01"
                     />
                   </div>
-
                   <div>
                     <div className="text-sm font-medium mb-1">Fotos de los daños</div>
                     <div className="mt-1 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
@@ -1226,7 +1275,6 @@ export function BookingManagement() {
                 </div>
               )}
             </div>
-
             <div className="p-6 border-t flex justify-end gap-3">
               <Button
                 variant="outline"

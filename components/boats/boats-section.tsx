@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -24,7 +23,6 @@ import {
   Mail,
   Camera,
   Music,
-  Shield,
   Star,
   Waves,
   CreditCard,
@@ -33,7 +31,6 @@ import {
   Coffee,
   Package,
   Filter,
-  Anchor,
   MapPin,
   ArrowLeft,
   ChevronDown,
@@ -762,11 +759,29 @@ export function BoatsSection() {
   const [fetchingLocations, setFetchingLocations] = useState(true)
   const [selectedBeachName, setSelectedBeachName] = useState<string>("")
 
+  // 🎯 NUEVO: Estados para la animación de los botones de licencia
+  const [showButtonAnimation, setShowButtonAnimation] = useState(false)
+
   const { isLoading: navigationLoading, startLoading, stopLoading } = useNavigationLoading()
 
   useEffect(() => {
     fetchBeachLocations()
   }, [])
+
+  // 🎯 NUEVO: useEffect para activar la animación cuando se selecciona una playa
+  useEffect(() => {
+    if (selectedBeachId !== null && vehicles.length > 0) {
+      // Activar la animación
+      setShowButtonAnimation(true)
+
+      // Desactivar la animación después de 3 segundos
+      const timer = setTimeout(() => {
+        setShowButtonAnimation(false)
+      }, 4000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [selectedBeachId, vehicles.length])
 
   // ✅ NUEVO: Función para obtener ubicaciones de playa
   const fetchBeachLocations = async () => {
@@ -969,10 +984,6 @@ export function BoatsSection() {
       <>
         <section className="py-24 bg-white min-h-screen">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
-              <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
-            </div>
             <Card className="bg-red-50 border border-red-200">
               <CardContent className="text-center py-12">
                 <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
@@ -994,11 +1005,6 @@ export function BoatsSection() {
       {navigationLoading && <OroLoading />}
       <section className="py-24 bg-white min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-6">{t.title}</h1>
-            <p className="text-xl md:text-2xl text-gray-600 max-w-4xl mx-auto">{t.subtitle}</p>
-          </div>
-
           {/* ✅ ACTUALIZADO: Selección de playa (se muestra si no hay playa seleccionada) */}
           {selectedBeachId === null && beachLocations.length > 0 && (
             <div className="mb-12 text-center">
@@ -1046,10 +1052,14 @@ export function BoatsSection() {
               {/* ✅ FILTRO SIMPLE DE FECHA */}
               <SimpleDateFilter onDateSelect={handleDateSelect} isLoading={searchLoading} language={language} />
 
-              {/* 🎯 SELECTOR DE PESTAÑAS OPTIMIZADO PARA MÓVILES */}
+              {/* 🎯 SELECTOR DE PESTAÑAS CON ANIMACIÓN ESPECIAL */}
               <div className="flex justify-center mb-12 px-2 sm:px-4">
                 <div className="w-full max-w-5xl">
-                  <div className="flex rounded-2xl overflow-hidden shadow-lg border-2 border-gray-200">
+                  <div
+                    className={`flex rounded-2xl overflow-hidden shadow-lg border-2 border-gray-200 transition-transform duration-500 ${
+                      showButtonAnimation ? "animate-[buttonZoom_5s_ease-in-out]" : ""
+                    }`}
+                  >
                     {/* Pestaña Sin Licencia */}
                     <button
                       onClick={() => setActiveLicense("without")}
@@ -1103,27 +1113,6 @@ export function BoatsSection() {
                         </>
                       )}
                     </button>
-                  </div>
-
-                  {/* Indicador adicional móvil - Más compacto */}
-                  <div className="mt-3 text-center sm:hidden">
-                    <div
-                      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${
-                        activeLicense === "without" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800"
-                      }`}
-                    >
-                      {activeLicense === "without" ? (
-                        <>
-                          <Waves className="h-3 w-3 mr-1.5" />
-                          {t.withoutLicense}
-                        </>
-                      ) : (
-                        <>
-                          <Anchor className="h-3 w-3 mr-1.5" />
-                          {t.withLicense}
-                        </>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1460,4 +1449,20 @@ function VehicleCard({
       </CardContent>
     </Card>
   )
+}
+
+// Agregar esto antes del export function BoatsSection()
+const buttonZoomKeyframes = `
+  @keyframes buttonZoom {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); }
+    100% { transform: scale(1); }
+  }
+`
+
+// Inyectar los keyframes en el head
+if (typeof document !== "undefined") {
+  const style = document.createElement("style")
+  style.textContent = buttonZoomKeyframes
+  document.head.appendChild(style)
 }

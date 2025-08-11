@@ -10,7 +10,20 @@ import { Badge } from "@/components/ui/badge"
 import { CalendarPicker } from "./calendar-picker"
 import { TimePicker } from "./time-picker"
 import { LiabilityWaiver } from "./liability-waiver"
-import { ArrowLeft, Ship, Zap, Users, Calendar, CreditCard, FileText, Share2, Copy, Check, Hotel } from "lucide-react" // ✅ NUEVO: Importar Hotel icon
+import {
+  ArrowLeft,
+  Ship,
+  Zap,
+  Users,
+  Calendar,
+  CreditCard,
+  FileText,
+  Share2,
+  Copy,
+  Check,
+  Hotel,
+  Loader2,
+} from "lucide-react"
 import Image from "next/image"
 import { useApp } from "@/components/providers"
 import type { Vehicle } from "@/lib/db/schema"
@@ -18,6 +31,15 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { StripePayment } from "./stripe-payment"
 import { OroLoading } from "@/components/ui/oro-loading"
 import { useToast } from "@/components/ui/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog" // Importar componentes de Dialog
 
 interface BookingFormProps {
   vehicle: Vehicle
@@ -38,8 +60,22 @@ interface BookingData {
   notes: string
   securityDeposit?: number
   liabilityWaiverId?: number
-  hotelCode?: string // ✅ NUEVO: Añadir hotelCode
+  hotelCode?: string
   beachLocationId?: string
+}
+
+interface TimeSlot {
+  time: string
+  endTime: string
+  available: boolean
+  type?: string
+  restricted?: boolean
+  restrictionReason?: string
+  duration: string
+  label: string
+  price: number
+  availableUnits?: number
+  totalUnits?: number
 }
 
 const translations = {
@@ -60,7 +96,7 @@ const translations = {
     notes: "Notas adicionales (opcional)",
     notesPlaceholder: "Alguna petición especial...",
     hotelCode: "Código de Hotel (opcional)",
-    hotelCodePlaceholder: "Introduce el código", // ✅ MODIFICADO: Nuevo placeholder
+    hotelCodePlaceholder: "Introduce el código",
     summary: "Resumen de la reserva",
     total: "Total",
     payNow: "Confirmar Reserva",
@@ -73,7 +109,6 @@ const translations = {
     fillAllFields: "Completa todos los campos obligatorios",
     bookingSuccess: "¡Reserva creada exitosamente!",
     pastBookingError: "No puedes reservar en el pasado",
-    // ✅ NUEVAS TRADUCCIONES PARA DEEPLINK
     shareBooking: "Compartir reserva",
     shareDescription: "Comparte este enlace para que el cliente complete la reserva",
     linkCopied: "Enlace copiado al portapapeles",
@@ -81,6 +116,12 @@ const translations = {
     prefilledDescription: "",
     vehicleSelected: "Vehículo seleccionado",
     dateTimeSelected: "Fecha y hora seleccionadas",
+    // NUEVAS TRADUCCIONES PARA EL MODAL DE DISPONIBILIDAD
+    slotNotAvailableTitle: "Horario no disponible",
+    slotNotAvailableDescription:
+      "El horario seleccionado ya no está disponible. Por favor, selecciona un nuevo horario.",
+    modifySelection: "Modificar selección",
+    checkingAvailability: "Verificando disponibilidad...",
   },
   en: {
     title: "Book",
@@ -99,7 +140,7 @@ const translations = {
     notes: "Additional notes (optional)",
     notesPlaceholder: "Any special requests...",
     hotelCode: "Hotel Code (optional)",
-    hotelCodePlaceholder: "Enter the code", // ✅ MODIFICADO: Nuevo placeholder
+    hotelCodePlaceholder: "Enter the code",
     summary: "Booking summary",
     total: "Total",
     payNow: "Confirm Booking",
@@ -112,7 +153,6 @@ const translations = {
     fillAllFields: "Fill all required fields",
     bookingSuccess: "Booking created successfully!",
     pastBookingError: "You cannot book in the past",
-    // ✅ NUEVAS TRADUCCIONES PARA DEEPLINK
     shareBooking: "Share booking",
     shareDescription: "Share this link for the customer to complete the booking",
     linkCopied: "Link copied to clipboard",
@@ -120,6 +160,11 @@ const translations = {
     prefilledDescription: "",
     vehicleSelected: "Vehicle selected",
     dateTimeSelected: "Date and time selected",
+    // NEW TRANSLATIONS FOR AVAILABILITY MODAL
+    slotNotAvailableTitle: "Time Slot Not Available",
+    slotNotAvailableDescription: "The selected time slot is no longer available. Please select a new time slot.",
+    modifySelection: "Modify selection",
+    checkingAvailability: "Checking availability...",
   },
 }
 
@@ -130,13 +175,11 @@ export function BookingForm({ vehicle }: BookingFormProps) {
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
-  // ✅ NUEVO: Estados para deeplink
   const [isDeeplink, setIsDeeplink] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareUrl, setShareUrl] = useState("")
   const [linkCopied, setLinkCopied] = useState(false)
 
-  // Obtener la fianza del vehículo
   const securityDeposit = Number(vehicle.securityDeposit) || 0
   const manualDeposit = Number(vehicle.manualDeposit) || 0
 
@@ -163,20 +206,22 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     notes: "",
     securityDeposit: securityDeposit,
     liabilityWaiverId: undefined,
-    hotelCode: "", // ✅ NUEVO: Inicializar hotelCode
+    hotelCode: "",
     beachLocationId: vehicle.beachLocationId ?? undefined,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [navigationLoading, setNavigationLoading] = useState(false)
-  const [showHotelCodeInput, setShowHotelCodeInput] = useState(false) // ✅ NUEVO: Estado para mostrar/ocultar campo de hotel code
+  const [showHotelCodeInput, setShowHotelCodeInput] = useState(false)
 
-  // ✅ REFERENCIAS SIMPLES - Solo las necesarias
+  // NUEVOS ESTADOS PARA EL MODAL DE DISPONIBILIDAD
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false)
+  const [availabilityCheckLoading, setAvailabilityCheckLoading] = useState(false)
+
   const stepTitleRef = useRef<HTMLDivElement>(null)
   const nextButtonRef = useRef<HTMLButtonElement>(null)
   const durationSectionRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>
 
-  // ✅ NUEVO: Efecto para manejar parámetros de deeplink
   useEffect(() => {
     const date = searchParams.get("date")
     const startTime = searchParams.get("startTime")
@@ -196,7 +241,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         price: Number(price),
       })
 
-      // Saltar directamente al paso 2 (datos del cliente)
       setCurrentStep(2)
 
       toast({
@@ -224,7 +268,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     }
   }, [selectedDate, selectedTime, securityDeposit, vehicle.beachLocationId])
 
-  // Efecto para hacer scroll al cambiar de paso
   useEffect(() => {
     const scrollTimer = setTimeout(() => {
       if (stepTitleRef.current) {
@@ -235,7 +278,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     return () => clearTimeout(scrollTimer)
   }, [currentStep])
 
-  // ✅ NUEVA FUNCIÓN: Generar deeplink
   const generateShareLink = () => {
     if (!selectedDate || !selectedTime) {
       toast({
@@ -261,7 +303,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     setShowShareModal(true)
   }
 
-  // ✅ NUEVA FUNCIÓN: Copiar enlace
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(shareUrl)
@@ -279,7 +320,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     }
   }
 
-  // ✅ FUNCIÓN SIMPLE PARA SCROLL EN MÓVIL
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>, delay = 500) => {
     setTimeout(() => {
       if (ref.current && window.innerWidth <= 768) {
@@ -292,7 +332,60 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     }, delay)
   }
 
-  const handleNextStep = () => {
+  const checkSelectedSlotAvailability = async (): Promise<boolean> => {
+    if (!bookingData.bookingDate || !bookingData.duration || !selectedTime) {
+      setError("Faltan datos para verificar la disponibilidad.")
+      return false
+    }
+
+    setAvailabilityCheckLoading(true)
+    setError("")
+
+    try {
+      const formattedDate = bookingData.bookingDate.includes("T")
+        ? bookingData.bookingDate.split("T")[0]
+        : bookingData.bookingDate
+
+      const url = `/api/availability/${vehicle.id}/slots?date=${encodeURIComponent(formattedDate)}&durationType=${encodeURIComponent(bookingData.duration)}`
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        setError(`Error al verificar disponibilidad: ${errorData.error || "No se pudieron cargar los horarios"}`)
+        return false
+      }
+
+      const data = await response.json()
+      const availableSlots: TimeSlot[] = data.slots || []
+
+      const foundSlot = availableSlots.find(
+        (slot) =>
+          slot.time === selectedTime.start &&
+          slot.endTime === selectedTime.end &&
+          slot.duration === selectedTime.duration,
+      )
+
+      if (
+        foundSlot &&
+        foundSlot.available &&
+        (foundSlot.availableUnits === undefined || foundSlot.availableUnits > 0)
+      ) {
+        return true // El slot sigue disponible
+      } else {
+        setError(t.slotNotAvailableDescription)
+        setShowAvailabilityModal(true)
+        return false // El slot ya no está disponible
+      }
+    } catch (err) {
+      console.error("Error en la verificación de disponibilidad:", err)
+      setError("Error de conexión al verificar disponibilidad.")
+      return false
+    } finally {
+      setAvailabilityCheckLoading(false)
+    }
+  }
+
+  const handleNextStep = async () => {
     setError("")
 
     if (currentStep === 1) {
@@ -304,9 +397,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         setError(t.selectTimeFirst)
         return
       }
-    }
-
-    if (currentStep === 2) {
+      setCurrentStep((prev) => prev + 1)
+    } else if (currentStep === 2) {
       if (
         !bookingData.customerName ||
         !bookingData.customerEmail ||
@@ -316,16 +408,21 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         setError(t.fillAllFields)
         return
       }
-    }
 
-    setCurrentStep((prev) => prev + 1)
+      // ✅ VERIFICAR DISPONIBILIDAD ANTES DE AVANZAR
+      const isAvailable = await checkSelectedSlotAvailability()
+      if (isAvailable) {
+        setCurrentStep((prev) => prev + 1)
+      }
+    } else {
+      setCurrentStep((prev) => prev + 1)
+    }
   }
 
   const handlePrevStep = () => {
     setNavigationLoading(true)
 
     setTimeout(() => {
-      // ✅ NUEVO: Si es deeplink, no permitir volver al paso 1
       if (isDeeplink && currentStep === 2) {
         setNavigationLoading(false)
         return
@@ -342,7 +439,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
       ...prev,
       liabilityWaiverId: waiverId,
     }))
-    setCurrentStep(5) // ✅ SALTAR DIRECTAMENTE AL PASO 5 (PAGO)
+    setCurrentStep(5)
   }
 
   const handleBooking = () => {
@@ -353,7 +450,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     <>
       <section className="py-24 bg-gray-50 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <Button
               variant="outline"
@@ -374,21 +470,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
               </h1>
               <p className="text-lg text-gray-600">{t.subtitle}</p>
             </div>
-
-            {/* ✅ NUEVO: Botón de compartir (solo en paso 1 y si hay selección)
-            {currentStep === 1 && selectedDate && selectedTime && !isDeeplink && (
-              <Button
-                variant="outline"
-                onClick={generateShareLink}
-                className="border-gold text-gold hover:bg-gold hover:text-black bg-transparent"
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                {t.shareBooking}
-              </Button>
-            )} */}
           </div>
 
-          {/* ✅ NUEVO: Banner de deeplink */}
           {isDeeplink && (
             <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-start gap-3">
@@ -417,10 +500,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
             </div>
           )}
 
-          {/* ✅ PROGRESS STEPS RESPONSIVE MEJORADO */}
           <div className="flex items-center justify-center mb-8 sm:mb-12 overflow-x-auto px-2">
             <div className="flex items-center space-x-2 sm:space-x-4 min-w-max">
-              {/* ✅ MODIFICADO: Mostrar pasos según si es deeplink o no */}
               {(isDeeplink ? [2, 3, 5] : [1, 2, 3, 5]).map((step, index) => (
                 <div key={step} className="flex items-center">
                   <div
@@ -439,11 +520,10 @@ export function BookingForm({ vehicle }: BookingFormProps) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Vehicle Info */}
             <div className="lg:col-span-1">
               <Card className="bg-white border border-gray-200 sticky top-24">
                 <CardContent className="p-6">
-                  <div className="relative w-full h-48 bg-gray-50 rounded-lg overflow-hidden mb-4">
+                  <div className="relative w-full h-50 bg-gray-50 rounded-lg overflow-hidden mb-5">
                     <Image
                       src={vehicle.image || "/placeholder.svg"}
                       alt={vehicle.name}
@@ -498,10 +578,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
               </Card>
             </div>
 
-            {/* Booking Form */}
             <div className="lg:col-span-2">
               <Card className="bg-white border border-gray-200">
-                {/* Título del paso con referencia para scroll */}
                 <div ref={stepTitleRef} id="step-title">
                   <CardHeader>
                     <CardTitle className="text-2xl font-bold text-black flex items-center">
@@ -526,7 +604,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Step 1: Date and Time Selection - ✅ OCULTAR SI ES DEEPLINK */}
                   {currentStep === 1 && !isDeeplink && (
                     <div className="space-y-8">
                       <div>
@@ -557,7 +634,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Step 2: Customer Information */}
                   {currentStep === 2 && (
                     <div className="space-y-6">
                       <h3 className="text-lg font-semibold text-black">{t.customerInfo}</h3>
@@ -621,13 +697,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                         />
                       </div>
 
-                      {/* ✅ MODIFICADO: Campo de código de hotel con icono de toggle */}
                       <div className="space-y-2">
                         {!showHotelCodeInput && (
                           <Button
                             variant="outline"
                             onClick={() => setShowHotelCodeInput(true)}
-                            className="w-12 h-12 p-0 flex items-center justify-center border-gray-300 text-gray-600 hover:text-black hover:bg-gray-100" // Botón solo con icono
+                            className="w-12 h-12 p-0 flex items-center justify-center border-gray-300 text-gray-600 hover:text-black hover:bg-gray-100"
                             aria-label="Añadir código de hotel"
                           >
                             <Hotel className="h-5 w-5" />
@@ -640,8 +715,8 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                               value={bookingData.hotelCode}
                               onChange={(e) =>
                                 setBookingData((prev) => ({ ...prev, hotelCode: e.target.value.toUpperCase() }))
-                              } // Force uppercase
-                              placeholder={t.hotelCodePlaceholder} // ✅ MODIFICADO: Nuevo placeholder
+                              }
+                              placeholder={t.hotelCodePlaceholder}
                               className="bg-gray-50 border-gray-200"
                             />
                           </div>
@@ -650,7 +725,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Step 3: Liability Waiver */}
                   {currentStep === 3 && (
                     <LiabilityWaiver
                       customerName={bookingData.customerName}
@@ -662,7 +736,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     />
                   )}
 
-                  {/* Step 5: Payment */}
                   {currentStep === 5 && (
                     <div className="space-y-6">
                       <div className="text-center">
@@ -705,17 +778,15 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                     </div>
                   )}
 
-                  {/* Navigation Buttons */}
                   <div className="pt-6 border-t border-gray-200 space-y-4">
                     {currentStep > 1 && currentStep < 5 && currentStep !== 3 ? (
-                      // Navegación normal para pasos 2 y otros (pero no 3 que tiene su propia navegación)
                       <div className="flex flex-col sm:flex-row gap-3 sm:justify-between">
-                        {/* ✅ MODIFICADO: Solo mostrar botón "Anterior" si no es deeplink en paso 2 */}
                         {!(isDeeplink && currentStep === 2) && (
                           <Button
                             variant="outline"
                             onClick={handlePrevStep}
                             className="border-gray-300 w-full sm:w-auto order-2 sm:order-1 bg-transparent"
+                            disabled={availabilityCheckLoading} // Deshabilitar si se está verificando disponibilidad
                           >
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Anterior
@@ -727,14 +798,23 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                             ref={nextButtonRef}
                             onClick={handleNextStep}
                             className="bg-black text-white hover:bg-gold hover:text-black transition-all duration-300 w-full sm:w-auto"
+                            disabled={availabilityCheckLoading} // Deshabilitar si se está verificando disponibilidad
                           >
-                            Siguiente
-                            <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                            {availabilityCheckLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                {t.checkingAvailability}
+                              </>
+                            ) : (
+                              <>
+                                Siguiente
+                                <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+                              </>
+                            )}
                           </Button>
                         </div>
                       </div>
                     ) : currentStep === 1 ? (
-                      // Primer paso
                       <div className="flex flex-col gap-4 sm:items-end">
                         <Button
                           ref={nextButtonRef}
@@ -745,7 +825,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                           <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
                         </Button>
 
-                        {/* ✅ Botón de compartir debajo del botón Siguiente */}
                         {selectedDate && selectedTime && !isDeeplink && (
                           <Button
                             variant="outline"
@@ -766,7 +845,6 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         </div>
       </section>
 
-      {/* ✅ NUEVO: Modal para compartir enlace */}
       {showShareModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -800,7 +878,36 @@ export function BookingForm({ vehicle }: BookingFormProps) {
         </div>
       )}
 
-      {/* Indicador de carga durante la navegación */}
+      {/* Nuevo Modal de Disponibilidad */}
+      <Dialog open={showAvailabilityModal} onOpenChange={setShowAvailabilityModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-600">
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              {t.slotNotAvailableTitle}
+            </DialogTitle>
+            <DialogDescription>{t.slotNotAvailableDescription}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button
+                onClick={() => {
+                  router.push(`/boats/${vehicle.id}/book`) // Navegar a la URL base del vehículo
+                  setIsDeeplink(false) // Resetear el estado de deeplink
+                  setSelectedDate("") // Limpiar la fecha seleccionada
+                  setSelectedTime(null) // Limpiar la hora seleccionada
+                  setCurrentStep(1) // Asegurarse de que el paso sea el 1
+                  setError("") // Limpiar cualquier error previo
+                }}
+                className="bg-black text-white hover:bg-gold hover:text-black"
+              >
+                {t.modifySelection}
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {navigationLoading && <OroLoading />}
     </>
   )

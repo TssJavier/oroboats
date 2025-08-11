@@ -163,6 +163,8 @@ export async function getBookings() {
         amountPending: row.amount_pending || "0",
         paymentLocation: row.payment_location || "online",
         hotelCode: row.hotel_code, // ✅ AÑADIDO: Incluir hotelCode
+        beachLocationId: row.beach_location_id,
+        beachLocationName: row.beach_location_name,
       },
       vehicle: row.vehicle_name
         ? {
@@ -203,7 +205,6 @@ export async function createBooking(bookingData: any) {
       bookingData.timeSlot = `${bookingData.startTime}-${bookingData.endTime}`
     }
     console.log("🔍 DB: timeSlot value:", bookingData.timeSlot)
-
     // ✅ VERIFICAR CAMPOS DE PAGO PARCIAL - NORMALIZAR NOMBRES
     const paymentType = bookingData.payment_type || bookingData.paymentType || "full_payment"
     const amountPaid = bookingData.amount_paid || bookingData.amountPaid || bookingData.totalPrice
@@ -215,7 +216,6 @@ export async function createBooking(bookingData: any) {
       amountPending,
       paymentLocation,
     })
-
     // ✅ USAR DIRECT SQL PARA MÁXIMO CONTROL
     const result = await db.execute(sql`
       INSERT INTO bookings (
@@ -225,7 +225,7 @@ export async function createBooking(bookingData: any) {
         discount_code, discount_amount, original_price, security_deposit,
         created_at, updated_at,
         payment_type, amount_paid, amount_pending, payment_location,
-        liability_waiver_id, is_test_booking, hotel_code, beach_location_id
+        liability_waiver_id, is_test_booking, hotel_code, beach_location_id, beach_location_name
       ) VALUES (
         ${Number(bookingData.vehicleId)},
         ${bookingData.customerName},
@@ -253,7 +253,8 @@ export async function createBooking(bookingData: any) {
         ${bookingData.liability_waiver_id || bookingData.liabilityWaiverId || null},
         ${bookingData.isTestBooking || false},
         ${bookingData.hotelCode || null},
-        ${bookingData.beachLocationId || null}
+        ${bookingData.beachLocationId || null},
+        ${bookingData.beachLocationName || null}
       ) RETURNING *;
     `)
     console.log("✅ DB: Booking created successfully")
@@ -263,6 +264,7 @@ export async function createBooking(bookingData: any) {
       console.log("✅ DB: Amount paid saved as:", result[0].amount_paid)
       console.log("✅ DB: Amount pending saved as:", result[0].amount_pending)
       console.log("✅ DB: Hotel Code saved as:", result[0].hotel_code) // ✅ NUEVO: Log para hotel_code
+      console.log("✅ DB: Beach Location Name saved as:", result[0].beach_location_name) // ✅ NUEVO: Log para beach_location_name
     }
     return result // ✅ CORREGIDO: Devolver las filas del resultado
   } catch (error) {

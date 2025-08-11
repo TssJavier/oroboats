@@ -17,12 +17,12 @@ export async function middleware(request: NextRequest) {
     "/api/liability-waiver",
     "/api/create-payment-intent",
     "/api/confirm-booking",
-    "/api/discount/validate", // ✅ CORREGIDO: Validar códigos es público
+    "/api/discount/validate",
+    "/api/analytics/track", // ✅ AÑADIDO: Permitir acceso público para el tracking de analíticas
   ]
 
-  const isPublicApi = publicApiRoutes.some((route) => request.nextUrl.pathname.startsWith(route))
-
-  if (isPublicApi) {
+  // Si la solicitud es para una ruta pública de API, permítela sin verificación de token.
+  if (publicApiRoutes.some((route) => request.nextUrl.pathname.startsWith(route))) {
     console.log("✅ Ruta pública, permitiendo acceso:", request.nextUrl.pathname)
     return NextResponse.next()
   }
@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
     "/test-descuentos",
     "/api/discount-codes", // 🔒 GESTIÓN DE CÓDIGOS (admin only)
     "/api/deposits", // 🔒 PROTEGER FIANZAS
-    "/api/analytics", // 🔒 PROTEGER ANALYTICS
+    "/api/admin/analytics", // 🔒 PROTEGER ANALYTICS (la ruta /api/analytics/track es pública, pero /api/admin/analytics no)
     "/api/users", // 🔒 PROTEGER GESTIÓN DE USUARIOS
   ]
 
@@ -80,13 +80,11 @@ export async function middleware(request: NextRequest) {
       if (isAdminOnlyPath) {
         // ✅ COMPATIBILIDAD: Verificar tanto isAdmin como role
         const isAdmin = payload.isAdmin === true || payload.role === "admin"
-
         if (!isAdmin) {
           console.log("❌ Acceso denegado: Se requiere rol admin")
           return NextResponse.redirect(new URL("/admin?error=access-denied", request.url))
         }
       }
-
       return NextResponse.next()
     } catch (error) {
       console.log("❌ Token inválido:", error)
@@ -110,7 +108,7 @@ export const config = {
     "/api/create-payment-intent/:path*",
     "/api/confirm-booking/:path*",
     "/api/deposits/:path*",
-    "/api/analytics/:path*",
+    "/api/analytics/:path*", // Esto cubre /api/admin/analytics y /api/analytics/track
     "/api/users/:path*",
   ],
 }

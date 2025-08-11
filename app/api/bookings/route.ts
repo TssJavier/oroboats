@@ -1,56 +1,58 @@
 import { NextResponse } from "next/server"
-import { sql } from "drizzle-orm"
+import { sql, eq } from "drizzle-orm" // Importar 'eq' para comparaciones
 import { db } from "@/lib/db"
 import type { NextRequest } from "next/server"
 import { createBooking } from "@/lib/db/queries"
 import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
+import { vehicles, locations } from "@/lib/db/schema" // Importar esquemas de vehicles y locations
 
 export async function GET(request: NextRequest) {
   try {
     console.log("🔍 API: Fetching bookings...")
     const { searchParams } = new URL(request.url)
     const beachLocationId = searchParams.get("beachLocationId")
-    const hotelCode = searchParams.get("hotelCode") // ✅ NUEVO: Obtener hotelCode del searchParams
+    const hotelCode = searchParams.get("hotelCode")
+    const bookingDate = searchParams.get("bookingDate") // NUEVO: Obtener bookingDate
 
     let query = sql`
-      SELECT
-        b.id,
-        b.customer_name,
-        b.customer_email,
-        b.customer_phone,
-        b.customer_dni,
-        b.booking_date,
-        b.time_slot,
-        b.duration,
-        b.total_price,
-        b.status,
-        b.payment_status,
-        b.notes,
-        b.created_at,
-        b.security_deposit,
-        b.inspection_status,
-        b.damage_description,
-        b.damage_cost,
-        b.liability_waiver_id,
-        b.is_test_booking,
-        b.is_manual_booking,
-        b.sales_person,
-        b.vehicle_name,
-        b.vehicle_type,
-        b.payment_type,
-        b.amount_paid,
-        b.amount_pending,
-        b.payment_location,
-        b.payment_method,
-        b.hotel_code, -- ✅ NUEVO: Seleccionar hotel_code
-        v.name as vehicle_current_name,
-        v.type as vehicle_current_type,
-        l.name as beach_location_name,
-        l.id as beach_location_id
-      FROM bookings b
-      LEFT JOIN vehicles v ON b.vehicle_id = v.id
-      LEFT JOIN locations l ON b.beach_location_id = l.id
-    `
+    SELECT
+      b.id,
+      b.customer_name,
+      b.customer_email,
+      b.customer_phone,
+      b.customer_dni,
+      b.booking_date,
+      b.time_slot,
+      b.duration,
+      b.total_price,
+      b.status,
+      b.payment_status,
+      b.notes,
+      b.created_at,
+      b.security_deposit,
+      b.inspection_status,
+      b.damage_description,
+      b.damage_cost,
+      b.liability_waiver_id,
+      b.is_test_booking,
+      b.is_manual_booking,
+      b.sales_person,
+      b.vehicle_name,
+      b.vehicle_type,
+      b.payment_type,
+      b.amount_paid,
+      b.amount_pending,
+      b.payment_location,
+      b.payment_method,
+      b.hotel_code,
+      b.beach_location_id, -- Asegurarse de seleccionar beach_location_id de bookings
+      l.name as beach_location_name, -- Seleccionar el nombre de la playa de locations
+      v.name as vehicle_current_name,
+      v.type as vehicle_current_type
+    FROM bookings b
+    LEFT JOIN vehicles v ON b.vehicle_id = v.id
+    LEFT JOIN locations l ON b.beach_location_id = l.id -- Unir con locations
+  `
     const conditions = []
 
     if (beachLocationId && beachLocationId !== "all") {
@@ -58,8 +60,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (hotelCode) {
-      // ✅ NUEVO: Añadir condición para filtrar por hotel_code
       conditions.push(sql`LOWER(b.hotel_code) LIKE LOWER(${`%${hotelCode}%`})`)
+    }
+
+    // NUEVO: Añadir condición para filtrar por bookingDate
+    if (bookingDate) {
+      conditions.push(sql`b.booking_date = ${bookingDate}`)
     }
 
     if (conditions.length > 0) {
@@ -68,10 +74,9 @@ export async function GET(request: NextRequest) {
 
     query = sql`${query} ORDER BY b.created_at DESC`
 
-    const bookingsResult = (await db.execute(query)) as any[] // Cast to any[] for flexible access
+    const bookingsResult = (await db.execute(query)) as any[]
     console.log(`✅ API: Found ${bookingsResult.length} bookings`)
 
-    // Debug específico para métodos de pago
     const paymentMethods = bookingsResult
       .filter((row) => row.is_manual_booking)
       .map((row) => ({
@@ -86,7 +91,6 @@ export async function GET(request: NextRequest) {
       console.table(paymentMethods)
     }
 
-    // Transformar los datos al formato esperado por el frontend
     const transformedBookings = bookingsResult.map((row) => ({
       booking: {
         id: row.id,
@@ -113,14 +117,14 @@ export async function GET(request: NextRequest) {
         vehicleName: row.vehicle_name || row.vehicle_current_name,
         vehicleType: row.vehicle_type || row.vehicle_current_type,
         payment_type: row.payment_type,
-        paymentType: row.payment_type, // Duplicado para compatibilidad
+        paymentType: row.payment_type,
         amountPaid: row.amount_paid?.toString() || null,
         amountPending: row.amount_pending?.toString() || null,
         paymentLocation: row.payment_location,
         paymentMethod: row.payment_method,
-        beachLocationId: row.beach_location_id, // Add beach location ID
-        beachLocationName: row.beach_location_name, // Add beach location name
-        hotelCode: row.hotel_code, // ✅ NUEVO: Incluir hotelCode
+        beachLocationId: row.beach_location_id,
+        beachLocationName: row.beach_location_name, // Ahora se obtiene de la unión
+        hotelCode: row.hotel_code,
       },
       vehicle: row.vehicle_current_name
         ? {
@@ -130,14 +134,12 @@ export async function GET(request: NextRequest) {
         : null,
     }))
 
-    // Debug para verificar reservas manuales y comerciales
     const manualBookings = transformedBookings.filter((b) => b.booking.isManualBooking)
     console.log(`🔍 API: Manual bookings found: ${manualBookings.length}`)
     manualBookings.forEach((b) => {
       console.log(`   - Booking ${b.booking.id}: sales_person = ${b.booking.salesPerson || "no sales person"}`)
     })
 
-    // Debug para verificar pagos parciales
     const partialPayments = transformedBookings.filter((b) => b.booking.payment_type === "partial_payment")
     console.log(`🔍 API: Partial payments found: ${partialPayments.length}`)
     partialPayments.forEach((b) => {
@@ -164,39 +166,102 @@ export async function POST(request: NextRequest) {
   try {
     console.log("🔄 API: Creating new booking...")
     const bookingData = await request.json()
-    console.log("📝 Received booking data:", {
+
+    console.log("📝 Received initial booking data:", {
+      vehicleId: bookingData.vehicleId,
       customerName: bookingData.customerName,
-      vehicleName: bookingData.vehicleName,
-      totalPrice: bookingData.totalPrice || bookingData.finalAmount,
-      paymentStatus: bookingData.paymentStatus,
-      paymentType: bookingData.paymentType,
-      hasDiscount: !!bookingData.discountCode,
-      hotelCode: bookingData.hotelCode, // ✅ NUEVO: Log hotelCode
+      bookingDate: bookingData.bookingDate,
+      timeSlot: bookingData.timeSlot,
+      totalPrice: bookingData.totalPrice,
+      hotelCode: bookingData.hotelCode,
     })
 
-    const booking = await createBooking(bookingData)
+    // 1. Obtener el vehículo para obtener su beachLocationId
+    const vehicle = await db
+      .select({
+        beachLocationId: vehicles.beachLocationId,
+      })
+      .from(vehicles)
+      .where(eq(vehicles.id, bookingData.vehicleId))
+      .limit(1)
+
+    console.log("🔍 Vehicle lookup result:", vehicle)
+    if (!vehicle || vehicle.length === 0) {
+      console.warn("⚠️ Vehicle not found for vehicleId:", bookingData.vehicleId)
+    } else if (!vehicle[0].beachLocationId) {
+      console.warn("⚠️ Vehicle found, but beachLocationId is null for vehicleId:", bookingData.vehicleId)
+    }
+
+    if (!vehicle || vehicle.length === 0 || !vehicle[0].beachLocationId) {
+      console.warn("⚠️ Vehicle or beachLocationId not found for vehicleId:", bookingData.vehicleId)
+      // Puedes decidir si quieres lanzar un error o continuar sin el nombre de la playa
+      // Por ahora, continuaremos pero el nombre de la playa será nulo
+    }
+
+    let beachLocationName: string | null = null
+    if (vehicle && vehicle.length > 0 && vehicle[0].beachLocationId) {
+      // 2. Obtener el nombre de la playa usando el beachLocationId
+      const location = await db
+        .select({
+          name: locations.name,
+        })
+        .from(locations)
+        .where(eq(locations.id, vehicle[0].beachLocationId))
+        .limit(1)
+
+      console.log("🔍 Location lookup result:", location)
+      if (!location || location.length === 0) {
+        console.warn("⚠️ Beach location name not found for ID:", vehicle[0].beachLocationId)
+      }
+
+      if (location && location.length > 0) {
+        beachLocationName = location[0].name
+        console.log("🏖️ Found beach location name:", beachLocationName)
+      } else {
+        console.warn("⚠️ Beach location name not found for ID:", vehicle[0].beachLocationId)
+      }
+    }
+
+    // 3. Añadir beachLocationId y beachLocationName a bookingData
+    const finalBookingData = {
+      ...bookingData,
+      beachLocationId: vehicle?.[0]?.beachLocationId || null, // Asegurarse de que se pasa el ID
+      beachLocationName: beachLocationName, // Añadir el nombre de la playa
+    }
+
+    console.log("📝 Final booking data before creation:", {
+      customerName: finalBookingData.customerName,
+      vehicleName: finalBookingData.vehicleName,
+      beachLocationId: finalBookingData.beachLocationId,
+      beachLocationName: finalBookingData.beachLocationName,
+      totalPrice: finalBookingData.totalPrice || finalBookingData.finalAmount,
+      hotelCode: finalBookingData.hotelCode,
+    })
+
+    const booking = await createBooking(finalBookingData)
     console.log("✅ Booking created successfully:", booking[0])
 
     try {
-      const vehicleName = bookingData.vehicleName || "Vehículo"
+      const vehicleName = finalBookingData.vehicleName || "Vehículo"
       const emailData = {
         bookingId: Number(booking[0].id),
-        customerName: bookingData.customerName,
-        customerEmail: bookingData.customerEmail,
-        customerPhone: bookingData.customerPhone,
+        customerName: finalBookingData.customerName,
+        customerEmail: finalBookingData.customerEmail,
+        customerPhone: finalBookingData.customerPhone,
         vehicleName: vehicleName,
-        bookingDate: bookingData.bookingDate,
-        startTime: bookingData.startTime,
-        endTime: bookingData.endTime,
-        totalPrice: bookingData.totalPrice || bookingData.finalAmount,
-        discountAmount: bookingData.discountAmount > 0 ? bookingData.discountAmount : undefined,
-        originalPrice: bookingData.discountAmount > 0 ? bookingData.originalPrice : undefined,
-        discountCode: bookingData.discountCode || undefined,
-        securityDeposit: bookingData.securityDeposit || 0,
-        paymentType: bookingData.paymentType || "full_payment",
-        amountPaid: bookingData.amountPaid || bookingData.finalAmount || 0,
-        amountPending: bookingData.amountPending || 0,
-        hotelCode: bookingData.hotelCode, // ✅ NUEVO: Incluir hotelCode en emailData
+        bookingDate: finalBookingData.bookingDate,
+        startTime: finalBookingData.startTime,
+        endTime: finalBookingData.endTime,
+        totalPrice: finalBookingData.totalPrice || finalBookingData.finalAmount,
+        discountAmount: finalBookingData.discountAmount > 0 ? finalBookingData.discountAmount : undefined,
+        originalPrice: finalBookingData.discountAmount > 0 ? finalBookingData.originalPrice : undefined,
+        discountCode: finalBookingData.discountCode || undefined,
+        securityDeposit: finalBookingData.securityDeposit || 0,
+        paymentType: finalBookingData.paymentType || "full_payment",
+        amountPaid: finalBookingData.amountPaid || finalBookingData.finalAmount || 0,
+        amountPending: finalBookingData.amountPending || 0,
+        hotelCode: finalBookingData.hotelCode,
+        beachLocationName: finalBookingData.beachLocationName, // Incluir en emailData
       }
       console.log("📧 Sending booking confirmation emails...")
       await sendAdminNotification(emailData)
