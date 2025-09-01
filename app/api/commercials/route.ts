@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import { getCurrentUser } from "@/lib/auth"
+import { supabaseAdmin } from "@/lib/db-supabase"
 
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+const supabase = supabaseAdmin
 
 // API específica para obtener solo los comerciales (para el dropdown del modal)
 export async function GET() {

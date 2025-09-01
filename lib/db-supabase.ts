@@ -18,9 +18,3 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 
 // Cliente para operaciones del cliente (con anon key)
 export const supabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-
-console.log("🔗 Supabase configured:", {
-  url: supabaseUrl,
-  hasServiceKey: !!supabaseServiceKey,
-  hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-})

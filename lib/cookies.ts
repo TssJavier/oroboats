@@ -8,7 +8,8 @@ export const cookieUtils = {
   set: (name: string, value: string, days = 365) => {
     const expires = new Date()
     expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
-    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+    const secure = window.location.protocol === "https:" ? ";Secure" : ""
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax${secure}`
   },
 
   // Obtener una cookie
@@ -25,7 +26,8 @@ export const cookieUtils = {
 
   // Eliminar una cookie
   delete: (name: string) => {
-    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`
+    const secure = window.location.protocol === "https:" ? ";Secure" : ""
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;${secure}`
   },
 
   // Verificar si una cookie existe

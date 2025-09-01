@@ -1,23 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import stripe from "@/lib/stripe-config"
+import { supabaseAdmin } from "@/lib/db-supabase"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabase = supabaseAdmin
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const bookingId = params.id
+    if (!bookingId) {
+      return NextResponse.json({ error: "Booking ID required" }, { status: 400 })
+    }
+
     let requestData
     try {
       requestData = await request.json()
-    } catch (jsonError) {
-      console.error("❌ JSON parsing error:", jsonError)
+    } catch {
       return NextResponse.json({ error: "Invalid JSON data" }, { status: 400 })
     }
 
     const { action, damageDescription, damageCost } = requestData
-    const bookingId = params.id
 
-    console.log(`🔄 Processing deposit ${action} for booking ${bookingId}`)
+    if (action !== "approve" && action !== "reject") {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    }
+    if (damageCost && isNaN(Number(damageCost))) {
+      return NextResponse.json({ error: "Invalid damage cost" }, { status: 400 })
+    }
 
     // Obtener datos de la reserva
     const { data: booking, error: bookingError } = await supabase

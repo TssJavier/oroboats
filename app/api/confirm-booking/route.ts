@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import stripe from "@/lib/stripe-config" // Asumo que este es tu cliente Stripe configurado
 import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
-import { createClient } from "@supabase/supabase-js"
+import { supabaseAdmin } from "@/lib/db-supabase"
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabase = supabaseAdmin
 
 export async function POST(request: NextRequest) {
   try {
