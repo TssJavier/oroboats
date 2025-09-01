@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
+import { supabaseAdmin } from "@/lib/db-supabase"
 
-// ✅ SUPABASE CLIENT
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabase = supabaseAdmin
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -15,19 +14,32 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
     }
 
-    const { name, password } = await request.json()
     const userId = params.id
+    if (!userId) {
+      return NextResponse.json({ error: "ID requerido" }, { status: 400 })
+    }
 
-    if (!name) {
+    let body
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    }
+
+    const { name, password } = body
+
+    if (typeof name !== "string" || name.trim() === "") {
       return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 })
     }
 
     // Preparar datos para actualizar
     const updateData: any = { name }
 
-    // Si se proporciona nueva contraseña, hashearla
-    if (password && password.trim() !== "") {
+    // Si se proporciona nueva contraseña, validar y hashearla
+    if (typeof password === "string" && password.trim() !== "") {
       updateData.password = await bcrypt.hash(password, 12)
+    } else if (password !== undefined && password !== null && password !== "") {
+      return NextResponse.json({ error: "Contraseña inválida" }, { status: 400 })
     }
 
     // Actualizar usuario
@@ -60,6 +72,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     const userId = params.id
+    if (!userId) {
+      return NextResponse.json({ error: "ID requerido" }, { status: 400 })
+    }
 
     // Eliminar usuario
     const { error } = await supabase.from("admin_users").delete().eq("id", userId)

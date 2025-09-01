@@ -1,10 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
+import { supabaseAdmin } from "@/lib/db-supabase"
 
-// ✅ SUPABASE CLIENT
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabase = supabaseAdmin
 
 export async function GET() {
   try {
@@ -42,10 +41,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
     }
 
-    const { email, name, password } = await request.json()
+    let body
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
+    }
 
-    if (!email || !name || !password) {
-      return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 })
+    const { email, name, password } = body
+
+    if (
+      typeof email !== "string" ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ||
+      typeof name !== "string" ||
+      name.trim() === "" ||
+      typeof password !== "string" ||
+      password.length < 6
+    ) {
+      return NextResponse.json({ error: "Datos de usuario inválidos" }, { status: 400 })
     }
 
     // Verificar si el email ya existe

@@ -1,12 +1,16 @@
 import { SignJWT, jwtVerify } from "jose"
 import { cookies } from "next/headers"
-import { createClient } from "@supabase/supabase-js"
 import bcrypt from "bcryptjs"
+import { supabaseAdmin } from "./db-supabase"
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "oroboats-secret-key-2024")
+const jwtSecret = process.env.JWT_SECRET
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET is not defined")
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecret)
 
 // ✅ SUPABASE CLIENT
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabase = supabaseAdmin
 
 export type UserRole = "admin" | "comercial"
 
