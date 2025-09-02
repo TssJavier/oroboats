@@ -27,6 +27,7 @@
     --brand-primary: #000000;
     --brand-secondary: #FFD700;
     --brand-background: #FFFFFF;
+    --brand-loading-background: #FFFFFF;
   }
 
   .dark {
@@ -79,6 +80,14 @@
     border-color: var(--brand-secondary);
   }
 
+  .border-black {
+    border-color: var(--brand-primary) !important;
+  }
+  .hover\:border-gold:hover {
+    border-color: var(--brand-secondary) !important;
+
+  }
+
   .from-gold {
     --tw-gradient-from: var(--brand-secondary);
   }
@@ -89,6 +98,43 @@
 
   .shadow-gold {
     --tw-shadow-color: var(--brand-secondary);
+  }
+
+  .btn-primary {
+    background-color: var(--brand-primary);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background-color: var(--brand-secondary);
+    color: #000;
+  }
+
+  .btn-secondary {
+    background-color: var(--brand-secondary);
+    color: #000;
+  }
+  .btn-secondary:hover {
+    background-color: var(--brand-primary);
+    color: #fff;
+  }
+
+  /* Override legacy color classes to use brand variables */
+  .bg-black {
+    background-color: var(--brand-primary) !important;
+  }
+  .hover\:bg-black:hover {
+    background-color: var(--brand-primary) !important;
+  }
+  .bg-gold,
+  .bg-yellow-300,
+  .bg-yellow-400 {
+    background-color: var(--brand-secondary) !important;
+  }
+  .hover\:bg-gold:hover,
+  .hover\:bg-yellow-300:hover,
+  .hover\:bg-yellow-400:hover {
+    background-color: var(--brand-secondary) !important;
+
   }
 }
 

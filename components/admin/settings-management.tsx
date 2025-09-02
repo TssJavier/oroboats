@@ -44,14 +44,15 @@ export function SettingsManagement() {
     end: "",
   })
   const [bookingAdvanceDays, setBookingAdvanceDays] = useState(30)
-  const defaultBranding = {
-    companyName: "OroBoats",
-    logoUrl: "/assets/negro.png",
-    primaryColor: "#000000",
-    secondaryColor: "#FFD700",
-    backgroundColor: "#FFFFFF",
-    tagline: "",
-  }
+    const defaultBranding = {
+      companyName: "OroBoats",
+      logoUrl: "/assets/negro.png",
+      primaryColor: "#000000",
+      secondaryColor: "#FFD700",
+      backgroundColor: "#FFFFFF",
+      loadingBackgroundColor: "#FFFFFF",
+      tagline: "",
+    }
   const [branding, setBranding] = useState({ ...defaultBranding })
 
 
@@ -99,6 +100,9 @@ export function SettingsManagement() {
           case "background_color":
             setBranding((b) => ({ ...b, backgroundColor: String(setting.value) }))
             break
+          case "loading_background_color":
+            setBranding((b) => ({ ...b, loadingBackgroundColor: String(setting.value) }))
+            break
 
           case "tagline":
             setBranding((b) => ({ ...b, tagline: String(setting.value) }))
@@ -130,21 +134,29 @@ export function SettingsManagement() {
   const handleSaveBranding = async () => {
     await saveSetting("company_name", branding.companyName, "Nombre de la empresa")
     await saveSetting("logo_url", branding.logoUrl, "URL del logo")
-    await saveSetting("primary_color", branding.primaryColor, "Color primario")
-    await saveSetting("secondary_color", branding.secondaryColor, "Color secundario")
-    await saveSetting("background_color", branding.backgroundColor, "Color de fondo")
-    await saveSetting("tagline", branding.tagline, "Eslogan de la empresa")
-  }
+      await saveSetting("primary_color", branding.primaryColor, "Color primario")
+      await saveSetting("secondary_color", branding.secondaryColor, "Color secundario")
+      await saveSetting("background_color", branding.backgroundColor, "Color de fondo")
+      await saveSetting("loading_background_color", branding.loadingBackgroundColor, "Color de fondo de carga")
+      await saveSetting("tagline", branding.tagline, "Eslogan de la empresa")
+    }
+
 
   const handleResetBranding = async () => {
     setBranding({ ...defaultBranding })
     await saveSetting("company_name", defaultBranding.companyName, "Nombre de la empresa")
     await saveSetting("logo_url", defaultBranding.logoUrl, "URL del logo")
-    await saveSetting("primary_color", defaultBranding.primaryColor, "Color primario")
-    await saveSetting("secondary_color", defaultBranding.secondaryColor, "Color secundario")
-    await saveSetting("background_color", defaultBranding.backgroundColor, "Color de fondo")
-    await saveSetting("tagline", defaultBranding.tagline, "Eslogan de la empresa")
-  }
+      await saveSetting("primary_color", defaultBranding.primaryColor, "Color primario")
+      await saveSetting("secondary_color", defaultBranding.secondaryColor, "Color secundario")
+      await saveSetting("background_color", defaultBranding.backgroundColor, "Color de fondo")
+      await saveSetting(
+        "loading_background_color",
+        defaultBranding.loadingBackgroundColor,
+        "Color de fondo de carga",
+      )
+      await saveSetting("tagline", defaultBranding.tagline, "Eslogan de la empresa")
+    }
+
 
   const handleSaveContactInfo = () => {
     saveSetting("contact_info", contactInfo, "Información de contacto del negocio")
@@ -210,39 +222,51 @@ export function SettingsManagement() {
                 value={branding.logoUrl}
                 onChange={(url) => setBranding({ ...branding, logoUrl: url })}
                 vehicleType="boat"
-
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Color Primario</label>
-                <Input
-                  type="color"
-                  value={branding.primaryColor}
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="bg-gray-50 border-gray-200"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Color Botón 1</label>
+                  <Input
+                    type="color"
+                    value={branding.primaryColor}
+                    onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Color Botón 2</label>
+                  <Input
+                    type="color"
+                    value={branding.secondaryColor}
+                    onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Color de Botones</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Background 1</label>
+                  <Input
+                    type="color"
+                    value={branding.loadingBackgroundColor}
+                    onChange={(e) =>
+                      setBranding({ ...branding, loadingBackgroundColor: e.target.value })
+                    }
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Background 2</label>
+                  <Input
+                    type="color"
+                    value={branding.backgroundColor}
+                    onChange={(e) => setBranding({ ...branding, backgroundColor: e.target.value })}
+                    className="bg-gray-50 border-gray-200"
+                  />
+                </div>
+              </div>
 
-                <Input
-                  type="color"
-                  value={branding.secondaryColor}
-                  onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
-                  className="bg-gray-50 border-gray-200"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Color de Fondo</label>
-              <Input
-                type="color"
-                value={branding.backgroundColor}
-                onChange={(e) => setBranding({ ...branding, backgroundColor: e.target.value })}
-                className="bg-gray-50 border-gray-200"
-              />
-            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Eslogan</label>
               <Textarea
@@ -252,24 +276,25 @@ export function SettingsManagement() {
                 className="bg-gray-50 border-gray-200"
               />
             </div>
-            <div className="space-y-2">
-              <Button
-                onClick={handleSaveBranding}
-                disabled={saving}
-                className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? "Guardando..." : "Guardar Branding"}
-              </Button>
-              <Button
-                type="button"
-                onClick={handleResetBranding}
-                className="w-full border-gray-300 hover:border-gold hover:bg-gold/10 text-black"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Restablecer de Fábrica
-              </Button>
-            </div>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleSaveBranding}
+                  disabled={saving}
+                  className="w-full btn-primary transition-all duration-300"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Guardando..." : "Guardar Branding"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleResetBranding}
+                  className="w-full border-gray-300 hover:border-gold hover:bg-gold/10 text-black"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Restablecer de Fábrica
+                </Button>
+              </div>
+
           </CardContent>
         </Card>
 
@@ -317,7 +342,7 @@ export function SettingsManagement() {
             <Button
               onClick={handleSaveContactInfo}
               disabled={saving}
-              className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
+              className="w-full btn-primary transition-all duration-300"
             >
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Guardando..." : "Guardar Contacto"}
@@ -366,7 +391,7 @@ export function SettingsManagement() {
             <Button
               onClick={handleSaveBusinessHours}
               disabled={saving}
-              className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
+              className="w-full btn-primary transition-all duration-300"
             >
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Guardando..." : "Guardar Horarios"}
@@ -403,7 +428,7 @@ export function SettingsManagement() {
             <Button
               onClick={handleSaveBookingAdvance}
               disabled={saving}
-              className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
+              className="w-full btn-primary transition-all duration-300"
             >
               <Save className="h-4 w-4 mr-2" />
               {saving ? "Guardando..." : "Guardar Configuración"}

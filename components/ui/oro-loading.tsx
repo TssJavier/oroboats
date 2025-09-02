@@ -1,6 +1,8 @@
 "use client"
 
 import Image from "next/image"
+import { useState } from "react"
+
 import { useApp } from "@/components/providers"
 
 interface OroLoadingProps {
@@ -15,7 +17,8 @@ export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProp
 
   // Aseguramos que el componente ocupe toda la pantalla y tenga la máxima prioridad de z-index
   const containerClasses = fullScreen
-    ? "fixed inset-0 bg-[var(--brand-background)] bg-opacity-95 backdrop-blur-sm z-[99999] flex items-center justify-center"
+    ? "fixed inset-0 bg-[var(--brand-loading-background)] bg-opacity-95 backdrop-blur-sm z-[99999] flex items-center justify-center"
+
     : "flex items-center justify-center p-8"
 
   return (
