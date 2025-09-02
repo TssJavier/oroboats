@@ -56,6 +56,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         setSettings(map)
         document.documentElement.style.setProperty("--brand-primary", map.primary_color || "#000000")
         document.documentElement.style.setProperty("--brand-secondary", map.secondary_color || "#FFD700")
+        document.documentElement.style.setProperty("--brand-background", map.background_color || "#FFFFFF")
+        document.body.style.backgroundColor = map.background_color || "#FFFFFF"
+
       })
       .catch((err) => console.error("Error fetching settings:", err))
   }, [])

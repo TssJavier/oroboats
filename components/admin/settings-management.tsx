@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Save, Phone, MapPin, Clock, Calendar, Palette } from "lucide-react"
+import { ImageUpload } from "@/components/admin/image-upload"
+import { Save, Phone, MapPin, Clock, Calendar, Palette, RotateCcw } from "lucide-react"
+
 
 interface Setting {
   id: number
@@ -42,13 +44,16 @@ export function SettingsManagement() {
     end: "",
   })
   const [bookingAdvanceDays, setBookingAdvanceDays] = useState(30)
-  const [branding, setBranding] = useState({
-    companyName: "",
-    logoUrl: "",
+  const defaultBranding = {
+    companyName: "OroBoats",
+    logoUrl: "/assets/negro.png",
     primaryColor: "#000000",
     secondaryColor: "#FFD700",
+    backgroundColor: "#FFFFFF",
     tagline: "",
-  })
+  }
+  const [branding, setBranding] = useState({ ...defaultBranding })
+
 
   useEffect(() => {
     fetchSettings()
@@ -91,6 +96,10 @@ export function SettingsManagement() {
           case "secondary_color":
             setBranding((b) => ({ ...b, secondaryColor: String(setting.value) }))
             break
+          case "background_color":
+            setBranding((b) => ({ ...b, backgroundColor: String(setting.value) }))
+            break
+
           case "tagline":
             setBranding((b) => ({ ...b, tagline: String(setting.value) }))
             break
@@ -123,7 +132,18 @@ export function SettingsManagement() {
     await saveSetting("logo_url", branding.logoUrl, "URL del logo")
     await saveSetting("primary_color", branding.primaryColor, "Color primario")
     await saveSetting("secondary_color", branding.secondaryColor, "Color secundario")
+    await saveSetting("background_color", branding.backgroundColor, "Color de fondo")
     await saveSetting("tagline", branding.tagline, "Eslogan de la empresa")
+  }
+
+  const handleResetBranding = async () => {
+    setBranding({ ...defaultBranding })
+    await saveSetting("company_name", defaultBranding.companyName, "Nombre de la empresa")
+    await saveSetting("logo_url", defaultBranding.logoUrl, "URL del logo")
+    await saveSetting("primary_color", defaultBranding.primaryColor, "Color primario")
+    await saveSetting("secondary_color", defaultBranding.secondaryColor, "Color secundario")
+    await saveSetting("background_color", defaultBranding.backgroundColor, "Color de fondo")
+    await saveSetting("tagline", defaultBranding.tagline, "Eslogan de la empresa")
   }
 
   const handleSaveContactInfo = () => {
@@ -185,11 +205,12 @@ export function SettingsManagement() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">URL del Logo</label>
-              <Input
+              <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+              <ImageUpload
                 value={branding.logoUrl}
-                onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })}
-                className="bg-gray-50 border-gray-200"
+                onChange={(url) => setBranding({ ...branding, logoUrl: url })}
+                vehicleType="boat"
+
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -203,7 +224,8 @@ export function SettingsManagement() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Color Secundario</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Color de Botones</label>
+
                 <Input
                   type="color"
                   value={branding.secondaryColor}
@@ -211,6 +233,15 @@ export function SettingsManagement() {
                   className="bg-gray-50 border-gray-200"
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Color de Fondo</label>
+              <Input
+                type="color"
+                value={branding.backgroundColor}
+                onChange={(e) => setBranding({ ...branding, backgroundColor: e.target.value })}
+                className="bg-gray-50 border-gray-200"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Eslogan</label>
@@ -221,14 +252,24 @@ export function SettingsManagement() {
                 className="bg-gray-50 border-gray-200"
               />
             </div>
-            <Button
-              onClick={handleSaveBranding}
-              disabled={saving}
-              className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Guardando..." : "Guardar Branding"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={handleSaveBranding}
+                disabled={saving}
+                className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Guardando..." : "Guardar Branding"}
+              </Button>
+              <Button
+                type="button"
+                onClick={handleResetBranding}
+                className="w-full border-gray-300 hover:border-gold hover:bg-gold/10 text-black"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restablecer de Fábrica
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

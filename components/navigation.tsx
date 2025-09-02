@@ -68,7 +68,9 @@ export function Navigation() {
   return (
     <nav
       className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm" : "bg-white"
+        scrolled
+          ? "bg-[color:var(--brand-background)/0.95] backdrop-blur-md border-b border-gray-200 shadow-sm"
+          : "bg-[var(--brand-background)]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -117,7 +119,7 @@ export function Navigation() {
                   {language.toUpperCase()}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-white border-gray-200">
+              <DropdownMenuContent className="bg-[var(--brand-background)] border-gray-200">
                 <DropdownMenuItem onClick={() => setLanguage("es")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                   Español
                 </DropdownMenuItem>
@@ -143,7 +145,7 @@ export function Navigation() {
 
         {/* Mobile Navigation */}
         {isOpen && (
-          <div className="md:hidden bg-white border-t border-gray-200">
+          <div className="md:hidden bg-[var(--brand-background)] border-t border-gray-200">
             <div className="px-2 pt-2 pb-3 space-y-1">
               <button
                 onClick={() => handleNavigation("/")}
@@ -178,7 +180,8 @@ export function Navigation() {
                     {language.toUpperCase()}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-white border-gray-200">
+                <DropdownMenuContent className="bg-[var(--brand-background)] border-gray-200">
+
                     <DropdownMenuItem onClick={() => setLanguage("es")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                       Español
                     </DropdownMenuItem>
