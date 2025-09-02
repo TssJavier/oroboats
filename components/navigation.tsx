@@ -24,10 +24,13 @@ const translations = {
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const { language, setLanguage } = useApp()
+  const { language, setLanguage, settings } = useApp()
   const { isLoading, startLoading, stopLoading } = useNavigationLoading()
   const router = useRouter()
   const t = translations[language]
+
+  const logoSrc = settings.logo_url || "/assets/negro.png"
+  const companyName = settings.company_name || "OroBoats"
 
   useEffect(() => {
     const handleScroll = () => {
@@ -65,7 +68,9 @@ export function Navigation() {
   return (
     <nav
       className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? "bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm" : "bg-white"
+        scrolled
+          ? "bg-[color:var(--brand-background)/0.95] backdrop-blur-md border-b border-gray-200 shadow-sm"
+          : "bg-[var(--brand-background)]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,8 +79,8 @@ export function Navigation() {
           <button onClick={handleLogoClick} className="flex items-center group cursor-pointer">
             <div className="relative h-8 w-auto flex items-center">
               <Image
-                src="/assets/negro.png"
-                alt="OroBoats Logo"
+                src={logoSrc}
+                alt={`${companyName} Logo`}
                 width={80}
                 height={32}
                 className="object-contain group-hover:scale-105 transition-transform duration-300"
@@ -88,20 +93,20 @@ export function Navigation() {
           <div className="hidden md:flex items-center space-x-8">
             <button
               onClick={() => handleNavigation("/")}
-              className="text-black hover:text-gold transition-colors duration-300 font-medium"
+              className="text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] transition-colors duration-300 font-medium"
             >
               {t.home}
             </button>
             <button
               onClick={() => handleNavigation("/boats")}
-              className="text-black hover:text-gold transition-colors duration-300 font-medium"
+              className="text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] transition-colors duration-300 font-medium"
             >
               {t.boats}
             </button>
             {/* ✅ NUEVO: Enlace al Blog */}
             <button
               onClick={() => handleNavigation("/blog")}
-              className="text-black hover:text-gold transition-colors duration-300 font-medium"
+              className="text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] transition-colors duration-300 font-medium"
             >
               {t.blog}
             </button>
@@ -109,16 +114,16 @@ export function Navigation() {
             {/* Language Selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-black hover:text-gold hover:bg-gray-50">
+                <Button variant="ghost" size="sm" className="text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] hover:bg-gray-50">
                   <Globe className="h-4 w-4 mr-2" />
                   {language.toUpperCase()}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-white border-gray-200">
-                <DropdownMenuItem onClick={() => setLanguage("es")} className="text-black hover:bg-gray-50">
+              <DropdownMenuContent className="bg-[var(--brand-background)] border-gray-200">
+                <DropdownMenuItem onClick={() => setLanguage("es")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                   Español
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLanguage("en")} className="text-black hover:bg-gray-50">
+                <DropdownMenuItem onClick={() => setLanguage("en")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                   English
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -127,7 +132,12 @@ export function Navigation() {
 
           {/* Mobile menu button */}
           <div className="md:hidden">
-            <Button variant="ghost" size="sm" onClick={() => setIsOpen(!isOpen)} className="text-black hover:text-gold">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-[var(--brand-primary)] hover:text-[var(--brand-secondary)]"
+            >
               {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
           </div>
@@ -135,24 +145,24 @@ export function Navigation() {
 
         {/* Mobile Navigation */}
         {isOpen && (
-          <div className="md:hidden bg-white border-t border-gray-200">
+          <div className="md:hidden bg-[var(--brand-background)] border-t border-gray-200">
             <div className="px-2 pt-2 pb-3 space-y-1">
               <button
                 onClick={() => handleNavigation("/")}
-                className="block w-full text-left px-3 py-2 text-black hover:text-gold transition-colors"
+                className="block w-full text-left px-3 py-2 text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] transition-colors"
               >
                 {t.home}
               </button>
               <button
                 onClick={() => handleNavigation("/boats")}
-                className="block w-full text-left px-3 py-2 text-black hover:text-gold transition-colors"
+                className="block w-full text-left px-3 py-2 text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] transition-colors"
               >
                 {t.boats}
               </button>
               {/* ✅ NUEVO: Enlace al Blog en móvil */}
               <button
                 onClick={() => handleNavigation("/blog")}
-                className="block w-full text-left px-3 py-2 text-black hover:text-gold transition-colors"
+                className="block w-full text-left px-3 py-2 text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] transition-colors"
               >
                 {t.blog}
               </button>
@@ -164,21 +174,21 @@ export function Navigation() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-black hover:text-gold hover:bg-gray-50 w-full justify-start"
-                    >
-                      <Globe className="h-4 w-4 mr-2" />
-                      {language.toUpperCase()}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-white border-gray-200">
-                    <DropdownMenuItem onClick={() => setLanguage("es")} className="text-black hover:bg-gray-50">
+                    className="text-[var(--brand-primary)] hover:text-[var(--brand-secondary)] hover:bg-gray-50 w-full justify-start"
+                  >
+                    <Globe className="h-4 w-4 mr-2" />
+                    {language.toUpperCase()}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-[var(--brand-background)] border-gray-200">
+                    <DropdownMenuItem onClick={() => setLanguage("es")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                       Español
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setLanguage("en")} className="text-black hover:bg-gray-50">
+                    <DropdownMenuItem onClick={() => setLanguage("en")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                       English
                     </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
               </div>
             </div>
           </div>
