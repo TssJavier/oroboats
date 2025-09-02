@@ -47,8 +47,11 @@ const translations = {
 }
 
 export function ContactSection() {
-  const { language } = useApp()
+  const { language, settings } = useApp()
   const t = translations[language]
+  const contactPhone = settings.contact_phone || "+34 655 52 79 88"
+  const contactEmail = settings.contact_email || "info@oroboats.com"
+  const contactWhatsapp = settings.contact_whatsapp || "+34 643 44 23 64"
 
   const [formData, setFormData] = useState({
     name: "",
@@ -116,7 +119,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">{t.phone}</p>
-                  <p className="text-black text-lg font-medium">+34 655 52 79 88</p>
+                  <p className="text-black text-lg font-medium">{contactPhone}</p>
                 </div>
               </div>
 
@@ -126,7 +129,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">{t.emailLabel}</p>
-                  <p className="text-black text-lg font-medium">info@oroboats.com</p>
+                  <p className="text-black text-lg font-medium">{contactEmail}</p>
                 </div>
               </div>
 
@@ -136,7 +139,7 @@ export function ContactSection() {
                 </div>
                 <div>
                   <p className="text-gray-500 text-sm">{t.whatsapp}</p>
-                  <p className="text-black text-lg font-medium">+34 643 44 23 64</p>
+                  <p className="text-black text-lg font-medium">{contactWhatsapp}</p>
                 </div>
               </div>
             </CardContent>
