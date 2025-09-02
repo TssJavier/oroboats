@@ -14,6 +14,9 @@ import { Switch } from "@/components/ui/switch"
 import { PlusCircle, Trash2, Search, Edit, Eye, Star, Calendar, Clock, FileText, Save, X } from "lucide-react"
 import type { BlogPost, NewBlogPost } from "@/lib/db/schema"
 
+const getRandomImage = () =>
+  `https://source.unsplash.com/random/800x600/?boat,beach,summer&sig=${Math.random()}`
+
 type BlogManagementProps = {}
 
 export function BlogManagement({}: BlogManagementProps) {
@@ -30,7 +33,7 @@ export function BlogManagement({}: BlogManagementProps) {
     title: "",
     excerpt: "",
     content: "",
-    featuredImage: "",
+    featuredImage: getRandomImage(),
     language: "es",
     isFeatured: false,
     isPublished: false,
@@ -121,7 +124,7 @@ export function BlogManagement({}: BlogManagementProps) {
       title: post.title,
       excerpt: post.excerpt,
       content: post.content,
-      featuredImage: post.featuredImage || "",
+      featuredImage: post.featuredImage || getRandomImage(),
       language: post.language,
       isFeatured: post.isFeatured,
       isPublished: post.isPublished,
@@ -139,7 +142,7 @@ export function BlogManagement({}: BlogManagementProps) {
       title: "",
       excerpt: "",
       content: "",
-      featuredImage: "",
+      featuredImage: getRandomImage(),
       language: "es",
       isFeatured: false,
       isPublished: false,
@@ -261,12 +264,21 @@ export function BlogManagement({}: BlogManagementProps) {
 
               <div>
                 <Label htmlFor="featuredImage">Imagen Destacada (URL)</Label>
-                <Input
-                  id="featuredImage"
-                  value={formData.featuredImage || ""}
-                  onChange={(e) => setFormData({ ...formData, featuredImage: e.target.value })}
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="featuredImage"
+                    value={formData.featuredImage || ""}
+                    onChange={(e) => setFormData({ ...formData, featuredImage: e.target.value })}
+                    placeholder="https://ejemplo.com/imagen.jpg"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setFormData({ ...formData, featuredImage: getRandomImage() })}
+                  >
+                    Aleatoria
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
