@@ -285,12 +285,15 @@ export async function getSetting(key: string) {
 }
 
 export async function updateSetting(key: string, value: unknown, description?: string) {
+  const serialized =
+    typeof value === "string" ? value : value === undefined ? "" : JSON.stringify(value)
+
   return await db
     .insert(settings)
-    .values({ key, value: value === undefined ? "" : String(value), description })
+    .values({ key, value: serialized, description })
     .onConflictDoUpdate({
       target: settings.key,
-      set: { value: value === undefined ? "" : String(value), updatedAt: new Date() },
+      set: { value: serialized, updatedAt: new Date() },
     })
 }
 

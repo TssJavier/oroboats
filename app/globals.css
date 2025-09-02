@@ -24,6 +24,9 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+    --brand-primary: #000000;
+    --brand-secondary: #FFD700;
+    --brand-background: #FFFFFF;
   }
 
   .dark {
@@ -54,7 +57,7 @@
     border-color: hsl(var(--border));
   }
   body {
-    background-color: hsl(var(--background));
+    background-color: var(--brand-background);
     color: hsl(var(--foreground));
   }
 }
@@ -65,27 +68,27 @@
   }
 
   .text-gold {
-    color: #ffd700;
+    color: var(--brand-secondary);
   }
 
   .bg-gold {
-    background-color: #ffd700;
+    background-color: var(--brand-secondary);
   }
 
   .border-gold {
-    border-color: #ffd700;
+    border-color: var(--brand-secondary);
   }
 
   .from-gold {
-    --tw-gradient-from: #ffd700;
+    --tw-gradient-from: var(--brand-secondary);
   }
 
   .to-gold {
-    --tw-gradient-to: #ffd700;
+    --tw-gradient-to: var(--brand-secondary);
   }
 
   .shadow-gold {
-    --tw-shadow-color: #ffd700;
+    --tw-shadow-color: var(--brand-secondary);
   }
 }
 

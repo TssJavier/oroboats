@@ -39,10 +39,16 @@ const translations = {
 }
 
 export function Footer() {
-  const { language } = useApp()
+  const { language, settings } = useApp()
   const t = translations[language]
   const router = useRouter()
   const { isLoading, startLoading, stopLoading } = useNavigationLoading()
+
+  const companyName = settings.company_name || "OroBoats"
+  const logoSrc = settings.logo_url || "/assets/logo.png"
+  const tagline = settings.tagline || t.tagline
+  const contactEmail = settings.contact_email || "info@oroboats.com"
+  const contactPhone = settings.contact_phone || "+34 655 52 79 88"
 
   const handleNavigation = (path: string) => {
     startLoading()
@@ -57,26 +63,24 @@ export function Footer() {
   }
 
   return (
-    <footer className="bg-black text-white">
+    <footer className="bg-[var(--brand-primary)] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               {/* ✅ CAMBIO: Usar imagen en lugar del icono Ship */}
-              <Image src="/assets/logo.png" alt="OroBoats Logo" width={24} height={24} className="h-12 w-12" />
-              <span className="text-2xl font-bold">
-                Oro<span className="text-gold">Boats</span>
-              </span>
+              <Image src={logoSrc} alt={`${companyName} Logo`} width={24} height={24} className="h-12 w-12" />
+              <span className="text-2xl font-bold">{companyName}</span>
             </div>
-            <p className="text-gray-400 mb-6 max-w-md">{t.tagline}</p>
+            <p className="text-gray-400 mb-6 max-w-md">{tagline}</p>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
-                <Mail className="h-5 w-5 text-gold" />
-                <span className="text-gray-300">info@oroboats.com</span>
+                <Mail className="h-5 w-5 text-[var(--brand-secondary)]" />
+                <span className="text-gray-300">{contactEmail}</span>
               </div>
               <div className="flex items-center space-x-3">
-                <Phone className="h-5 w-5 text-gold" />
-                <span className="text-gray-300">+34 655 52 79 88</span>
+                <Phone className="h-5 w-5 text-[var(--brand-secondary)]" />
+                <span className="text-gray-300">{contactPhone}</span>
               </div>
             </div>
           </div>
@@ -87,7 +91,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/about")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.about}
                 </button>
@@ -95,7 +99,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/contact")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.contact}
                 </button>
@@ -103,7 +107,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/privacy")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.privacy}
                 </button>
@@ -111,7 +115,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/terms")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.terms}
                 </button>
@@ -125,7 +129,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/boats?type=boats")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.boats}
                 </button>
@@ -133,7 +137,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/boats?type=jetskis")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.jetskis}
                 </button>
@@ -141,7 +145,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/fiestas")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.parties}
                 </button>
@@ -149,7 +153,7 @@ export function Footer() {
               <li>
                 <button
                   onClick={() => handleNavigation("/boats")}
-                  className="text-gray-400 hover:text-gold transition-colors duration-300 text-left"
+                  className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300 text-left"
                 >
                   {t.booking}
                 </button>
@@ -161,20 +165,20 @@ export function Footer() {
         <div className="border-t border-gray-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 mb-4 md:mb-0">
-              © {new Date().getFullYear()} OroBoats. {t.rights}
+              © {new Date().getFullYear()} {companyName}. {t.rights}
             </p>
 
             <div className="flex items-center space-x-6">
               <span className="text-gray-400 font-medium mr-4">{t.follow}</span>
               <a
                 href="https://www.facebook.com/oroboats/"
-                className="text-gray-400 hover:text-gold transition-colors duration-300"
+                className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300"
               >
                 <Facebook className="h-5 w-5" />
               </a>
               <a
                 href="https://www.instagram.com/oroboats"
-                className="text-gray-400 hover:text-gold transition-colors duration-300"
+                className="text-gray-400 hover:text-[var(--brand-secondary)] transition-colors duration-300"
               >
                 <Instagram className="h-5 w-5" />
               </a>

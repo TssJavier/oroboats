@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import Image from "next/image"
+import { useApp } from "@/components/providers"
 
 interface OroLoadingProps {
   fullScreen?: boolean
@@ -9,9 +9,13 @@ interface OroLoadingProps {
 }
 
 export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProps) {
+  const { settings } = useApp()
+  const logoSrc = settings.logo_url || "/assets/negro.png"
+  const companyName = settings.company_name || "OroBoats"
+
   // Aseguramos que el componente ocupe toda la pantalla y tenga la máxima prioridad de z-index
   const containerClasses = fullScreen
-    ? "fixed inset-0 bg-white bg-opacity-95 backdrop-blur-sm z-[99999] flex items-center justify-center"
+    ? "fixed inset-0 bg-[var(--brand-background)] bg-opacity-95 backdrop-blur-sm z-[99999] flex items-center justify-center"
     : "flex items-center justify-center p-8"
 
   return (
@@ -31,7 +35,7 @@ export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProp
               cy="50"
               r="48"
               fill="none"
-              stroke="#d4af37"
+              stroke="var(--brand-secondary)"
               strokeWidth="3"
               strokeLinecap="round"
               strokeDasharray="301.6"
@@ -46,7 +50,7 @@ export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProp
               cy="50"
               r="48"
               fill="none"
-              stroke="#f4d03f"
+              stroke="var(--brand-secondary)"
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeDasharray="301.6"
@@ -68,15 +72,15 @@ export function OroLoading({ fullScreen = true, className = "" }: OroLoadingProp
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative w-32 h-32 animate-float-logo">
               <Image
-                src="/assets/negro.png"
-                alt="OroBoats Logo"
+                src={logoSrc}
+                alt={`${companyName} Logo`}
                 fill
                 className="object-contain drop-shadow-lg"
                 priority
               />
 
               {/* Efecto de brillo sutil alrededor del logo */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gold/10 to-transparent animate-shimmer"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[color:var(--brand-secondary)]/10 to-transparent animate-shimmer"></div>
             </div>
           </div>
         </div>
