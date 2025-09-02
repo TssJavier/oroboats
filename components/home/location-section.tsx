@@ -83,10 +83,10 @@ export function LocationSection() {
             </div>
           </div>
 
-          {/* ✅ IMAGEN ESTÁTICA CLICKEABLE */}
-          <div className="relative">
+          {/* ✅ IMAGEN ESTÁTICA CLICKEABLE EN LUGAR DEL IFRAME */}
+          <div className="mt-8">
             <div
-              className="h-96 rounded-lg border border-gray-200 overflow-hidden shadow-sm cursor-pointer group relative"
+              className="aspect-video rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer group relative"
               onClick={openInGoogleMaps}
             >
               <Image
