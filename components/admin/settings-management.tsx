@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ImageUpload } from "@/components/admin/image-upload"
 import { Save, Phone, MapPin, Clock, Calendar, Palette, RotateCcw } from "lucide-react"
 
+
 interface Setting {
   id: number
   key: string
@@ -53,6 +54,7 @@ export function SettingsManagement() {
   }
   const [branding, setBranding] = useState({ ...defaultBranding })
 
+
   useEffect(() => {
     fetchSettings()
   }, [])
@@ -97,6 +99,7 @@ export function SettingsManagement() {
           case "background_color":
             setBranding((b) => ({ ...b, backgroundColor: String(setting.value) }))
             break
+
           case "tagline":
             setBranding((b) => ({ ...b, tagline: String(setting.value) }))
             break
@@ -207,6 +210,7 @@ export function SettingsManagement() {
                 value={branding.logoUrl}
                 onChange={(url) => setBranding({ ...branding, logoUrl: url })}
                 vehicleType="boat"
+
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -221,6 +225,7 @@ export function SettingsManagement() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Color de Botones</label>
+
                 <Input
                   type="color"
                   value={branding.secondaryColor}
