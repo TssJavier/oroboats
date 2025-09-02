@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Save, Phone, MapPin, Clock, Calendar } from "lucide-react"
+import { Save, Phone, MapPin, Clock, Calendar, Palette } from "lucide-react"
 
 interface Setting {
   id: number
@@ -42,6 +42,13 @@ export function SettingsManagement() {
     end: "",
   })
   const [bookingAdvanceDays, setBookingAdvanceDays] = useState(30)
+  const [branding, setBranding] = useState({
+    companyName: "",
+    logoUrl: "",
+    primaryColor: "#000000",
+    secondaryColor: "#FFD700",
+    tagline: "",
+  })
 
   useEffect(() => {
     fetchSettings()
@@ -56,13 +63,36 @@ export function SettingsManagement() {
       data.forEach((setting: Setting) => {
         switch (setting.key) {
           case "contact_info":
-            setContactInfo(setting.value as ContactInfo)
+            try {
+              setContactInfo(JSON.parse(setting.value as string))
+            } catch {
+              /* ignore */
+            }
             break
           case "business_hours":
-            setBusinessHours(setting.value as BusinessHours)
+            try {
+              setBusinessHours(JSON.parse(setting.value as string))
+            } catch {
+              /* ignore */
+            }
             break
           case "booking_advance_days":
-            setBookingAdvanceDays(setting.value as number)
+            setBookingAdvanceDays(Number(setting.value))
+            break
+          case "company_name":
+            setBranding((b) => ({ ...b, companyName: String(setting.value) }))
+            break
+          case "logo_url":
+            setBranding((b) => ({ ...b, logoUrl: String(setting.value) }))
+            break
+          case "primary_color":
+            setBranding((b) => ({ ...b, primaryColor: String(setting.value) }))
+            break
+          case "secondary_color":
+            setBranding((b) => ({ ...b, secondaryColor: String(setting.value) }))
+            break
+          case "tagline":
+            setBranding((b) => ({ ...b, tagline: String(setting.value) }))
             break
         }
       })
@@ -86,6 +116,14 @@ export function SettingsManagement() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSaveBranding = async () => {
+    await saveSetting("company_name", branding.companyName, "Nombre de la empresa")
+    await saveSetting("logo_url", branding.logoUrl, "URL del logo")
+    await saveSetting("primary_color", branding.primaryColor, "Color primario")
+    await saveSetting("secondary_color", branding.secondaryColor, "Color secundario")
+    await saveSetting("tagline", branding.tagline, "Eslogan de la empresa")
   }
 
   const handleSaveContactInfo = () => {
@@ -129,6 +167,71 @@ export function SettingsManagement() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="bg-white border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-black flex items-center">
+              <Palette className="h-5 w-5 text-gold mr-3" />
+              Branding y Apariencia
+            </CardTitle>
+            <CardDescription>Personaliza la marca y los colores del sitio</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nombre de la Empresa</label>
+              <Input
+                value={branding.companyName}
+                onChange={(e) => setBranding({ ...branding, companyName: e.target.value })}
+                className="bg-gray-50 border-gray-200"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">URL del Logo</label>
+              <Input
+                value={branding.logoUrl}
+                onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })}
+                className="bg-gray-50 border-gray-200"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Color Primario</label>
+                <Input
+                  type="color"
+                  value={branding.primaryColor}
+                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
+                  className="bg-gray-50 border-gray-200"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Color Secundario</label>
+                <Input
+                  type="color"
+                  value={branding.secondaryColor}
+                  onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
+                  className="bg-gray-50 border-gray-200"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Eslogan</label>
+              <Textarea
+                value={branding.tagline}
+                onChange={(e) => setBranding({ ...branding, tagline: e.target.value })}
+                rows={2}
+                className="bg-gray-50 border-gray-200"
+              />
+            </div>
+            <Button
+              onClick={handleSaveBranding}
+              disabled={saving}
+              className="w-full bg-black text-white hover:bg-gold hover:text-black transition-all duration-300"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Guardando..." : "Guardar Branding"}
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card className="bg-white border border-gray-200">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-black flex items-center">
