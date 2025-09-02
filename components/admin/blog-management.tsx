@@ -15,7 +15,7 @@ import { PlusCircle, Trash2, Search, Edit, Eye, Star, Calendar, Clock, FileText,
 import type { BlogPost, NewBlogPost } from "@/lib/db/schema"
 
 const getRandomImage = () =>
-  `https://source.unsplash.com/random/800x600/?boat,beach,summer&sig=${Math.random()}`
+  `https://loremflickr.com/800/600/boat,beach,summer?random=${Math.random()}`
 
 type BlogManagementProps = {}
 
