@@ -21,6 +21,8 @@ interface ContactInfo {
   phone: string
   email: string
   address: string
+  city: string
+  whatsapp: string
 }
 
 interface BusinessHours {
@@ -38,6 +40,8 @@ export function SettingsManagement() {
     phone: "",
     email: "",
     address: "",
+    city: "",
+    whatsapp: "",
   })
   const [businessHours, setBusinessHours] = useState<BusinessHours>({
     start: "",
@@ -70,7 +74,8 @@ export function SettingsManagement() {
         switch (setting.key) {
           case "contact_info":
             try {
-              setContactInfo(JSON.parse(setting.value as string))
+              const parsed = JSON.parse(setting.value as string)
+              setContactInfo((prev) => ({ ...prev, ...parsed }))
             } catch {
               /* ignore */
             }
@@ -329,12 +334,32 @@ export function SettingsManagement() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp</label>
+              <Input
+                value={contactInfo.whatsapp}
+                onChange={(e) => setContactInfo({ ...contactInfo, whatsapp: e.target.value })}
+                placeholder="+34 123 456 789"
+                className="bg-gray-50 border-gray-200"
+              />
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
               <Textarea
                 value={contactInfo.address}
                 onChange={(e) => setContactInfo({ ...contactInfo, address: e.target.value })}
                 placeholder="Puerto Marina Valencia, Muelle VIP 15"
                 rows={3}
+                className="bg-gray-50 border-gray-200"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ciudad</label>
+              <Input
+                value={contactInfo.city}
+                onChange={(e) => setContactInfo({ ...contactInfo, city: e.target.value })}
+                placeholder="La Herradura, Granada"
                 className="bg-gray-50 border-gray-200"
               />
             </div>

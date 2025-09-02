@@ -28,8 +28,11 @@ const translations = {
 }
 
 export function LocationSection() {
-  const { language } = useApp()
+  const { language, settings } = useApp()
   const t = translations[language]
+  const address = settings.contact_address || t.address
+  const city = settings.contact_city || t.location
+  const phone = settings.contact_phone || t.phone
 
   const openInGoogleMaps = () => {
     window.open(
@@ -54,8 +57,8 @@ export function LocationSection() {
                 <MapPin className="h-6 w-6 text-black" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-black mb-2">{t.address}</h3>
-                <p className="text-gray-600">{t.location}</p>
+                <h3 className="text-xl font-bold text-black mb-2">{address}</h3>
+                <p className="text-gray-600">{city}</p>
               </div>
             </div>
 
@@ -75,25 +78,15 @@ export function LocationSection() {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-black mb-2">Contacto</h3>
-                <p className="text-gray-600">{t.phone}</p>
+                <p className="text-gray-600">{phone}</p>
               </div>
-            </div>
-
-            <div className="pt-4">
-              <button
-                onClick={openInGoogleMaps}
-                className="inline-flex items-center px-6 py-3 bg-gold hover:bg-yellow-500 text-black font-medium rounded-lg transition-colors duration-200"
-              >
-                <ExternalLink className="h-5 w-5 mr-2" />
-                {t.openInMaps}
-              </button>
             </div>
           </div>
 
-          {/* ✅ IMAGEN ESTÁTICA CLICKEABLE */}
-          <div className="relative">
+          {/* ✅ IMAGEN ESTÁTICA CLICKEABLE EN LUGAR DEL IFRAME */}
+          <div className="mt-8">
             <div
-              className="h-96 rounded-lg border border-gray-200 overflow-hidden shadow-sm cursor-pointer group relative"
+              className="aspect-video rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer group relative"
               onClick={openInGoogleMaps}
             >
               <Image

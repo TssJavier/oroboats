@@ -80,8 +80,13 @@ const translations = {
 }
 
 export default function ContactPage() {
-  const { language } = useApp()
+  const { language, settings } = useApp()
   const t = translations[language]
+  const contactPhone = settings.contact_phone || t.info.phone
+  const contactEmail = settings.contact_email || t.info.email
+  const contactWhatsapp = settings.contact_whatsapp || t.info.whatsapp
+  const contactAddress = settings.contact_address || t.info.address
+  const contactCity = settings.contact_city || t.info.city
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -169,7 +174,7 @@ export default function ContactPage() {
                   <Phone className="h-6 w-6 text-gold mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900">{t.phone}</h3>
-                    <p className="text-gray-600">{t.info.phone}</p>
+                    <p className="text-gray-600">{contactPhone}</p>
                   </div>
                 </div>
 
@@ -177,7 +182,7 @@ export default function ContactPage() {
                   <Mail className="h-6 w-6 text-gold mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900">{t.email}</h3>
-                    <p className="text-gray-600">{t.info.email}</p>
+                    <p className="text-gray-600">{contactEmail}</p>
                   </div>
                 </div>
 
@@ -185,7 +190,7 @@ export default function ContactPage() {
                   <MessageCircle className="h-6 w-6 text-gold mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900">{t.whatsapp}</h3>
-                    <p className="text-gray-600">{t.info.whatsapp}</p>
+                    <p className="text-gray-600">{contactWhatsapp}</p>
                   </div>
                 </div>
 
@@ -193,8 +198,8 @@ export default function ContactPage() {
                   <MapPin className="h-6 w-6 text-gold mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900">{t.address}</h3>
-                    <p className="text-gray-600">{t.info.address}</p>
-                    <p className="text-gray-600">{t.info.city}</p>
+                    <p className="text-gray-600">{contactAddress}</p>
+                    <p className="text-gray-600">{contactCity}</p>
                   </div>
                 </div>
 

@@ -646,19 +646,26 @@ function LicenseWarningModal({
 
 // Widget de contacto flotante
 function FloatingContactWidget({ t }: { t: Translations }) {
+  const { settings } = useApp()
   const [isOpen, setIsOpen] = useState(false)
 
+  const contactPhone = settings.contact_phone || "+34 655 52 79 88"
+  const contactWhatsapp = settings.contact_whatsapp || "+34 643 44 23 64"
+  const contactEmail = settings.contact_email || "info@oroboats.com"
+  const cleanPhone = contactPhone.replace(/\s+/g, "")
+  const cleanWhatsapp = contactWhatsapp.replace(/\s+/g, "").replace(/^\+/, "")
+
   const handleCall = () => {
-    window.location.href = "tel:+34655527988"
+    window.location.href = `tel:${cleanPhone}`
   }
 
   const handleWhatsApp = () => {
     const message = encodeURIComponent("Hola, necesito ayuda con el alquiler de embarcaciones")
-    window.open(`https://wa.me/34643442364?text=${message}`, "_blank")
+    window.open(`https://wa.me/${cleanWhatsapp}?text=${message}`, "_blank")
   }
 
   const handleEmail = () => {
-    window.location.href = "mailto:info@oroboats.com"
+    window.location.href = `mailto:${contactEmail}`
   }
 
   return (
@@ -707,7 +714,7 @@ function FloatingContactWidget({ t }: { t: Translations }) {
                 <Phone className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
                 <div className="text-left flex-1">
                   <div className="font-semibold text-sm sm:text-base">{t.call}</div>
-                  <div className="text-xs sm:text-sm opacity-90">+34 655 52 79 88</div>
+                  <div className="text-xs sm:text-sm opacity-90">{contactPhone}</div>
                 </div>
               </button>
               <button
@@ -717,7 +724,7 @@ function FloatingContactWidget({ t }: { t: Translations }) {
                 <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
                 <div className="text-left flex-1">
                   <div className="font-semibold text-sm sm:text-base">{t.whatsapp}</div>
-                  <div className="text-xs sm:text-sm opacity-90">+34 643 44 23 64</div>
+                  <div className="text-xs sm:text-sm opacity-90">{contactWhatsapp}</div>
                 </div>
               </button>
               <button
@@ -727,7 +734,7 @@ function FloatingContactWidget({ t }: { t: Translations }) {
                 <Mail className="h-4 w-4 sm:h-5 sm:w-5 mr-2 sm:mr-3 flex-shrink-0" />
                 <div className="text-left flex-1">
                   <div className="font-semibold text-sm sm:text-base">{t.email}</div>
-                  <div className="text-xs sm:text-sm opacity-90">info@oroboats.com</div>
+                  <div className="text-xs sm:text-sm opacity-90">{contactEmail}</div>
                 </div>
               </button>
             </div>
