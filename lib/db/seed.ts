@@ -142,7 +142,9 @@ async function seed() {
         value: {
           phone: "+34 123 456 789",
           email: "info@oroboats.com",
+          whatsapp: "+34 987 654 321",
           address: "Puerto Marina Valencia, Muelle VIP 15",
+          city: "Valencia, España",
         },
         description: "Información de contacto del negocio",
       },
