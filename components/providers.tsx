@@ -71,6 +71,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           map.loading_background_color || map.background_color || "#FFFFFF",
         )
         document.body.style.backgroundColor = map.background_color || "#FFFFFF"
+
       })
       .catch((err) => console.error("Error fetching settings:", err))
   }, [])

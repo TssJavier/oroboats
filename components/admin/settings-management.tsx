@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ImageUpload } from "@/components/admin/image-upload"
 import { Save, Phone, MapPin, Clock, Calendar, Palette, RotateCcw } from "lucide-react"
 
+
 interface Setting {
   id: number
   key: string
@@ -53,6 +54,7 @@ export function SettingsManagement() {
       tagline: "",
     }
   const [branding, setBranding] = useState({ ...defaultBranding })
+
 
   useEffect(() => {
     fetchSettings()
@@ -101,6 +103,7 @@ export function SettingsManagement() {
           case "loading_background_color":
             setBranding((b) => ({ ...b, loadingBackgroundColor: String(setting.value) }))
             break
+
           case "tagline":
             setBranding((b) => ({ ...b, tagline: String(setting.value) }))
             break
@@ -138,6 +141,7 @@ export function SettingsManagement() {
       await saveSetting("tagline", branding.tagline, "Eslogan de la empresa")
     }
 
+
   const handleResetBranding = async () => {
     setBranding({ ...defaultBranding })
     await saveSetting("company_name", defaultBranding.companyName, "Nombre de la empresa")
@@ -152,6 +156,7 @@ export function SettingsManagement() {
       )
       await saveSetting("tagline", defaultBranding.tagline, "Eslogan de la empresa")
     }
+
 
   const handleSaveContactInfo = () => {
     saveSetting("contact_info", contactInfo, "Información de contacto del negocio")
@@ -261,6 +266,7 @@ export function SettingsManagement() {
                   />
                 </div>
               </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Eslogan</label>
               <Textarea
@@ -288,6 +294,7 @@ export function SettingsManagement() {
                   Restablecer de Fábrica
                 </Button>
               </div>
+
           </CardContent>
         </Card>
 

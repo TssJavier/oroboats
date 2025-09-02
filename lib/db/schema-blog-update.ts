@@ -10,7 +10,8 @@ export const blogPosts = pgTable("blog_posts", {
   slug: text("slug").unique().notNull(), // URL amigable
   excerpt: text("excerpt").notNull(), // Resumen corto
   content: text("content").notNull(), // Contenido completo en markdown/HTML
-  featuredImage: text("featured_image"), // URL de imagen destacada
+  featuredImage: text("featured_image").default("https://loremflickr.com/800/600/boat,beach,summer"), // URL de imagen destacada
+
   language: varchar("language", { length: 2 }).notNull().default("es"), // 'es' | 'en'
   isFeatured: boolean("is_featured").default(false), // Solo uno puede ser featured por idioma
   isPublished: boolean("is_published").default(false),

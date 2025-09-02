@@ -181,6 +181,7 @@ export function Navigation() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="bg-[var(--brand-background)] border-gray-200">
+
                     <DropdownMenuItem onClick={() => setLanguage("es")} className="text-[var(--brand-primary)] hover:bg-gray-50">
                       Español
                     </DropdownMenuItem>
