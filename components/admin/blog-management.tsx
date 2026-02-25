@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { PlusCircle, Trash2, Search, Edit, Eye, Star, Calendar, Clock, FileText, Save, X } from "lucide-react"
+import { PlusCircle, Trash2, Search, Edit, Eye, Star, Calendar, Clock, FileText, Save, X, Bot, Copy, CheckCircle2 } from "lucide-react"
 import type { BlogPost, NewBlogPost } from "@/lib/db/schema"
 
 const getRandomImage = () =>
@@ -19,7 +19,7 @@ const getRandomImage = () =>
 
 type BlogManagementProps = {}
 
-export function BlogManagement({}: BlogManagementProps) {
+export function BlogManagement({ }: BlogManagementProps) {
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -27,6 +27,11 @@ export function BlogManagement({}: BlogManagementProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all")
   const [isCreating, setIsCreating] = useState(false)
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
+
+  // AI Prompt Generator state
+  const [aiTopic, setAiTopic] = useState("")
+  const [aiPrompt, setAiPrompt] = useState("")
+  const [copiedPrompt, setCopiedPrompt] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState<Partial<NewBlogPost>>({
@@ -137,6 +142,36 @@ export function BlogManagement({}: BlogManagementProps) {
     setIsCreating(true)
   }
 
+  const generateAiPrompt = () => {
+    if (!aiTopic.trim()) return
+
+    const promptText = `Eres un experto redactor SEO y especialista en marketing de contenidos para una empresa de alquiler de barcos y motos de agua llamada "Oro Boats". Necesito que escribas un artículo de blog sobre el siguiente tema: "${aiTopic}".
+
+Por favor, devuélveme la respuesta con los siguientes apartados claramente separados:
+
+1. META TÍTULO SEO (Menos de 60 caracteres)
+2. META DESCRIPCIÓN SEO (Menos de 160 caracteres, debe ser muy atractiva)
+3. TÍTULO DEL POST (Atractivo y que invite al clic)
+4. RESUMEN CORTO (2-3 frases)
+5. CONTENIDO DEL ARTÍCULO:
+- Escribe el contenido usando formato HTML (NO Markdown).
+- Solo debes usar las etiquetas: <h2>, <h3>, <p>, <strong>, <ul>, <li> y <a href="...">.
+- NO uses <h1>.
+- NO ofrezcas un saludo al inicio ni una despedida al final, solo dame el código HTML directamente.
+- Estructura el artículo en al menos 3 o 4 secciones lógicas (con sus <h2> correspondientes).
+- Utiliza la etiqueta <strong> para resaltar las palabras clave más importantes.
+- El tono debe ser profesional, aventurero y enfocado a turistas y amantes del mar.`
+
+    setAiPrompt(promptText)
+    setCopiedPrompt(false)
+  }
+
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(aiPrompt)
+    setCopiedPrompt(true)
+    setTimeout(() => setCopiedPrompt(false), 2000)
+  }
+
   const resetForm = () => {
     setFormData({
       title: "",
@@ -209,6 +244,50 @@ export function BlogManagement({}: BlogManagementProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* AI Prompter Section */}
+            <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl">
+              <div className="flex items-center gap-2 mb-4">
+                <Bot className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-blue-900">Asistente IA para SEO</h3>
+              </div>
+              <p className="text-sm text-blue-800 mb-4">
+                ¿No estás seguro de cómo escribir o estructurar el artículo? Escribe el tema del que quieres hablar y te generaremos el "Prompt Perfecto" para que se lo pidas a ChatGPT o Claude y te devuelva el artículo maquetado y con el SEO optimizado listo para publicar.
+              </p>
+              <div className="flex gap-2 mb-4">
+                <Input
+                  placeholder="Ej: Las 5 mejores calas secretas de Granada para ir en barco..."
+                  value={aiTopic}
+                  onChange={(e) => setAiTopic(e.target.value)}
+                  className="flex-1 bg-white"
+                />
+                <Button onClick={generateAiPrompt} className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap">
+                  Generar Prompt
+                </Button>
+              </div>
+
+              {aiPrompt && (
+                <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                  <Label className="text-blue-900 font-medium mb-2 block">Copia este prompt y pégalo en tu IA favorita:</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={aiPrompt}
+                      readOnly
+                      className="min-h-[150px] bg-white text-sm font-mono text-gray-700 pr-12"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={handleCopyPrompt}
+                      className="absolute top-2 right-2 hover:bg-gray-100"
+                      title="Copiar al portapapeles"
+                    >
+                      {copiedPrompt ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-gray-500" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

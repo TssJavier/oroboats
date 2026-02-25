@@ -102,7 +102,7 @@ export const metadata: Metadata = {
 
   // Verificación y analytics
   verification: {
-    google: "tu-codigo-google-search-console",
+    google: "googleb24ef2ef7222975d",
     // yandex: 'tu-codigo-yandex',
     // bing: 'tu-codigo-bing',
   },
