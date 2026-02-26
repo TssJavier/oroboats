@@ -391,7 +391,7 @@ function generateSlotsWithStrictStock(
   return slots
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     console.log("🚀 Availability API started with FIXED STOCK support")
 
@@ -399,7 +399,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const date = searchParams.get("date")
     const durationType = searchParams.get("durationType")
 
-    const vehicleId = params.id // Acceder directamente a params.id
+    const params = await props.params
+    const vehicleId = params.id // Acceder de la promesa resuelta
 
     if (!vehicleId || !date) {
       console.log("❌ Missing required parameters")
@@ -536,12 +537,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         ? vehicle.pricing
         : typeof vehicle.pricing === "string"
           ? (() => {
-              try {
-                return JSON.parse(vehicle.pricing)
-              } catch {
-                return []
-              }
-            })()
+            try {
+              return JSON.parse(vehicle.pricing)
+            } catch {
+              return []
+            }
+          })()
           : vehicle.pricing && typeof vehicle.pricing === "object"
             ? Object.values(vehicle.pricing)
             : [],

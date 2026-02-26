@@ -4,12 +4,12 @@ import { locations } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 
 interface RouteParams {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
-    const id = params.id
+    const { id } = await params
     const body = await request.json()
     const { name } = body
 
@@ -36,7 +36,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const id = params.id
+    const { id } = await params
 
     const deletedLocation = await db.delete(locations).where(eq(locations.id, id)).returning()
 

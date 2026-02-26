@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/db-supabase"
 
 const supabase = supabaseAdmin
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const currentUser = await getCurrentUser()
 
@@ -14,7 +14,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
     }
 
-    const userId = params.id
+    const { id: userId } = await params
     if (!userId) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 })
     }
@@ -62,7 +62,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const currentUser = await getCurrentUser()
 
@@ -71,7 +71,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
     }
 
-    const userId = params.id
+    const { id: userId } = await params
     if (!userId) {
       return NextResponse.json({ error: "ID requerido" }, { status: 400 })
     }

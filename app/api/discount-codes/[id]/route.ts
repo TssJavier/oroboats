@@ -4,9 +4,10 @@ import { discountCodes } from "@/lib/db/schema"
 import { eq } from "drizzle-orm"
 
 // ✅ ACTUALIZAR CÓDIGO
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = Number.parseInt(params.id)
+    const { id: paramId } = await params
+    const id = Number.parseInt(paramId)
     const updates = await request.json()
 
     // ✅ USAR NOMBRES CORRECTOS DEL SCHEMA
@@ -31,9 +32,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 // ✅ ELIMINAR CÓDIGO
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = Number.parseInt(params.id)
+    const { id: paramId } = await params
+    const id = Number.parseInt(paramId)
 
     const deletedCode = await db.delete(discountCodes).where(eq(discountCodes.id, id)).returning()
 

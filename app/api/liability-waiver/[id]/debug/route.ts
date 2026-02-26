@@ -2,9 +2,10 @@ import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { sql } from "drizzle-orm"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const waiverId = Number.parseInt(params.id)
-  
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id: paramId } = await params
+  const waiverId = Number.parseInt(paramId)
+
   const debugInfo: {
     waiverId: number,
     database_connected: boolean,

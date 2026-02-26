@@ -4,9 +4,9 @@ import { supabaseAdmin } from "@/lib/db-supabase"
 
 const supabase = supabaseAdmin
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const bookingId = params.id
+    const { id: bookingId } = await params
     if (!bookingId) {
       return NextResponse.json({ error: "Booking ID required" }, { status: 400 })
     }

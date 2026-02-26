@@ -23,7 +23,7 @@ function cleanFilename(name: string): string {
     .replace(/^-|-$/g, "")
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // 🔒 VERIFICAR AUTENTICACIÓN
     const token = request.cookies.get("admin-token")?.value
@@ -36,7 +36,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return new NextResponse("Token inválido", { status: 401 })
     }
 
-    const waiverId = Number.parseInt(params.id)
+    const { id: paramId } = await params
+    const waiverId = Number.parseInt(paramId)
     console.log(`🔍 PDF: Generating document for waiver ID ${waiverId}`)
 
     if (isNaN(waiverId)) {
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     console.log(`💰 PDF: Manual deposit from DB: ${waiver.manual_deposit}`)
 
     // Obtener la dirección IP del cliente (del registro de la exención si existe, si no, de la solicitud)
-    const ipAddress = waiver.ip_address || request.headers.get("x-forwarded-for") || request.ip || "N/A"
+    const ipAddress = waiver.ip_address || request.headers.get("x-forwarded-for") || (request as any).ip || "N/A"
 
     // Determinar el idioma (puedes pasarlo como query param, ej: /api/waiver/123/pdf?lang=en)
     const language = request.nextUrl.searchParams.get("lang") === "en" ? "en" : "es"
@@ -327,11 +328,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
               <strong>FECHA: ${new Date(waiver.signed_at).toLocaleDateString("es-ES")}</strong><br>
               <strong>HORA: ${new Date(waiver.signed_at).toLocaleTimeString("es-ES")}</strong>
             </div>
-            ${
-              waiver.signature_data && waiver.signature_data.startsWith("data:image/")
-                ? `<img src="${waiver.signature_data}" alt="Firma digital del cliente" class="signature-image" />`
-                : `<div class="signature-placeholder">Sin firma digital guardada</div>`
-            }
+            ${waiver.signature_data && waiver.signature_data.startsWith("data:image/")
+        ? `<img src="${waiver.signature_data}" alt="Firma digital del cliente" class="signature-image" />`
+        : `<div class="signature-placeholder">Sin firma digital guardada</div>`
+      }
           </div>
           <div style="margin-top: 20px; padding: 15px; background: #f0f8ff; border-radius: 5px; text-align: center;">
             <strong>Este documento ha sido firmado electrónicamente y tiene la misma validez legal que una firma manuscrita.</strong>
@@ -383,7 +383,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
               ? error.message
               : "Unknown error"
             : "Internal server error",
-        waiverId: params.id,
+        waiverId: "unknown",
       },
       { status: 500 },
     )
