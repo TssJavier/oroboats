@@ -3,7 +3,7 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 
 export const metadata = {
-  metadataBase: new URL("https://your-domain.com"), // ✅ Reemplaza con tu dominio real
+  metadataBase: new URL("https://oroboats.com"),
   title: "Blog - Oro Boats | Consejos y Experiencias de Deportes Acuáticos",
   description:
     "Descubre consejos, noticias y experiencias sobre deportes acuáticos, alquiler de barcos y motos de agua en nuestro blog.",
