@@ -9,6 +9,14 @@ if (!jwtSecret) {
 const JWT_SECRET = new TextEncoder().encode(jwtSecret)
 
 export async function middleware(request: NextRequest) {
+  // Allow embed routes and add iframe-friendly headers
+  if (request.nextUrl.pathname.startsWith("/embed")) {
+    const response = NextResponse.next()
+    response.headers.delete("X-Frame-Options")
+    response.headers.set("Content-Security-Policy", "frame-ancestors *")
+    return response
+  }
+
   if (request.nextUrl.pathname === "/auth/login") {
     return NextResponse.next()
   }
@@ -39,6 +47,7 @@ export async function middleware(request: NextRequest) {
     "/api/deposits",
     "/api/admin/analytics",
     "/api/users",
+    "/api/commercial",
   ]
 
   const adminOnlyPaths = [
@@ -81,6 +90,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/embed/:path*",
     "/admin/:path*",
     "/dashboard/:path*",
     "/auth/login",
@@ -94,5 +104,6 @@ export const config = {
     "/api/deposits/:path*",
     "/api/analytics/:path*", // Esto cubre /api/admin/analytics y /api/analytics/track
     "/api/users/:path*",
+    "/api/commercial/:path*",
   ],
 }

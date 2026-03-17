@@ -126,6 +126,8 @@ export const hotels = pgTable("hotels", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: varchar("code", { length: 50 }).unique().notNull(),
+  commercialEmail: text("commercial_email"), // Email del comercial asignado
+  commissionPercent: numeric("commission_percent", { precision: 5, scale: 2 }).default("0"), // % comisión
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 })

@@ -28,8 +28,10 @@ import {
   MapPin,
   Hotel,
   FileText,
+  Loader2,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { CommercialDashboard } from "./commercial-dashboard"
 
 interface User {
   email: string
@@ -113,6 +115,28 @@ export function AdminDashboard() {
       setActiveTab("stats")
     }
   }, [currentUser, activeTab, filteredTabOptions])
+
+  // If user is a comercial (not admin), show only their sales dashboard
+  if (currentUser && userRole === "comercial") {
+    return (
+      <section className="py-8 md:py-24 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+          <AdminHeader />
+          <CommercialDashboard />
+        </div>
+      </section>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <section className="py-8 md:py-24 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-8 md:py-24 bg-gray-50 min-h-screen">

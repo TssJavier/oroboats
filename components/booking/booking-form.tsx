@@ -43,6 +43,7 @@ import {
 
 interface BookingFormProps {
   vehicle: Vehicle
+  embedded?: boolean
 }
 
 interface BookingData {
@@ -168,7 +169,7 @@ const translations = {
   },
 }
 
-export function BookingForm({ vehicle }: BookingFormProps) {
+export function BookingForm({ vehicle, embedded = false }: BookingFormProps) {
   const { language } = useApp()
   const t = translations[language]
   const router = useRouter()
@@ -228,6 +229,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
     const endTime = searchParams.get("endTime")
     const duration = searchParams.get("duration")
     const price = searchParams.get("price")
+
+    // Auto-inject hotelCode from URL (used in embed mode)
+    const urlHotelCode = searchParams.get("hotelCode")
+    if (urlHotelCode) {
+      setBookingData((prev) => ({ ...prev, hotelCode: urlHotelCode.toUpperCase() }))
+    }
 
     if (date && startTime && endTime && duration && price) {
       console.log("🔗 Deeplink detectado:", { date, startTime, endTime, duration, price })
@@ -455,8 +462,12 @@ export function BookingForm({ vehicle }: BookingFormProps) {
               variant="outline"
               onClick={() => {
                 setNavigationLoading(true)
+                const urlHotelCode = searchParams.get("hotelCode")
+                const backUrl = embedded
+                  ? `/embed/boats${urlHotelCode ? `?hotelCode=${encodeURIComponent(urlHotelCode)}` : ""}`
+                  : "/boats"
                 setTimeout(() => {
-                  router.push("/boats")
+                  router.push(backUrl)
                 }, 1500)
               }}
               className="border-gray-300"
@@ -697,31 +708,33 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                         />
                       </div>
 
-                      <div className="space-y-2">
-                        {!showHotelCodeInput && (
-                          <Button
-                            variant="outline"
-                            onClick={() => setShowHotelCodeInput(true)}
-                            className="w-12 h-12 p-0 flex items-center justify-center border-gray-300 text-gray-600 hover:text-black hover:bg-gray-100"
-                            aria-label="Añadir código de hotel"
-                          >
-                            <Hotel className="h-5 w-5" />
-                          </Button>
-                        )}
-                        {showHotelCodeInput && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">{t.hotelCode}</label>
-                            <Input
-                              value={bookingData.hotelCode}
-                              onChange={(e) =>
-                                setBookingData((prev) => ({ ...prev, hotelCode: e.target.value.toUpperCase() }))
-                              }
-                              placeholder={t.hotelCodePlaceholder}
-                              className="bg-gray-50 border-gray-200"
-                            />
-                          </div>
-                        )}
-                      </div>
+                      {!embedded && (
+                        <div className="space-y-2">
+                          {!showHotelCodeInput && (
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowHotelCodeInput(true)}
+                              className="w-12 h-12 p-0 flex items-center justify-center border-gray-300 text-gray-600 hover:text-black hover:bg-gray-100"
+                              aria-label="Añadir código de hotel"
+                            >
+                              <Hotel className="h-5 w-5" />
+                            </Button>
+                          )}
+                          {showHotelCodeInput && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">{t.hotelCode}</label>
+                              <Input
+                                value={bookingData.hotelCode}
+                                onChange={(e) =>
+                                  setBookingData((prev) => ({ ...prev, hotelCode: e.target.value.toUpperCase() }))
+                                }
+                                placeholder={t.hotelCodePlaceholder}
+                                className="bg-gray-50 border-gray-200"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -825,7 +838,7 @@ export function BookingForm({ vehicle }: BookingFormProps) {
                           <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
                         </Button>
 
-                        {selectedDate && selectedTime && !isDeeplink && (
+                        {selectedDate && selectedTime && !isDeeplink && !embedded && (
                           <Button
                             variant="outline"
                             onClick={generateShareLink}

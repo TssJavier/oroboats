@@ -19,6 +19,8 @@ export function HotelManagement() {
   const [hotels, setHotels] = useState<HotelType[]>([])
   const [newHotelName, setNewHotelName] = useState("")
   const [newHotelCode, setNewHotelCode] = useState("")
+  const [newCommercialEmail, setNewCommercialEmail] = useState("")
+  const [newCommissionPercent, setNewCommissionPercent] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -72,9 +74,11 @@ export function HotelManagement() {
     }
     setError(null)
     try {
-      const newHotel: NewHotel = {
+      const newHotel = {
         name: newHotelName,
-        code: newHotelCode.toUpperCase(), // Convert to uppercase for consistency
+        code: newHotelCode.toUpperCase(),
+        commercialEmail: newCommercialEmail || null,
+        commissionPercent: newCommissionPercent || "0",
       }
       const response = await fetch("/api/hotels", {
         method: "POST",
@@ -87,6 +91,8 @@ export function HotelManagement() {
       }
       setNewHotelName("")
       setNewHotelCode("")
+      setNewCommercialEmail("")
+      setNewCommissionPercent("")
       fetchHotelsAndBookingCounts() // Re-fetch to update the list and counts
     } catch (err) {
       console.error("Error adding hotel:", err)
@@ -166,12 +172,12 @@ export function HotelManagement() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="hotelName">Nombre del Hotel</Label>
+              <Label htmlFor="hotelName">Nombre del Hotel / Comercial</Label>
               <Input
                 id="hotelName"
                 value={newHotelName}
                 onChange={(e) => setNewHotelName(e.target.value)}
-                placeholder="Ej: Hotel Luna"
+                placeholder="Ej: Hotel Luna / Jose Comercial"
               />
             </div>
             <div>
@@ -179,8 +185,31 @@ export function HotelManagement() {
               <Input
                 id="hotelCode"
                 value={newHotelCode}
-                onChange={(e) => setNewHotelCode(e.target.value.toUpperCase())} // Force uppercase
+                onChange={(e) => setNewHotelCode(e.target.value.toUpperCase())}
                 placeholder="Ej: HL-1234"
+              />
+            </div>
+            <div>
+              <Label htmlFor="commercialEmail">Email del Comercial (opcional)</Label>
+              <Input
+                id="commercialEmail"
+                type="email"
+                value={newCommercialEmail}
+                onChange={(e) => setNewCommercialEmail(e.target.value)}
+                placeholder="jose@email.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="commissionPercent">Comisión % (opcional)</Label>
+              <Input
+                id="commissionPercent"
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                value={newCommissionPercent}
+                onChange={(e) => setNewCommissionPercent(e.target.value)}
+                placeholder="Ej: 10"
               />
             </div>
           </div>
@@ -224,10 +253,18 @@ export function HotelManagement() {
                   >
                     <div>
                       <p className="font-semibold text-gray-800">{hotel.name}</p>
-                      <p className="text-sm text-gray-600 flex items-center">
-                        <Hotel className="h-3 w-3 mr-1" />
-                        Código: {hotel.code}
-                        <span className="ml-2 text-xs font-medium text-gray-500">(Reservas: {bookingCount})</span>
+                      <p className="text-sm text-gray-600 flex items-center flex-wrap gap-x-2">
+                        <span className="flex items-center">
+                          <Hotel className="h-3 w-3 mr-1" />
+                          Código: {hotel.code}
+                        </span>
+                        <span className="text-xs font-medium text-gray-500">(Reservas: {bookingCount})</span>
+                        {hotel.commercialEmail && (
+                          <span className="text-xs text-blue-600">Comercial: {hotel.commercialEmail}</span>
+                        )}
+                        {hotel.commissionPercent && Number(hotel.commissionPercent) > 0 && (
+                          <span className="text-xs text-yellow-600">Comisión: {hotel.commissionPercent}%</span>
+                        )}
                       </p>
                     </div>
                     <Button variant="destructive" size="sm" onClick={() => deleteHotel(hotel.id)}>
