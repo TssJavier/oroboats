@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web de Jose - Test Embed OroBoats</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #333;
+    }
+    header {
+      background: #1a1a2e;
+      color: white;
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.4rem; }
+    header span { font-size: 0.85rem; opacity: 0.7; }
+    .hero {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      color: white;
+      text-align: center;
+      padding: 60px 20px 40px;
+    }
+    .hero h2 { font-size: 2rem; margin-bottom: 12px; }
+    .hero p { font-size: 1.1rem; opacity: 0.8; max-width: 600px; margin: 0 auto; }
+    .booking-section {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    .booking-section h3 {
+      font-size: 1.3rem;
+      margin-bottom: 20px;
+      color: #1a1a2e;
+    }
+    .iframe-wrapper {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    iframe {
+      display: block;
+      width: 100%;
+      height: 900px;
+      border: none;
+    }
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: #888;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Hotel Sol & Mar · Almuñécar</h1>
+      <span>Tu hotel de referencia en la Costa Tropical</span>
+    </div>
+  </header>
+
+  <div class="hero">
+    <h2>Alquila una embarcación</h2>
+    <p>Reserva directamente desde nuestro hotel y disfruta del mar Mediterráneo</p>
+  </div>
+
+  <div class="booking-section">
+    <h3>Reserva tu embarcación</h3>
+    <div class="iframe-wrapper">
+      <!--
+        NOTA: Cambia "JN26" por el código de hotel correcto.
+        La URL apunta a localhost:3000 para pruebas locales.
+        En producción será: https://oroboats.com/embed/boats?hotelCode=JN26
+      -->
+      <iframe
+        src="http://localhost:3000/embed/boats?hotelCode=JN26"
+        allow="payment"
+        title="Reservas OroBoats"
+      ></iframe>
+    </div>
+  </div>
+
+  <footer>
+    &copy; 2025 Hotel Sol &amp; Mar · Powered by <strong>OroBoats</strong>
+  </footer>
+
+</body>
+</html>

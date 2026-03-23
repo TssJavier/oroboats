@@ -155,7 +155,7 @@ export function SuccessModal({ isOpen, onClose, bookingData }: SuccessModalProps
                     </div>
                     <p className="text-xs text-orange-700 font-bold">€{displayAmountPending}</p>
                   </div>
-                ) : bookingData.securityDeposit && bookingData.securityDeposit > 0 ? (
+                ) : bookingData.securityDeposit != null && bookingData.securityDeposit > 0 ? (
                   <div className="bg-cyan-50 p-3 rounded-lg">
                     <div className="flex items-center mb-1">
                       <Shield className="h-3 w-3 text-cyan-600 mr-1" />

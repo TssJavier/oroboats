@@ -31,23 +31,65 @@ interface Vehicle {
   securityDeposit?: number | null
 }
 
+// Slug de Almuñécar en base de datos (se detecta automáticamente si no se pasa location)
+const DEFAULT_LOCATION_KEYWORD = "carboneras"
+
 function EmbedBoatsContent() {
   const searchParams = useSearchParams()
   const hotelCode = searchParams.get("hotelCode") || ""
+  // Permite forzar ubicación via ?location=slug, si no busca Almuñécar automáticamente
+  const locationParam = searchParams.get("location") || ""
   const { language } = useApp()
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
+  const [resolvedLocation, setResolvedLocation] = useState<string>("")
+  const [locationName, setLocationName] = useState<string>("")
 
   useEffect(() => {
-    fetch("/api/vehicles")
-      .then((res) => res.json())
-      .then((data) => {
-        setVehicles(data)
+    async function loadVehicles() {
+      try {
+        let locationId = locationParam
+
+        // Si no se pasa location explícita, auto-detectar Carboneras
+        const locRes = await fetch("/api/locations")
+        if (locRes.ok) {
+          const locs: { id: string; name: string }[] = await locRes.json()
+          if (!locationId) {
+            const match = locs.find((l) =>
+              l.name.toLowerCase().includes(DEFAULT_LOCATION_KEYWORD) ||
+              l.id.toLowerCase().includes(DEFAULT_LOCATION_KEYWORD)
+            )
+            if (match) {
+              locationId = match.id
+              setLocationName(match.name)
+            }
+          } else {
+            const match = locs.find((l) => l.id === locationId)
+            if (match) setLocationName(match.name)
+          }
+        }
+
+        setResolvedLocation(locationId)
+
+        const url = locationId
+          ? `/api/vehicles?beachLocationId=${encodeURIComponent(locationId)}`
+          : "/api/vehicles"
+
+        const res = await fetch(url)
+        if (res.ok) {
+          const data = await res.json()
+          setVehicles(data)
+        }
+      } catch {
+        // silently fail
+      } finally {
         setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+      }
+    }
+
+    loadVehicles()
+  }, [locationParam])
 
   const t = language === "es"
     ? {
@@ -75,9 +117,9 @@ function EmbedBoatsContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-yellow-500" />
-        <span className="ml-3 text-gray-600">{t.loading}</span>
+      <div className="flex flex-col items-center justify-center min-h-[600px]">
+        <Loader2 className="h-10 w-10 animate-spin text-yellow-500" />
+        <span className="mt-4 text-gray-600 text-lg">{t.loading}</span>
       </div>
     )
   }
@@ -91,7 +133,10 @@ function EmbedBoatsContent() {
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-2xl md:text-3xl font-bold text-black">{t.title}</h1>
-        <p className="text-gray-600 mt-2">{t.subtitle}</p>
+        {locationName && (
+          <p className="text-yellow-600 font-semibold mt-1">{locationName}</p>
+        )}
+        <p className="text-gray-600 mt-1">{t.subtitle}</p>
       </div>
 
       {vehicles.length === 0 ? (
@@ -120,14 +165,26 @@ function EmbedBoatsContent() {
 
                 <p className="text-sm text-gray-600 mb-3 line-clamp-2">{vehicle.description}</p>
 
-                <div className="flex items-center justify-between mb-3">
-                  <span className="flex items-center text-sm text-gray-500">
-                    <Users className="h-4 w-4 mr-1 text-yellow-500" />
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <Badge variant="outline" className="text-xs">
+                    <Users className="h-3 w-3 mr-1" />
                     {vehicle.capacity} {t.people}
-                  </span>
+                  </Badge>
                   <Badge variant="outline" className="text-xs">
                     <Fuel className="h-3 w-3 mr-1" />
                     {vehicle.fuelIncluded ? t.fuelIncluded : t.fuelSeparate}
+                  </Badge>
+                  <Badge
+                    className={`text-xs ${
+                      vehicle.requiresLicense
+                        ? "bg-red-50 text-red-700 border-red-200"
+                        : "bg-green-50 text-green-700 border-green-200"
+                    }`}
+                    variant="outline"
+                  >
+                    {vehicle.requiresLicense
+                      ? (language === "es" ? "Requiere licencia" : "License required")
+                      : (language === "es" ? "Sin licencia" : "No license needed")}
                   </Badge>
                 </div>
 
@@ -140,9 +197,11 @@ function EmbedBoatsContent() {
                   </div>
                   <Button
                     onClick={() => {
-                      window.location.href = `/embed/boats/${vehicle.id}/book?hotelCode=${encodeURIComponent(hotelCode)}`
+                      const params = new URLSearchParams({ hotelCode })
+                      if (resolvedLocation) params.set("location", resolvedLocation)
+                      window.location.href = `/embed/boats/${vehicle.id}/book?${params.toString()}`
                     }}
-                    className="bg-black text-white hover:bg-yellow-500 hover:text-black transition-all"
+                    className="!bg-black !text-white hover:!bg-yellow-500 hover:!text-black transition-all"
                   >
                     {t.book}
                   </Button>
@@ -164,8 +223,9 @@ export default function EmbedBoatsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-yellow-500" />
+        <div className="flex flex-col items-center justify-center min-h-[600px]">
+          <Loader2 className="h-10 w-10 animate-spin text-yellow-500" />
+          <span className="mt-4 text-gray-600 text-lg">Cargando embarcaciones...</span>
         </div>
       }
     >
