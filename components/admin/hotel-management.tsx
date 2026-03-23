@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { PlusCircle, Trash2, Search, Hotel } from "lucide-react" // Importar Hotel icon
+import { PlusCircle, Trash2, Search, Hotel, Pencil, Check, X } from "lucide-react"
 import type { Hotel as HotelType, NewHotel } from "@/lib/db/schema"
 
 // Definir una interfaz para el tipo de Booking simplificado para el conteo
@@ -20,11 +20,14 @@ export function HotelManagement() {
   const [newHotelName, setNewHotelName] = useState("")
   const [newHotelCode, setNewHotelCode] = useState("")
   const [newCommercialEmail, setNewCommercialEmail] = useState("")
+  const [newNotificationEmail, setNewNotificationEmail] = useState("")
   const [newCommissionPercent, setNewCommissionPercent] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [hotelBookingCounts, setHotelBookingCounts] = useState<Record<string, number>>({}) // Nuevo estado para los conteos
+  const [hotelBookingCounts, setHotelBookingCounts] = useState<Record<string, number>>({})
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editData, setEditData] = useState({ name: "", code: "", commercialEmail: "", notificationEmail: "", commissionPercent: "" })
 
   useEffect(() => {
     fetchHotelsAndBookingCounts()
@@ -78,6 +81,7 @@ export function HotelManagement() {
         name: newHotelName,
         code: newHotelCode.toUpperCase(),
         commercialEmail: newCommercialEmail || null,
+        notificationEmail: newNotificationEmail || null,
         commissionPercent: newCommissionPercent || "0",
       }
       const response = await fetch("/api/hotels", {
@@ -92,6 +96,7 @@ export function HotelManagement() {
       setNewHotelName("")
       setNewHotelCode("")
       setNewCommercialEmail("")
+      setNewNotificationEmail("")
       setNewCommissionPercent("")
       fetchHotelsAndBookingCounts() // Re-fetch to update the list and counts
     } catch (err) {
@@ -117,6 +122,50 @@ export function HotelManagement() {
     } catch (err) {
       console.error("Error deleting hotel:", err)
       setError(err instanceof Error ? err.message : "Error al eliminar hotel.")
+    }
+  }
+
+  const startEdit = (hotel: HotelType) => {
+    setEditingId(hotel.id)
+    setEditData({
+      name: hotel.name,
+      code: hotel.code,
+      commercialEmail: hotel.commercialEmail || "",
+      notificationEmail: (hotel as any).notificationEmail || "",
+      commissionPercent: hotel.commissionPercent ? String(hotel.commissionPercent) : "",
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditData({ name: "", code: "", commercialEmail: "", notificationEmail: "", commissionPercent: "" })
+  }
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    setError(null)
+    try {
+      const response = await fetch("/api/hotels", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingId,
+          name: editData.name,
+          code: editData.code.toUpperCase(),
+          commercialEmail: editData.commercialEmail || null,
+          notificationEmail: editData.notificationEmail || null,
+          commissionPercent: editData.commissionPercent || "0",
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.details || "Failed to update hotel")
+      }
+      setEditingId(null)
+      fetchHotelsAndBookingCounts()
+    } catch (err) {
+      console.error("Error updating hotel:", err)
+      setError(err instanceof Error ? err.message : "Error al actualizar hotel.")
     }
   }
 
@@ -190,13 +239,23 @@ export function HotelManagement() {
               />
             </div>
             <div>
-              <Label htmlFor="commercialEmail">Email del Comercial (opcional)</Label>
+              <Label htmlFor="commercialEmail">Email de login (dashboard)</Label>
               <Input
                 id="commercialEmail"
                 type="email"
                 value={newCommercialEmail}
                 onChange={(e) => setNewCommercialEmail(e.target.value)}
-                placeholder="jose@email.com"
+                placeholder="cuenta@oroboats.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="notificationEmail">Email de notificaciones</Label>
+              <Input
+                id="notificationEmail"
+                type="email"
+                value={newNotificationEmail}
+                onChange={(e) => setNewNotificationEmail(e.target.value)}
+                placeholder="info@suempresa.com"
               />
             </div>
             <div>
@@ -246,6 +305,69 @@ export function HotelManagement() {
             <div className="space-y-3">
               {filteredHotels.map((hotel) => {
                 const bookingCount = hotelBookingCounts[hotel.code.toUpperCase()] || 0
+                const isEditing = editingId === hotel.id
+
+                if (isEditing) {
+                  return (
+                    <div key={hotel.id} className="p-4 border-2 border-yellow-300 rounded-md bg-yellow-50 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs text-gray-500">Nombre</Label>
+                          <Input
+                            value={editData.name}
+                            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Código</Label>
+                          <Input
+                            value={editData.code}
+                            onChange={(e) => setEditData({ ...editData, code: e.target.value.toUpperCase() })}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Email login (dashboard)</Label>
+                          <Input
+                            type="email"
+                            value={editData.commercialEmail}
+                            onChange={(e) => setEditData({ ...editData, commercialEmail: e.target.value })}
+                            placeholder="cuenta@oroboats.com"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Email notificaciones</Label>
+                          <Input
+                            type="email"
+                            value={editData.notificationEmail}
+                            onChange={(e) => setEditData({ ...editData, notificationEmail: e.target.value })}
+                            placeholder="info@suempresa.com"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Comisión %</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            value={editData.commissionPercent}
+                            onChange={(e) => setEditData({ ...editData, commissionPercent: e.target.value })}
+                            placeholder="10"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button onClick={saveEdit} size="sm" className="bg-green-600 text-white hover:bg-green-700">
+                          <Check className="h-4 w-4 mr-1" /> Guardar
+                        </Button>
+                        <Button onClick={cancelEdit} size="sm" variant="outline">
+                          <X className="h-4 w-4 mr-1" /> Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+
                 return (
                   <div
                     key={hotel.id}
@@ -260,16 +382,24 @@ export function HotelManagement() {
                         </span>
                         <span className="text-xs font-medium text-gray-500">(Reservas: {bookingCount})</span>
                         {hotel.commercialEmail && (
-                          <span className="text-xs text-blue-600">Comercial: {hotel.commercialEmail}</span>
+                          <span className="text-xs text-blue-600">Login: {hotel.commercialEmail}</span>
+                        )}
+                        {(hotel as any).notificationEmail && (
+                          <span className="text-xs text-purple-600">Notif: {(hotel as any).notificationEmail}</span>
                         )}
                         {hotel.commissionPercent && Number(hotel.commissionPercent) > 0 && (
                           <span className="text-xs text-yellow-600">Comisión: {hotel.commissionPercent}%</span>
                         )}
                       </p>
                     </div>
-                    <Button variant="destructive" size="sm" onClick={() => deleteHotel(hotel.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => startEdit(hotel)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => deleteHotel(hotel.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 )
               })}

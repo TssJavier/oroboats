@@ -34,6 +34,34 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { id, ...updateData } = body
+
+    if (!id) {
+      return NextResponse.json({ error: "Hotel ID is required" }, { status: 400 })
+    }
+
+    console.log(`🔍 API: Updating hotel ${id} with:`, updateData)
+    const [updated] = await db
+      .update(hotels)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(hotels.id, Number(id)))
+      .returning()
+
+    if (!updated) {
+      return NextResponse.json({ error: "Hotel not found" }, { status: 404 })
+    }
+
+    console.log("✅ API: Hotel updated:", updated)
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error("❌ API: Error updating hotel:", error)
+    return NextResponse.json({ error: "Failed to update hotel", details: error.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)

@@ -17,11 +17,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Token inválido" }, { status: 401 })
     }
 
-    // Find hotel codes assigned to this commercial
+    // Find hotel codes assigned to this commercial (case-insensitive)
     const assignedHotels = await db
       .select()
       .from(hotels)
-      .where(eq(hotels.commercialEmail, user.email))
+      .where(sql`LOWER(${hotels.commercialEmail}) = LOWER(${user.email})`)
 
     if (assignedHotels.length === 0) {
       return NextResponse.json({
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate summary
     const paidBookings = bookings.filter(
-      (b: any) => b.payment_status === "paid" && b.status !== "cancelled"
+      (b: any) => (b.payment_status === "paid" || b.payment_status === "completed" || b.payment_status === "free_booking") && b.status !== "cancelled"
     )
     const totalRevenue = paidBookings.reduce(
       (sum: number, b: any) => sum + (Number(b.total_price) || 0),

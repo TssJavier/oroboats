@@ -781,7 +781,17 @@ export function BookingForm({ vehicle, embedded = false }: BookingFormProps) {
                           vehicleCategory: vehicle.category,
                         }}
                         onSuccess={() => {
-                          router.push("/")
+                          if (embedded) {
+                            const hc = searchParams.get("hotelCode")
+                            const loc = searchParams.get("location")
+                            const p = new URLSearchParams()
+                            if (hc) p.set("hotelCode", hc)
+                            if (loc) p.set("location", loc)
+                            const qs = p.toString()
+                            router.push(`/embed/boats${qs ? `?${qs}` : ""}`)
+                          } else {
+                            router.push("/")
+                          }
                         }}
                         onError={(error) => {
                           setError(error)

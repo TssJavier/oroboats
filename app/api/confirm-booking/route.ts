@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import stripe from "@/lib/stripe-config" // Asumo que este es tu cliente Stripe configurado
-import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
+import { sendAdminNotification, sendCustomerConfirmation, sendCommercialNotification } from "@/lib/email"
 import { supabaseAdmin } from "@/lib/db-supabase"
 
 const supabase = supabaseAdmin
@@ -249,6 +249,25 @@ export async function POST(request: NextRequest) {
       console.log("✅ Admin notification sent")
       await sendCustomerConfirmation(emailData)
       console.log("✅ Customer confirmation sent")
+
+      // ✅ NOTIFICAR AL COMERCIAL si la reserva tiene código de hotel
+      if (bookingData.hotel_code) {
+        try {
+          const { data: hotel } = await supabase
+            .from("hotels")
+            .select("name, commercial_email, notification_email")
+            .eq("code", bookingData.hotel_code)
+            .single()
+
+          const notifyEmail = hotel?.notification_email || hotel?.commercial_email
+          if (notifyEmail) {
+            await sendCommercialNotification(emailData, notifyEmail, hotel.name)
+            console.log("✅ Commercial notification sent to:", notifyEmail)
+          }
+        } catch (commercialError) {
+          console.error("⚠️ Error sending commercial notification:", commercialError)
+        }
+      }
     } catch (emailError) {
       console.error("⚠️ Error sending emails:", emailError)
     }

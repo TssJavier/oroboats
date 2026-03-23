@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
         securityDeposit: securityDeposit.toString(),
         paymentType: paymentType,
         liabilityWaiverId: bookingData?.liabilityWaiverId?.toString() || "",
+        hotelCode: bookingData?.hotelCode || "",
         debug: paymentType === "partial_payment" ? "PARTIAL_PAYMENT_INTENT" : "FULL_PAYMENT_INTENT",
       },
     })

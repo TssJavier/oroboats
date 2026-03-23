@@ -270,7 +270,6 @@ export function CommercialDashboard() {
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Horario</th>
                     <th className="text-right py-3 px-2 font-semibold text-gray-600">Importe</th>
                     <th className="text-right py-3 px-2 font-semibold text-gray-600">Comisión</th>
-                    <th className="text-center py-3 px-2 font-semibold text-gray-600">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -290,9 +289,6 @@ export function CommercialDashboard() {
                       </td>
                       <td className="py-3 px-2 text-right font-semibold text-yellow-600">
                         €{booking.commission.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-2 text-center">
-                        {getStatusBadge(booking.status, booking.payment_status)}
                       </td>
                     </tr>
                   ))}

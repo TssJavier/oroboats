@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cookieUtils } from "@/lib/cookies"
@@ -8,16 +9,18 @@ import { Cookie, X } from "lucide-react"
 
 export function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
-    // Verificar si el usuario ya ha dado su consentimiento
+    // No mostrar cookies en el embed (iframe)
+    if (pathname?.startsWith("/embed")) return
+
     const hasConsent = cookieUtils.exists("cookie-consent")
     if (!hasConsent) {
-      // Mostrar el banner después de un pequeño delay para mejor UX
       const timer = setTimeout(() => setShowBanner(true), 1500)
       return () => clearTimeout(timer)
     }
-  }, [])
+  }, [pathname])
 
   const acceptCookies = () => {
     cookieUtils.set("cookie-consent", "accepted", 365)

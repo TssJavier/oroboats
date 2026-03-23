@@ -41,23 +41,7 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 }
 
 // Permite que slugs no pre-generados se resuelvan en el servidor (nuevos artículos sin redeploy)
-export const dynamicParams = true
-// Revalida la caché cada hora para reflejar cambios recientes
-export const revalidate = 3600
-
-export async function generateStaticParams() {
-  const posts = await getPublishedBlogPosts("es")
-  const postsEn = await getPublishedBlogPosts("en")
-
-  return [
-    ...posts.map((post) => ({
-      slug: post.slug,
-    })),
-    ...postsEn.map((post) => ({
-      slug: post.slug,
-    })),
-  ]
-}
+export const dynamic = "force-dynamic"
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params

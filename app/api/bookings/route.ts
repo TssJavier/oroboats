@@ -3,8 +3,8 @@ import { sql, eq } from "drizzle-orm" // Importar 'eq' para comparaciones
 import { db } from "@/lib/db"
 import type { NextRequest } from "next/server"
 import { createBooking } from "@/lib/db/queries"
-import { sendAdminNotification, sendCustomerConfirmation } from "@/lib/email"
-import { vehicles, locations } from "@/lib/db/schema" // Importar esquemas de vehicles y locations
+import { sendAdminNotification, sendCustomerConfirmation, sendCommercialNotification } from "@/lib/email"
+import { vehicles, locations, hotels } from "@/lib/db/schema"
 
 export async function GET(request: NextRequest) {
   try {
@@ -268,6 +268,27 @@ export async function POST(request: NextRequest) {
       console.log("✅ Admin notification sent")
       await sendCustomerConfirmation(emailData)
       console.log("✅ Customer confirmation sent")
+
+      // Notificar al comercial si hay código de hotel
+      if (finalBookingData.hotelCode) {
+        try {
+          const hotelResult = await db
+            .select({ name: hotels.name, commercialEmail: hotels.commercialEmail, notificationEmail: hotels.notificationEmail })
+            .from(hotels)
+            .where(eq(hotels.code, finalBookingData.hotelCode))
+            .limit(1)
+
+          if (hotelResult.length > 0) {
+            const notifyEmail = hotelResult[0].notificationEmail || hotelResult[0].commercialEmail
+            if (notifyEmail) {
+              await sendCommercialNotification(emailData, notifyEmail, hotelResult[0].name)
+              console.log("✅ Commercial notification sent to:", notifyEmail)
+            }
+          }
+        } catch (commercialError) {
+          console.error("⚠️ Error sending commercial notification:", commercialError)
+        }
+      }
     } catch (emailError) {
       console.error("⚠️ Error sending emails (booking still created):", emailError)
     }
