@@ -33,6 +33,40 @@ Copia y pega el siguiente codigo HTML en la pagina de tu web donde quieras mostr
 
 ---
 
+## 1b. Embed individual por vehiculo
+
+Ademas del codigo anterior (que muestra todas las embarcaciones), tambien puedes insertar un iframe para **un barco o moto de agua en concreto**. Esto es util si quieres poner cada vehiculo en una seccion diferente de tu web.
+
+El codigo es el mismo pero cambiando la URL. Solo necesitas el **ID del vehiculo**:
+
+```html
+<iframe
+  src="https://oroboats.com/embed/boats/15?hotelCode=JN26"
+  width="100%"
+  height="800"
+  style="border: none; border-radius: 12px;"
+  allow="payment"
+></iframe>
+```
+
+Cambia el numero `15` por el ID del vehiculo que quieras mostrar.
+
+### Donde encuentro el codigo de cada vehiculo?
+
+No necesitas saber los IDs de memoria. En tu panel de comercial (**https://oroboats.com/auth/login**) tienes una seccion llamada **"Codigos embed por vehiculo"** donde aparecen todos los barcos y motos de agua disponibles. Solo tienes que pulsar el boton **"Copiar"** del vehiculo que quieras y pegar el codigo en tu web.
+
+### Como funciona:
+- El cliente vera la **ficha del vehiculo** con foto, descripcion, precios y un boton de "Reservar ahora"
+- Al pulsar "Reservar", se abre el formulario de reserva dentro del mismo iframe
+- El codigo de hotel `JN26` va integrado automaticamente, igual que con el embed completo
+
+### Notas:
+- Puedes poner tantos iframes individuales como quieras en tu web
+- Cada iframe funciona de forma independiente
+- El alto recomendado es de 800px, igual que el embed completo
+
+---
+
 ## 2. Ver tus ventas y comisiones
 
 Accede a tu panel de comercial en:

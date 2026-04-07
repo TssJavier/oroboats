@@ -15,6 +15,9 @@ import {
   Check,
   Code,
   ExternalLink,
+  Ship,
+  Zap,
+  Users,
 } from "lucide-react"
 
 interface Booking {
@@ -40,6 +43,14 @@ interface Summary {
   totalCommission: number
 }
 
+interface EmbedVehicle {
+  id: number
+  name: string
+  type: string
+  image: string
+  capacity: number
+}
+
 export function CommercialDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [summary, setSummary] = useState<Summary>({
@@ -52,6 +63,9 @@ export function CommercialDashboard() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [copied, setCopied] = useState(false)
+  const [embedVehicles, setEmbedVehicles] = useState<EmbedVehicle[]>([])
+  const [embedHotelCode, setEmbedHotelCode] = useState("")
+  const [copiedVehicleId, setCopiedVehicleId] = useState<number | null>(null)
 
   const fetchSales = async () => {
     setLoading(true)
@@ -74,8 +88,22 @@ export function CommercialDashboard() {
     }
   }
 
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch("/api/commercial/vehicles")
+      if (response.ok) {
+        const data = await response.json()
+        setEmbedVehicles(data.vehicles)
+        setEmbedHotelCode(data.hotelCode)
+      }
+    } catch (error) {
+      console.error("Error fetching vehicles:", error)
+    }
+  }
+
   useEffect(() => {
     fetchSales()
+    fetchVehicles()
   }, [])
 
   const handleFilter = () => {
@@ -91,6 +119,19 @@ export function CommercialDashboard() {
       await navigator.clipboard.writeText(embedCode)
       setCopied(true)
       setTimeout(() => setCopied(false), 3000)
+    } catch (err) {
+      console.error("Error copying:", err)
+    }
+  }
+
+  const getVehicleEmbedCode = (vehicleId: number) =>
+    `<iframe\n  src="https://oroboats.com/embed/boats/${vehicleId}?hotelCode=${embedHotelCode}"\n  width="100%"\n  height="800"\n  style="border: none; border-radius: 12px;"\n  allow="payment"\n></iframe>`
+
+  const copyVehicleEmbed = async (vehicleId: number) => {
+    try {
+      await navigator.clipboard.writeText(getVehicleEmbedCode(vehicleId))
+      setCopiedVehicleId(vehicleId)
+      setTimeout(() => setCopiedVehicleId(null), 3000)
     } catch (err) {
       console.error("Error copying:", err)
     }
@@ -208,6 +249,67 @@ export function CommercialDashboard() {
                   /embed/boats?hotelCode={hotelCodes[0]}
                 </a>
               </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Individual Vehicle Embed Codes */}
+      {embedVehicles.length > 0 && embedHotelCode && (
+        <Card className="bg-white border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center">
+              <Ship className="h-5 w-5 mr-2 text-gray-600" />
+              Códigos embed por vehículo
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              Copia el código de un vehículo concreto para insertarlo individualmente en tu web.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {embedVehicles.map((v) => (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-yellow-400 transition-colors"
+                >
+                  <div className="shrink-0">
+                    {v.type === "jetski" ? (
+                      <Zap className="h-5 w-5 text-yellow-500" />
+                    ) : (
+                      <Ship className="h-5 w-5 text-yellow-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-black truncate">{v.name}</p>
+                    <p className="text-xs text-gray-400 flex items-center gap-2">
+                      <span className="font-mono bg-gray-100 px-1 rounded">ID:{v.id}</span>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {v.capacity} pers.
+                      </span>
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => copyVehicleEmbed(v.id)}
+                    size="sm"
+                    variant={copiedVehicleId === v.id ? "default" : "outline"}
+                    className="shrink-0"
+                  >
+                    {copiedVehicleId === v.id ? (
+                      <>
+                        <Check className="h-3 w-3 mr-1" />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3 mr-1" />
+                        Copiar
+                      </>
+                    )}
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
