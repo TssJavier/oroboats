@@ -41,10 +41,18 @@ export async function POST(request: NextRequest) {
 
     // ✅ PAYMENT INTENT 1: MONTO CORRECTO SEGÚN TIPO DE PAGO
     console.log("💳 Creating RENTAL payment intent for:", actualChargeAmount)
+    // Klarna no soporta pre-autorización de fianza (manual capture).
+    // Si hay fianza online (pago completo + securityDeposit > 0) → solo tarjeta.
+    // En cualquier otro caso → métodos automáticos del dashboard (incluye Klarna).
+    const hasOnlineDeposit = paymentType === "full_payment" && securityDeposit > 0
+    const paymentMethodConfig = hasOnlineDeposit
+      ? { payment_method_types: ["card"] as string[] }
+      : { automatic_payment_methods: { enabled: true } }
+
     const rentalPaymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(actualChargeAmount * 100), // ✅ USAR MONTO CORRECTO
       currency: "eur",
-      payment_method_types: ["card"],
+      ...paymentMethodConfig,
       metadata: {
         bookingId: bookingData?.id || "debug",
         type: paymentType === "partial_payment" ? "PARTIAL_RENTAL_PAYMENT" : "FULL_RENTAL_PAYMENT",

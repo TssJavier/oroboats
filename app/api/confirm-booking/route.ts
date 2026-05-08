@@ -30,6 +30,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Stripe configuration error" }, { status: 500 })
     }
 
+    // ✅ IDEMPOTENCIA: si ya existe una reserva para este payment_intent, devolverla
+    // (necesario para Klarna y otros métodos con redirect — el cliente puede refrescar /booking-success)
+    {
+      const { data: existing } = await supabase
+        .from("bookings")
+        .select("*")
+        .eq("payment_id", paymentIntentId)
+        .maybeSingle()
+
+      if (existing) {
+        console.log("ℹ️ Booking already exists for this payment_intent, returning existing:", existing.id)
+        return NextResponse.json({
+          success: true,
+          bookingId: existing.id,
+          alreadyExisted: true,
+          message: "Reserva ya confirmada previamente",
+          paymentInfo: {
+            mainPaymentId: paymentIntentId,
+            depositPaymentId: existing.deposit_payment_intent_id || null,
+            totalRentalAmount: Number(existing.total_price),
+            amountPaid: Number(existing.amount_paid),
+            amountPending: Number(existing.amount_pending),
+            paymentType: existing.payment_type,
+            liabilityWaiverId: existing.liability_waiver_id,
+          },
+          bookingDetails: {
+            customerEmail: existing.customer_email,
+            bookingDate: existing.booking_date,
+            startTime: existing.start_time,
+            endTime: existing.end_time,
+            vehicleName: existing.vehicle_name,
+            totalPrice: Number(existing.total_price),
+            securityDeposit: Number(existing.security_deposit || 0),
+            paymentType: existing.payment_type,
+            amountPaid: Number(existing.amount_paid),
+            amountPending: Number(existing.amount_pending),
+          },
+        })
+      }
+    }
+
     // ✅ OBTENER DATOS DEL PAYMENT INTENT PRINCIPAL
     const mainPaymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)
     console.log("💳 Main Payment Intent retrieved:", {
@@ -284,6 +325,18 @@ export async function POST(request: NextRequest) {
         amountPending: Number(actualAmountPending),
         paymentType: paymentType,
         liabilityWaiverId: finalLiabilityWaiverId,
+      },
+      bookingDetails: {
+        customerEmail: bookingData.customer_email,
+        bookingDate: bookingData.booking_date,
+        startTime: bookingData.start_time,
+        endTime: bookingData.end_time,
+        vehicleName: bookingData.vehicle_name,
+        totalPrice: Number(totalRentalAmount),
+        securityDeposit: Number(bookingData.security_deposit || 0),
+        paymentType: paymentType,
+        amountPaid: Number(actualAmountPaid),
+        amountPending: Number(actualAmountPending),
       },
     })
   } catch (error) {
