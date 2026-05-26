@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         b.id,
         b.customer_name,
         b.customer_email,
+        b.customer_phone,
         b.booking_date,
         b.time_slot,
         b.duration,

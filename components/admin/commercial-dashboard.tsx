@@ -24,6 +24,7 @@ interface Booking {
   id: number
   customer_name: string
   customer_email: string
+  customer_phone: string
   booking_date: string
   time_slot: string
   duration: string
@@ -369,6 +370,7 @@ export function CommercialDashboard() {
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Fecha</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Vehículo</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Cliente</th>
+                    <th className="text-left py-3 px-2 font-semibold text-gray-600">Teléfono</th>
                     <th className="text-left py-3 px-2 font-semibold text-gray-600">Horario</th>
                     <th className="text-right py-3 px-2 font-semibold text-gray-600">Importe</th>
                     <th className="text-right py-3 px-2 font-semibold text-gray-600">Comisión</th>
@@ -384,6 +386,18 @@ export function CommercialDashboard() {
                       <td className="py-3 px-2">
                         <div>{booking.customer_name}</div>
                         <div className="text-xs text-gray-400">{booking.customer_email}</div>
+                      </td>
+                      <td className="py-3 px-2 text-gray-600">
+                        {booking.customer_phone ? (
+                          <a
+                            href={`tel:${booking.customer_phone}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {booking.customer_phone}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="py-3 px-2 text-gray-600">{booking.time_slot || "—"}</td>
                       <td className="py-3 px-2 text-right font-semibold">
