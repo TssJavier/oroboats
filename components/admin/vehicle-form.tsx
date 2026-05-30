@@ -381,8 +381,78 @@ const TIME_SLOTS = {
     { duration: "30min", label: "30 minutos", hours: 0.5, defaultPrice: 60 },
     { duration: "1hour", label: "1 hora", hours: 1, defaultPrice: 90 },
     { duration: "2hour", label: "2 horas", hours: 2, defaultPrice: 160 },
-    { duration: "halfday", label: "Medio día (4 horas)", hours: 4, defaultPrice: 250 },
-    { duration: "fullday", label: "Día completo (8 horas)", hours: 8, defaultPrice: 400 },
+    {
+      duration: "halfday_10_14",
+      label: "Medio día (10:00 - 14:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "10:00",
+      endTime: "14:00",
+    },
+    {
+      duration: "halfday_11_15",
+      label: "Medio día (11:00 - 15:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "11:00",
+      endTime: "15:00",
+    },
+    {
+      duration: "halfday_12_16",
+      label: "Medio día (12:00 - 16:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "12:00",
+      endTime: "16:00",
+    },
+    {
+      duration: "halfday_13_17",
+      label: "Medio día (13:00 - 17:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "13:00",
+      endTime: "17:00",
+    },
+    {
+      duration: "halfday_14_18",
+      label: "Medio día (14:00 - 18:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "14:00",
+      endTime: "18:00",
+    },
+    {
+      duration: "halfday_15_19",
+      label: "Medio día (15:00 - 19:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "15:00",
+      endTime: "19:00",
+    },
+    {
+      duration: "halfday_16_20",
+      label: "Medio día (16:00 - 20:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "16:00",
+      endTime: "20:00",
+    },
+    {
+      duration: "halfday_17_21",
+      label: "Medio día (17:00 - 21:00)",
+      hours: 4,
+      defaultPrice: 250,
+      startTime: "17:00",
+      endTime: "21:00",
+    },
+    {
+      duration: "fullday_10_21",
+      label: "Día completo (10:00 - 21:00)",
+      hours: 11,
+      defaultPrice: 400,
+      startTime: "10:00",
+      endTime: "21:00",
+    },
   ],
 }
 
@@ -578,6 +648,40 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
       ...prev,
       pricing: newPricing,
     }))
+  }
+
+  // ✅ Añade SOLO las franjas de medio día y día completo sin tocar el resto del pricing.
+  //    - Borra entradas antiguas con duración "halfday" o "fullday" (formato sin startTime/endTime, que causaba el bug del slot 10:00-21:00).
+  //    - Borra también franjas halfday_XX_YY / fullday_XX_YY ya existentes para evitar duplicados.
+  //    - Mantiene 30min/1hour/2hour con sus precios.
+  //    - Añade todas las franjas halfday y fullday definidas en TIME_SLOTS para la categoría actual.
+  const addHalfdayFulldaySlots = () => {
+    const slots = TIME_SLOTS[formData.category as keyof typeof TIME_SLOTS] || []
+    const newFranjas = slots
+      .filter((s) => s.duration.startsWith("halfday") || s.duration.startsWith("fullday"))
+      .map((s) => ({
+        duration: s.duration,
+        price: s.defaultPrice || 0,
+        label: s.label,
+        startTime: s.startTime,
+        endTime: s.endTime,
+      }))
+
+    if (newFranjas.length === 0) {
+      toast.error("No hay franjas de medio día / día completo definidas para esta categoría.")
+      return
+    }
+
+    const preserved = formData.pricing.filter(
+      (p) => !p.duration.startsWith("halfday") && !p.duration.startsWith("fullday"),
+    )
+
+    setFormData((prev) => ({
+      ...prev,
+      pricing: [...preserved, ...newFranjas],
+    }))
+
+    toast.success(`${newFranjas.length} franjas añadidas. Ajusta los precios si lo necesitas.`)
   }
 
   const updatePricing = (index: number, field: string, value: string | number) => {
@@ -849,14 +953,27 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 <h4 className="font-medium text-gray-700">Franjas disponibles para: {formData.category}</h4>
                 <p className="text-sm text-gray-500">{availableSlots.length} franjas horarias disponibles</p>
               </div>
-              <Button
-                type="button"
-                onClick={generateTimeSlots}
-                className="bg-gold text-black hover:bg-black hover:text-white"
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                Generar Franjas
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  type="button"
+                  onClick={addHalfdayFulldaySlots}
+                  variant="outline"
+                  className="border-gold text-black hover:bg-gold hover:text-black"
+                  title="Añade las franjas de medio día y día completo sin sobrescribir el resto del pricing"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Añadir franjas medio día / día completo
+                </Button>
+                <Button
+                  type="button"
+                  onClick={generateTimeSlots}
+                  className="bg-gold text-black hover:bg-black hover:text-white"
+                  title="Reemplaza TODO el pricing por las franjas predefinidas de la categoría"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Generar Franjas
+                </Button>
+              </div>
             </div>
 
             {/* Lista de precios */}

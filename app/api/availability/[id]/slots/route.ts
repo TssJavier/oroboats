@@ -330,8 +330,18 @@ function generateSlotsWithStrictStock(
         }
       } else {
         // Para duraciones como 'halfday' o 'fullday' que son franjas fijas
+        // ⚠️ Si falta startTime/endTime (config antigua tipo "halfday" a secas),
+        //    derivamos endTime de la duración real en minutos en vez de caer en workEnd (21:00).
+        //    Esto evita el bug histórico que mostraba un slot 10:00-21:00 al elegir medio día.
         const startTime = option.startTime || minutesToTime(workStart)
-        const endTime = option.endTime || minutesToTime(workEnd)
+        const endTime =
+          option.endTime || minutesToTime(timeToMinutes(startTime) + duration)
+
+        if (!option.startTime || !option.endTime) {
+          console.warn(
+            `⚠️ Pricing mal configurado para ${option.duration}: falta startTime/endTime. Usando ${startTime}-${endTime} derivado de la duración (${duration} min). Reconfigura el vehículo en /admin con las franjas correctas.`,
+          )
+        }
 
         const availability = checkSlotAvailability(startTime, endTime)
 
