@@ -297,10 +297,9 @@ export function TimePicker({
         "1hour": { label: t.oneHour, description: t.completeExperience },
         "2hour": { label: t.twoHours, description: t.extendedAdventure },
         "4hour": { label: t.fourHours, description: t.halfDayFun },
-        halfday: { label: t.halfDay, description: `4 ${t.hoursOfAdventure}` },
-        fullday: { label: t.fullDay, description: t.fullDayFun },
       }
 
+      // Duraciones simples (30min, 1hour, 2hour, 4hour): un botón por entrada.
       pricingOptions.forEach((pricing) => {
         const durationInfo = durationMap[pricing.duration as keyof typeof durationMap]
         if (durationInfo) {
@@ -312,6 +311,31 @@ export function TimePicker({
           })
         }
       })
+
+      // ✅ Agrupar franjas halfday_XX_YY / fullday_XX_YY en un único botón "Medio día" / "Día completo"
+      //    (mismo patrón que se usa con los barcos). También soporta los antiguos "halfday" / "fullday" simples.
+      const halfdayOptions = pricingOptions.filter((p) => p.duration.startsWith("halfday"))
+      const fulldayOptions = pricingOptions.filter((p) => p.duration.startsWith("fullday"))
+
+      if (halfdayOptions.length > 0) {
+        const minPrice = Math.min(...halfdayOptions.map((o) => o.price))
+        options.push({
+          key: "halfday",
+          label: t.halfDay,
+          description: `4 ${t.hoursOfAdventure}`,
+          price: minPrice,
+        })
+      }
+
+      if (fulldayOptions.length > 0) {
+        const minPrice = Math.min(...fulldayOptions.map((o) => o.price))
+        options.push({
+          key: "fullday",
+          label: t.fullDay,
+          description: t.fullDayFun,
+          price: minPrice,
+        })
+      }
     }
 
     return options
