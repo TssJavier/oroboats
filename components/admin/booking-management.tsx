@@ -33,6 +33,13 @@ import {
   Search,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  ALL_SEASONS,
+  getCurrentSeasonYear,
+  getSeasonLabel,
+  getSeasonRange,
+  listSeasonYears,
+} from "@/lib/season"
 
 interface Booking {
   booking: {
@@ -102,6 +109,9 @@ export function BookingManagement() {
   const [hotelCodeFilter, setHotelCodeFilter] = useState<string>("") // ✅ NUEVO: Estado para el filtro aplicado
   // NUEVO: Estado para el input de búsqueda de fecha
   const [dateSearchInput, setDateSearchInput] = useState<string>("")
+  // ✅ NUEVO: temporada seleccionada (por defecto, la temporada actual)
+  const [selectedSeason, setSelectedSeason] = useState<string>(String(getCurrentSeasonYear()))
+  const seasonYears = listSeasonYears()
 
   useEffect(() => {
     fetchBeachLocations()
@@ -121,8 +131,11 @@ export function BookingManagement() {
       dateToFetch = dateSearchInput
     }
 
-    fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
-  }, [selectedBeachFilterId, hotelCodeFilter, dateFilter, dateSearchInput]) // dateSearchInput es una dependencia para 'specific_date'
+    // ✅ NUEVO: cuando no hay una fecha exacta, acotar por temporada
+    const { startDate, endDate } = getSeasonDateRange(dateToFetch)
+
+    fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch, startDate, endDate)
+  }, [selectedBeachFilterId, hotelCodeFilter, dateFilter, dateSearchInput, selectedSeason]) // dateSearchInput es una dependencia para 'specific_date'
 
   const fetchBeachLocations = async () => {
     try {
@@ -143,13 +156,26 @@ export function BookingManagement() {
     }
   }
 
-  // MODIFICADO: Añadir bookingDate como parámetro opcional
-  const fetchBookings = async (beachId = "all", hotelCode = "", bookingDate?: string) => {
+  // ✅ NUEVO: Calcula el rango de temporada a enviar a la API.
+  // Si hay una fecha exacta seleccionada o la temporada es "histórico", no se acota.
+  const getSeasonDateRange = (exactDate?: string): { startDate?: string; endDate?: string } => {
+    if (exactDate || selectedSeason === ALL_SEASONS) return {}
+    return getSeasonRange(Number(selectedSeason))
+  }
+
+  // MODIFICADO: Añadir bookingDate y rango de temporada como parámetros opcionales
+  const fetchBookings = async (
+    beachId = "all",
+    hotelCode = "",
+    bookingDate?: string,
+    startDate?: string,
+    endDate?: string,
+  ) => {
     try {
       setError(null)
       setLoading(true)
       console.log(
-        `🔍 Frontend: Fetching bookings for beach: ${beachId}, hotelCode: ${hotelCode}, date: ${bookingDate || "all"}`,
+        `🔍 Frontend: Fetching bookings for beach: ${beachId}, hotelCode: ${hotelCode}, date: ${bookingDate || "all"}, season: ${startDate || "-"}→${endDate || "-"}`,
       )
       const url = new URL("/api/bookings", window.location.origin)
 
@@ -162,6 +188,13 @@ export function BookingManagement() {
       // NUEVO: Añadir bookingDate a los parámetros de búsqueda si está presente
       if (bookingDate) {
         url.searchParams.append("bookingDate", bookingDate)
+      }
+      // NUEVO: Acotar por temporada (rango de fechas)
+      if (startDate) {
+        url.searchParams.append("startDate", startDate)
+      }
+      if (endDate) {
+        url.searchParams.append("endDate", endDate)
       }
 
       const response = await fetch(url.toString())
@@ -249,7 +282,8 @@ export function BookingManagement() {
     } else if (dateFilter === "specific_date" && dateSearchInput) {
       dateToFetch = dateSearchInput
     }
-    fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch)
+    const { startDate, endDate } = getSeasonDateRange(dateToFetch)
+    fetchBookings(selectedBeachFilterId, hotelCodeFilter, dateToFetch, startDate, endDate)
   }
 
   const viewWaiver = async (waiverId: number, customerName: string) => {
@@ -684,6 +718,24 @@ export function BookingManagement() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* ✅ NUEVO: Filtro por Temporada */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Temporada</label>
+              <Select value={selectedSeason} onValueChange={setSelectedSeason}>
+                <SelectTrigger className="w-full p-3 border border-gray-200 rounded-md bg-gray-50">
+                  <SelectValue placeholder="Selecciona temporada" />
+                </SelectTrigger>
+                <SelectContent>
+                  {seasonYears.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {getSeasonLabel(year)}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={ALL_SEASONS}>Histórico (todas)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">Del 1 de junio al 31 de mayo del año siguiente</p>
+            </div>
             {/* Filtro por playa */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Playa</label>

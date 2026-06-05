@@ -746,6 +746,8 @@ export function BookingForm({ vehicle, embedded = false }: BookingFormProps) {
                       manualDeposit={manualDeposit}
                       onWaiverSigned={handleWaiverSigned}
                       onBack={handlePrevStep}
+                      vehicleName={vehicle.name}
+                      beachLocationId={vehicle.beachLocationId ?? undefined}
                     />
                   )}
 

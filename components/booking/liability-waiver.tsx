@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -15,13 +15,34 @@ interface LiabilityWaiverProps {
   onWaiverSigned: (waiverId: number) => void
   className?: string
   onBack: () => void
+  // ✅ NUEVO: datos de la reserva para mostrar en el contrato que firma el cliente
+  vehicleName?: string
+  beachLocationId?: string
 }
 
-export function LiabilityWaiver({ customerName, customerEmail, customerDni, manualDeposit, onWaiverSigned, className = "" }: LiabilityWaiverProps) {
+export function LiabilityWaiver({ customerName, customerEmail, customerDni, manualDeposit, onWaiverSigned, className = "", vehicleName, beachLocationId }: LiabilityWaiverProps) {
   const [agreed, setAgreed] = useState(false)
   const [signatureData, setSignatureData] = useState<string>("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // ✅ NUEVO: nombre de la playa resuelto a partir del beachLocationId
+  const [beachName, setBeachName] = useState<string>("")
+
+  useEffect(() => {
+    if (!beachLocationId) return
+    let cancelled = false
+    fetch("/api/locations")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (cancelled || !Array.isArray(data)) return
+        const match = data.find((loc: { id: string; name: string }) => loc.id === beachLocationId)
+        if (match?.name) setBeachName(match.name)
+      })
+      .catch((err) => console.error("Error resolviendo el nombre de la playa:", err))
+    return () => {
+      cancelled = true
+    }
+  }, [beachLocationId])
 
   console.log("🔍 DEBUG - LiabilityWaiver received:", {
     customerName,
@@ -100,6 +121,23 @@ export function LiabilityWaiver({ customerName, customerEmail, customerDni, manu
   return (
     <div className={`space-y-4 ${className}`}>
       <h3 className="text-lg font-semibold">Exención de Responsabilidad</h3>
+
+      {/* ✅ NUEVO: Resumen de la reserva que se está firmando */}
+      {(vehicleName || beachName) && (
+        <div className="rounded-md border border-gray-200 bg-blue-50 p-3 text-sm">
+          <p className="font-semibold text-gray-800 mb-1">Estás firmando el contrato para:</p>
+          {vehicleName && (
+            <p className="text-gray-700">
+              <span className="font-medium">Vehículo:</span> {vehicleName}
+            </p>
+          )}
+          {beachName && (
+            <p className="text-gray-700">
+              <span className="font-medium">Playa / Ubicación:</span> {beachName}
+            </p>
+          )}
+        </div>
+      )}
 
       <ScrollArea className="h-64 border rounded-md p-4 bg-gray-50">
         <div className="whitespace-pre-wrap">{waiverContent}</div>

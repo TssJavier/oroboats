@@ -63,10 +63,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         b.time_slot, -- Usar time_slot de bookings
         b.total_price,
         v.name as vehicle_name,
-        v.type as vehicle_type
+        v.type as vehicle_type,
+        l.name as beach_location_name -- Nombre de la playa/ubicación de la reserva
       FROM liability_waivers lw
       LEFT JOIN bookings b ON lw.booking_id = b.id
       LEFT JOIN vehicles v ON b.vehicle_id = v.id
+      LEFT JOIN locations l ON b.beach_location_id = l.id
       WHERE lw.id = ${waiverId}
     `)
 
@@ -296,6 +298,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               <p><strong>DNI/NIE:</strong> ${waiver.customer_dni || "N/A"}</p>
               <p><strong>Vehículo:</strong> ${waiver.vehicle_name || "N/A"}</p>
               <p><strong>Tipo:</strong> ${waiver.vehicle_type || "N/A"}</p>
+              <p><strong>Playa / Ubicación:</strong> ${waiver.beach_location_name || "N/A"}</p>
               <p><strong>Fecha:</strong> ${waiver.booking_date ? new Date(waiver.booking_date).toLocaleDateString("es-ES") : new Date().toLocaleDateString("es-ES")}</p>
               <p><strong>Horario:</strong> ${waiver.time_slot || "N/A"}</p>
             </div>

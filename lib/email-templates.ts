@@ -54,6 +54,7 @@ export const bookingConfirmationTemplate = (data: {
   endTime: string
   totalPrice: number
   securityDeposit?: number
+  beachLocationName?: string | null
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
@@ -86,6 +87,7 @@ export const bookingConfirmationTemplate = (data: {
           <h3 style="margin-top: 0; color: #333;">Detalles de la reserva</h3>
           <p style="margin: 5px 0;"><strong>ID de reserva:</strong> #${data.bookingId}</p>
           <p style="margin: 5px 0;"><strong>Vehículo:</strong> ${data.vehicleName}</p>
+          ${data.beachLocationName ? `<p style="margin: 5px 0;"><strong>Playa / Ubicación:</strong> ${data.beachLocationName}</p>` : ""}
           <p style="margin: 5px 0;"><strong>Fecha:</strong> ${data.bookingDate}</p>
           <p style="margin: 5px 0;"><strong>Horario:</strong> ${data.startTime} - ${data.endTime}</p>
         </div>
@@ -180,6 +182,7 @@ export const adminNotificationTemplate = (data: {
   endTime: string
   totalPrice: number
   securityDeposit?: number
+  beachLocationName?: string | null
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
@@ -230,6 +233,7 @@ export const adminNotificationTemplate = (data: {
         <div style="background: #f0f8ff; padding: 20px; border-radius: 8px; border-left: 4px solid #D4AF37;">
           <h3 style="margin-top: 0; color: #333;">Detalles de la reserva</h3>
           <p style="margin: 5px 0;"><strong>Vehículo:</strong> ${data.vehicleName}</p>
+          ${data.beachLocationName ? `<p style="margin: 5px 0;"><strong>Playa / Ubicación:</strong> ${data.beachLocationName}</p>` : ""}
           <p style="margin: 5px 0;"><strong>Fecha:</strong> ${data.bookingDate}</p>
           <p style="margin: 5px 0;"><strong>Horario:</strong> ${data.startTime} - ${data.endTime}</p>
         </div>
@@ -361,6 +365,7 @@ export const renderAdminBookingNotification = (data: {
   endTime: string
   totalPrice: number
   securityDeposit?: number
+  beachLocationName?: string | null
   discountAmount?: number
   originalPrice?: number
   discountCode?: string
@@ -380,6 +385,7 @@ export const renderCustomerBookingConfirmation = (data: {
   endTime: string
   totalPrice: number
   securityDeposit?: number
+  beachLocationName?: string | null
   discountAmount?: number
   originalPrice?: number
   discountCode?: string

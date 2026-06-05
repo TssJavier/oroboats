@@ -31,6 +31,7 @@ interface BookingEmailData {
   originalPrice?: number
   discountCode?: string
   securityDeposit: number
+  beachLocationName?: string | null
 }
 
 interface ContactEmailData {
@@ -137,6 +138,10 @@ export async function sendCommercialNotification(booking: BookingEmailData & { h
                 <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #666;">Vehículo</td>
                 <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-weight: 600; text-align: right;">${booking.vehicleName}</td>
               </tr>
+              ${booking.beachLocationName ? `<tr>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #666;">Playa</td>
+                <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-weight: 600; text-align: right;">${booking.beachLocationName}</td>
+              </tr>` : ""}
               <tr>
                 <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; color: #666;">Fecha</td>
                 <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-weight: 600; text-align: right;">${booking.bookingDate}</td>

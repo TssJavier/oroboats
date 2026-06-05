@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     const beachLocationId = searchParams.get("beachLocationId")
     const hotelCode = searchParams.get("hotelCode")
     const bookingDate = searchParams.get("bookingDate") // NUEVO: Obtener bookingDate
+    const startDate = searchParams.get("startDate") // NUEVO: Filtro por temporada (rango)
+    const endDate = searchParams.get("endDate") // NUEVO: Filtro por temporada (rango)
 
     let query = sql`
     SELECT
@@ -66,6 +68,14 @@ export async function GET(request: NextRequest) {
     // NUEVO: Añadir condición para filtrar por bookingDate
     if (bookingDate) {
       conditions.push(sql`b.booking_date = ${bookingDate}`)
+    }
+
+    // NUEVO: Filtro por rango de temporada (1 jun -> 31 may del año siguiente)
+    if (startDate) {
+      conditions.push(sql`b.booking_date >= ${startDate}`)
+    }
+    if (endDate) {
+      conditions.push(sql`b.booking_date <= ${endDate}`)
     }
 
     if (conditions.length > 0) {

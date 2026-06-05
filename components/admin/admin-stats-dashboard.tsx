@@ -5,7 +5,15 @@ import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DollarSign, Calendar, Clock, AlertTriangle } from "lucide-react"
+import {
+  ALL_SEASONS,
+  getCurrentSeasonYear,
+  getSeasonLabel,
+  getSeasonRange,
+  listSeasonYears,
+} from "@/lib/season"
 
 interface BookingStats {
   totalBookings: number
@@ -32,17 +40,27 @@ export function AdminStatsDashboard() {
   const [stats, setStats] = useState<BookingStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // ✅ NUEVO: temporada seleccionada (por defecto, la temporada actual)
+  const [selectedSeason, setSelectedSeason] = useState<string>(String(getCurrentSeasonYear()))
+  const seasonYears = listSeasonYears()
 
   useEffect(() => {
     fetchStats()
-  }, [])
+  }, [selectedSeason])
 
   const fetchStats = async () => {
     try {
       setLoading(true)
       setError(null)
       // ✅ CORREGIDO: Llamar a la ruta de API correcta
-      const response = await fetch("/api/admin/stats")
+      // ✅ NUEVO: filtrar por temporada (rango de fechas) salvo que sea "histórico"
+      const url = new URL("/api/admin/stats", window.location.origin)
+      if (selectedSeason !== ALL_SEASONS) {
+        const { startDate, endDate } = getSeasonRange(Number(selectedSeason))
+        url.searchParams.set("startDate", startDate)
+        url.searchParams.set("endDate", endDate)
+      }
+      const response = await fetch(url.toString())
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(`HTTP error! Status: ${response.status}. Details: ${errorData.error || "Unknown error"}`)
@@ -108,6 +126,32 @@ export function AdminStatsDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* ✅ NUEVO: Selector de temporada */}
+      <Card>
+        <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 py-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Temporada</span>
+          </div>
+          <Select value={selectedSeason} onValueChange={setSelectedSeason}>
+            <SelectTrigger className="w-full sm:w-64">
+              <SelectValue placeholder="Selecciona temporada" />
+            </SelectTrigger>
+            <SelectContent>
+              {seasonYears.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {getSeasonLabel(year)}
+                </SelectItem>
+              ))}
+              <SelectItem value={ALL_SEASONS}>Histórico (todas)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground sm:ml-auto">
+            Del 1 de junio al 31 de mayo del año siguiente
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
