@@ -88,6 +88,7 @@ export function LiabilityWaiver({ customerName, customerEmail, customerDni, manu
           customerDni,
           signatureData,
           manualDeposit,
+          beachLocationName: beachName || null, // ✅ NUEVO: para incluir la playa en el texto guardado
         }),
       })
 
@@ -115,8 +116,8 @@ export function LiabilityWaiver({ customerName, customerEmail, customerDni, manu
     manualDepositFormatted: (typeof manualDeposit === 'number' ? manualDeposit : 0).toFixed(2) + " €",
 
   })
-  // Generar contenido del waiver
-  const waiverContent = getWaiverContent("es", customerName, "127.0.0.1", manualDeposit)
+  // Generar contenido del waiver (incluye la playa/ubicación en el cuerpo legal si está disponible)
+  const waiverContent = getWaiverContent("es", customerName, "127.0.0.1", manualDeposit, beachName)
 
   return (
     <div className={`space-y-4 ${className}`}>

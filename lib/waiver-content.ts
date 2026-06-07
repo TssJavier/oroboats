@@ -2,7 +2,7 @@
 export const WAIVER_CONTENT_ES = `EXENCIÓN DE RESPONSABILIDAD Y ASUNCIÓN DE RIESGO
 ALQUILER DE EMBARCACIONES Y MOTOS ACUÁTICAS
 
-Yo, [CUSTOMER_NAME], con fecha [DATE], declaro y acepto lo siguiente:
+Yo, [CUSTOMER_NAME], con fecha [DATE][LOCATION_CLAUSE], declaro y acepto lo siguiente:
 
 1. ASUNCIÓN DE RIESGO
 Entiendo y acepto que las actividades náuticas, incluyendo el uso de embarcaciones y motos acuáticas, conllevan riesgos inherentes que pueden resultar en lesiones personales, daños a la propiedad o incluso la muerte. Estos riesgos incluyen, pero no se limitan a:
@@ -61,7 +61,7 @@ Este documento ha sido firmado electrónicamente y tiene la misma validez legal 
 export const WAIVER_CONTENT_EN = `LIABILITY WAIVER AND ASSUMPTION OF RISK
 BOAT AND JET SKI RENTAL
 
-I, [CUSTOMER_NAME], on [DATE], declare and accept the following:
+I, [CUSTOMER_NAME], on [DATE][LOCATION_CLAUSE], declare and accept the following:
 
 1. ASSUMPTION OF RISK
 I understand and accept that nautical activities, including the use of boats and jet skis, carry inherent risks that may result in personal injury, property damage, or even death. These risks include, but are not limited to:
@@ -122,6 +122,7 @@ export function getWaiverContent(
   customerName: string,
   ipAddress: string,
   manualDeposit: number | null, // Solo se pasa manualDeposit
+  location?: string | null, // ✅ NUEVO: playa / ubicación de la reserva (opcional)
 ): string {
   const content = language === "es" ? WAIVER_CONTENT_ES : WAIVER_CONTENT_EN
   const now = new Date()
@@ -129,11 +130,21 @@ export function getWaiverContent(
   // Usar manualDeposit directamente para el placeholder [DEPOSIT]
   const displayDeposit = manualDeposit || 0
 
+  // ✅ NUEVO: Cláusula de ubicación dentro del cuerpo legal. Si no hay playa, queda vacío
+  //    para no dejar frases a medias ("...con fecha X, declaro...").
+  const trimmedLocation = (location || "").trim()
+  const locationClause = trimmedLocation
+    ? language === "es"
+      ? `, para el alquiler de equipo acuático en ${trimmedLocation}`
+      : `, for the rental of watercraft at ${trimmedLocation}`
+    : ""
+
   console.log("🔍 DEBUG - getWaiverContent received:", {
     language,
     customerName,
     ipAddress,
     manualDeposit,
+    location: trimmedLocation || "(sin ubicación)",
     displayDeposit: displayDeposit.toFixed(2) + " €",
   })
 
@@ -142,5 +153,6 @@ export function getWaiverContent(
     .replace(/\[DATE\]/g, now.toLocaleDateString(language === "es" ? "es-ES" : "en-US"))
     .replace(/\[TIME\]/g, now.toLocaleTimeString(language === "es" ? "es-ES" : "en-US"))
     .replace(/\[IP_ADDRESS\]/g, ipAddress)
+    .replace(/\[LOCATION_CLAUSE\]/g, locationClause) // ✅ NUEVO
     .replace(/\[DEPOSIT\]/g, displayDeposit.toFixed(2) + " €") // Usar el valor de manualDeposit
 }

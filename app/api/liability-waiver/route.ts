@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     // MODIFICACIÓN 1: Eliminar el valor por defecto de manualDeposit en la desestructuración
-    const { customerName, customerEmail, customerDni, language = "es", signatureData, manualDeposit } = body
+    const { customerName, customerEmail, customerDni, language = "es", signatureData, manualDeposit, beachLocationName } = body
 
     // ✅ AÑADIR LOG PARA DEBUG DEL MANUAL DEPOSIT
     console.log("🔍 DEBUG - API received:", {
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     // Generar contenido del documento
     let waiverContent: string
     try {
-      waiverContent = getWaiverContent(language, customerName, ip, safeManualDeposit)
+      waiverContent = getWaiverContent(language, customerName, ip, safeManualDeposit, beachLocationName)
       console.log("📝 Waiver content generated, length:", waiverContent.length)
     } catch (contentError) {
       console.error("❌ Error generating waiver content:", contentError)

@@ -93,6 +93,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       waiver.customer_name,
       ipAddress,
       Number(waiver.manual_deposit) || null, // Pasar solo manual_deposit
+      waiver.beach_location_name || null, // ✅ NUEVO: playa/ubicación dentro del cuerpo legal
     )
 
     // Limpiar nombre para filename
