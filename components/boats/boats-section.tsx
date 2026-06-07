@@ -843,7 +843,25 @@ export function BoatsSection() {
       if (Array.isArray(data)) {
         setVehicles(data)
         setFilteredVehicles(data)
-        console.log("✅ Vehicles set successfully")
+
+        // ✅ NUEVO: Elegir la pestaña por defecto según la disponibilidad real en esta playa.
+        //    Si "sin licencia" no tiene vehículos pero "con licencia" sí (o viceversa),
+        //    abrimos directamente la pestaña que SÍ tiene artículos para no mostrar una lista vacía.
+        const noLicenseCount = data.filter((v: Vehicle) =>
+          ["boat_no_license", "jetski_no_license"].includes(v.category ?? ""),
+        ).length
+        const withLicenseCount = data.filter((v: Vehicle) =>
+          ["boat_with_license", "jetski_with_license"].includes(v.category ?? ""),
+        ).length
+
+        if (noLicenseCount === 0 && withLicenseCount > 0) {
+          setActiveLicense("with")
+        } else if (withLicenseCount === 0 && noLicenseCount > 0) {
+          setActiveLicense("without")
+        }
+        // Si ambas categorías tienen (o ninguna tiene) vehículos, se respeta la selección actual.
+
+        console.log("✅ Vehicles set successfully", { noLicenseCount, withLicenseCount })
       } else {
         console.error("API returned non-array data:", data)
         setVehicles([])
