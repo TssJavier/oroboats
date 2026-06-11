@@ -63,6 +63,7 @@ interface BookingData {
   liabilityWaiverId?: number
   hotelCode?: string
   beachLocationId?: string
+  holdToken?: string // ✅ NUEVO: token del bloqueo comercial (cuando se abre desde una URL bloqueada)
 }
 
 interface TimeSlot {
@@ -236,6 +237,12 @@ export function BookingForm({ vehicle, embedded = false }: BookingFormProps) {
       setBookingData((prev) => ({ ...prev, hotelCode: urlHotelCode.toUpperCase() }))
     }
 
+    // ✅ NUEVO: token de bloqueo comercial (URL bloqueada que el comercial pasa al cliente)
+    const urlHold = searchParams.get("hold")
+    if (urlHold) {
+      setBookingData((prev) => ({ ...prev, holdToken: urlHold }))
+    }
+
     if (date && startTime && endTime && duration && price) {
       console.log("🔗 Deeplink detectado:", { date, startTime, endTime, duration, price })
 
@@ -353,7 +360,11 @@ export function BookingForm({ vehicle, embedded = false }: BookingFormProps) {
         ? bookingData.bookingDate.split("T")[0]
         : bookingData.bookingDate
 
-      const url = `/api/availability/${vehicle.id}/slots?date=${encodeURIComponent(formattedDate)}&durationType=${encodeURIComponent(bookingData.duration)}`
+      let url = `/api/availability/${vehicle.id}/slots?date=${encodeURIComponent(formattedDate)}&durationType=${encodeURIComponent(bookingData.duration)}`
+      // ✅ NUEVO: si la reserva viene de una URL de bloqueo, ese hueco no debe contar como ocupado
+      if (bookingData.holdToken) {
+        url += `&excludeHold=${encodeURIComponent(bookingData.holdToken)}`
+      }
       const response = await fetch(url)
 
       if (!response.ok) {

@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
         paymentType: paymentType,
         liabilityWaiverId: bookingData?.liabilityWaiverId?.toString() || "",
         hotelCode: bookingData?.hotelCode || "",
+        holdToken: bookingData?.holdToken || "", // ✅ NUEVO: token del bloqueo comercial (si viene de una URL bloqueada)
         debug: paymentType === "partial_payment" ? "PARTIAL_PAYMENT_INTENT" : "FULL_PAYMENT_INTENT",
       },
     })

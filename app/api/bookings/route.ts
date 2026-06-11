@@ -57,6 +57,9 @@ export async function GET(request: NextRequest) {
   `
     const conditions = []
 
+    // ✅ NUEVO: Excluir bloqueos comerciales del listado de reservas (viven en el panel del comercial)
+    conditions.push(sql`(b.payment_status IS NULL OR b.payment_status != 'hold')`)
+
     if (beachLocationId && beachLocationId !== "all") {
       conditions.push(sql`b.beach_location_id = ${beachLocationId}`)
     }

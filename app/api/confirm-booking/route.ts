@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import stripe from "@/lib/stripe-config" // Asumo que este es tu cliente Stripe configurado
 import { sendAdminNotification, sendCustomerConfirmation, sendCommercialNotification } from "@/lib/email"
 import { supabaseAdmin } from "@/lib/db-supabase"
+import { verifyHoldToken, releaseHoldById } from "@/lib/holds"
 
 const supabase = supabaseAdmin
 
@@ -265,6 +266,18 @@ export async function POST(request: NextRequest) {
       beachLocationId: newBooking.beach_location_id, // Log para verificar
       beachLocationName: newBooking.beach_location_name, // Log para verificar
     })
+
+    // ✅ NUEVO: si esta reserva viene de una URL de bloqueo comercial, liberar el bloqueo
+    // para que no quede ocupando el hueco junto a la reserva ya pagada.
+    try {
+      const holdId = verifyHoldToken(metadata.holdToken)
+      if (holdId) {
+        await releaseHoldById(holdId)
+        console.log("🔓 Bloqueo comercial liberado tras el pago:", holdId)
+      }
+    } catch (holdError) {
+      console.error("⚠️ Error liberando el bloqueo comercial (no crítico):", holdError)
+    }
 
     // ✅ ENVIAR EMAILS CON MONTOS CORRECTOS Y DATOS DE PLAYA
     try {

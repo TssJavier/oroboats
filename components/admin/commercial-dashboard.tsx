@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { CommercialHolds } from "./commercial-holds"
 import {
   TrendingUp,
   DollarSign,
@@ -200,6 +201,9 @@ export function CommercialDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ✅ NUEVO: Bloqueos / Reservas en espera */}
+      <CommercialHolds />
 
       {/* Embed Code Section */}
       {hotelCodes.length > 0 && (

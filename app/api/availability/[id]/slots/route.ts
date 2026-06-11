@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "drizzle-orm"
 import { db } from "@/lib/db"
+import { releaseExpiredHolds, verifyHoldToken } from "@/lib/holds"
 
 // Helper to convert "HH:MM" to minutes from midnight
 function timeToMinutes(time: string) {
@@ -408,6 +409,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     const { searchParams } = new URL(request.url)
     const date = searchParams.get("date")
     const durationType = searchParams.get("durationType")
+    // ✅ NUEVO: si se abre desde una URL de bloqueo, ese bloqueo no debe contar como ocupado
+    const excludeHoldId = verifyHoldToken(searchParams.get("excludeHold"))
 
     const params = await props.params
     const vehicleId = params.id // Acceder de la promesa resuelta
@@ -484,6 +487,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
       console.log(`⏱️ Found ${relevantPricing.length} pricing options for type: ${durationType}`)
 
+      // ✅ NUEVO: liberar bloqueos comerciales caducados (8h) antes de calcular disponibilidad
+      await releaseExpiredHolds(Number(vehicleId), date)
+
       // ✅ CRÍTICO: Obtener reservas CONFIRMADAS para la fecha específica
       console.log(`📅 Fetching CONFIRMED bookings for vehicle ${vehicleId} on ${date}...`)
 
@@ -506,6 +512,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       `)
 
       existingBookings = bookingsQuery || []
+
+      // ✅ NUEVO: excluir el propio bloqueo para que el cliente pueda pagar ese hueco
+      if (excludeHoldId) {
+        existingBookings = existingBookings.filter((b: any) => Number(b.id) !== excludeHoldId)
+      }
 
       console.log("📊 CONFIRMED bookings found for date", date, ":", existingBookings.length)
       existingBookings.forEach((booking, index) => {

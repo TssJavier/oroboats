@@ -25,6 +25,9 @@ export async function GET(request: Request) {
     // ✅ CONDICIÓN PRINCIPAL: Excluir reservas de prueba
     whereConditions.push("(is_test_booking IS NULL OR is_test_booking = false)")
 
+    // ✅ NUEVO: Excluir bloqueos comerciales (no son reservas reales)
+    whereConditions.push("(payment_status IS NULL OR payment_status != 'hold')")
+
     // Añadir filtros de fecha si están presentes
     if (startDate && endDate) {
       whereConditions.push(`booking_date BETWEEN '${startDate}' AND '${endDate}'`)
