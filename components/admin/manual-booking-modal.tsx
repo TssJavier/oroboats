@@ -101,6 +101,34 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
   const [showWaiverModal, setShowWaiverModal] = useState(false)
   const [liabilityWaiverId, setLiabilityWaiverId] = useState<number | null>(null)
 
+  // ✅ NUEVO: comerciales creados desde el panel (tabla admin_users, role 'comercial')
+  const [comerciales, setComerciales] = useState<{ id: number; name: string; email: string }[]>([])
+
+  // ✅ NUEVO: cargar la lista de comerciales reales al abrir el modal
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    fetch("/api/users")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) setComerciales(data)
+      })
+      .catch((err) => console.error("Error cargando comerciales:", err))
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
+
+  // ✅ NUEVO: opciones del desplegable = staff interno + comerciales del panel (sin duplicar por nombre)
+  const salesOptions = useMemo(() => {
+    const staffOptions = SALES_STAFF.map((s) => ({ value: s.id, label: s.name }))
+    const existingNames = new Set(SALES_STAFF.map((s) => s.name.toLowerCase()))
+    const dbOptions = comerciales
+      .filter((c) => c.name && !existingNames.has(c.name.toLowerCase()))
+      .map((c) => ({ value: c.name, label: c.name }))
+    return [...staffOptions, ...dbOptions]
+  }, [comerciales])
+
   // Cargar slots disponibles cuando cambie la fecha
   useEffect(() => {
     if (formData.bookingDate && vehicle) {
@@ -476,9 +504,9 @@ export function ManualBookingModal({ vehicle, isOpen, onClose, onSuccess }: Manu
                     <SelectValue placeholder="Selecciona un comercial" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SALES_STAFF.map((staff) => (
-                      <SelectItem key={staff.id} value={staff.id}>
-                        {staff.name}
+                    {salesOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
