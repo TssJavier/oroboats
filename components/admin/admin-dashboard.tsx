@@ -32,6 +32,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { CommercialDashboard } from "./commercial-dashboard"
+import { CommercialHolds } from "./commercial-holds"
 
 interface User {
   email: string
@@ -233,7 +234,10 @@ export function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="bookings" className="mt-0">
-            <BookingManagement />
+            <div className="space-y-8">
+              <CommercialHolds isAdmin />
+              <BookingManagement />
+            </div>
           </TabsContent>
 
           <TabsContent value="blog" className="mt-0">

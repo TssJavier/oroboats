@@ -80,7 +80,7 @@ function durationLabel(cat: string): string {
   }
 }
 
-export function CommercialHolds() {
+export function CommercialHolds({ isAdmin = false }: { isAdmin?: boolean }) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [locations, setLocations] = useState<BeachLocation[]>([])
   const [holds, setHolds] = useState<Hold[]>([])
@@ -598,7 +598,7 @@ export function CommercialHolds() {
                       <span className="flex items-center gap-1 text-amber-600">
                         <Clock className="h-3 w-3" /> caduca {formatExpiry(h.expiresAt)}
                       </span>
-                      {!h.hotelCode && (
+                      {!isAdmin && !h.hotelCode && (
                         <Badge className="bg-red-100 text-red-700 border-red-200">sin código → sin comisión</Badge>
                       )}
                     </div>

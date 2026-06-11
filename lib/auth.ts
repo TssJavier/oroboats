@@ -70,7 +70,7 @@ export async function getUserInfo(email: string): Promise<AdminUser | null> {
       email,
       isAdmin: true,
       id: "admin-env",
-      name: "Administrador Principal",
+      name: "Fermin",
       role: "admin",
     }
   }
