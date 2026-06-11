@@ -1,17 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Lock, Loader2, Copy, Check, Unlock, Clock, Calendar, Ship, Zap } from "lucide-react"
+import { Lock, Loader2, Copy, Check, Unlock, Clock, Calendar, Ship, Zap, MapPin, KeyRound } from "lucide-react"
 
 interface Vehicle {
   id: number
   name: string
   type: string
+  requiresLicense: boolean
+  beachLocationId: string | null
+  image: string
+}
+
+interface BeachLocation {
+  id: string
+  name: string
 }
 
 interface Slot {
@@ -42,26 +50,81 @@ interface Hold {
   payUrl: string
 }
 
+// Orden y etiquetas de los tramos de duración (de más corto a más largo)
+const DURATION_ORDER = ["30min", "1hour", "2hour", "3hour", "4hour", "halfday", "fullday"]
+
+function durationCategory(duration: string): string {
+  if (duration.startsWith("halfday")) return "halfday"
+  if (duration.startsWith("fullday")) return "fullday"
+  return duration
+}
+
+function durationLabel(cat: string): string {
+  switch (cat) {
+    case "30min":
+      return "30 minutos"
+    case "1hour":
+      return "1 hora"
+    case "2hour":
+      return "2 horas"
+    case "3hour":
+      return "3 horas"
+    case "4hour":
+      return "4 horas"
+    case "halfday":
+      return "Medio día"
+    case "fullday":
+      return "Día completo"
+    default:
+      return cat
+  }
+}
+
 export function CommercialHolds() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [locations, setLocations] = useState<BeachLocation[]>([])
   const [holds, setHolds] = useState<Hold[]>([])
   const [loadingHolds, setLoadingHolds] = useState(true)
 
+  // Flujo de selección en cascada
+  const [beachId, setBeachId] = useState<string>("")
+  const [vType, setVType] = useState<string>("") // 'boat' | 'jetski'
+  const [license, setLicense] = useState<string>("") // 'yes' | 'no'
   const [vehicleId, setVehicleId] = useState<string>("")
   const [date, setDate] = useState<string>("")
+
   const [slots, setSlots] = useState<Slot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
+  const [durationCat, setDurationCat] = useState<string>("")
   const [selectedSlotKey, setSelectedSlotKey] = useState<string>("")
+
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string>("")
   const [copiedId, setCopiedId] = useState<number | null>(null)
 
-  // Cargar vehículos y bloqueos al montar
+  // Cargar vehículos, playas y bloqueos al montar
   useEffect(() => {
     fetch("/api/vehicles")
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
-        if (Array.isArray(data)) setVehicles(data.map((v: any) => ({ id: v.id, name: v.name, type: v.type })))
+        if (Array.isArray(data)) {
+          setVehicles(
+            data.map((v: any) => ({
+              id: v.id,
+              name: v.name,
+              type: v.type,
+              requiresLicense: Boolean(v.requiresLicense),
+              beachLocationId: v.beachLocationId ?? null,
+              image: v.image || "",
+            })),
+          )
+        }
+      })
+      .catch(() => {})
+    fetch("/api/locations")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setLocations(data.map((l: any) => ({ id: String(l.id), name: l.name })))
       })
       .catch(() => {})
     fetchHolds()
@@ -82,9 +145,74 @@ export function CommercialHolds() {
     }
   }
 
+  // ✅ Opciones derivadas de los datos reales para no dejar callejones sin salida
+  const beachOptions = useMemo(
+    () => locations.filter((l) => vehicles.some((v) => v.beachLocationId === l.id)),
+    [locations, vehicles],
+  )
+
+  const typeOptions = useMemo(() => {
+    const set = new Set(vehicles.filter((v) => v.beachLocationId === beachId).map((v) => v.type))
+    return Array.from(set)
+  }, [vehicles, beachId])
+
+  const licenseOptions = useMemo(() => {
+    const set = new Set(
+      vehicles.filter((v) => v.beachLocationId === beachId && v.type === vType).map((v) => v.requiresLicense),
+    )
+    return Array.from(set) // [true] | [false] | [true,false]
+  }, [vehicles, beachId, vType])
+
+  const filteredVehicles = useMemo(
+    () =>
+      vehicles.filter(
+        (v) =>
+          v.beachLocationId === beachId && v.type === vType && v.requiresLicense === (license === "yes"),
+      ),
+    [vehicles, beachId, vType, license],
+  )
+
+  const selectedVehicle = useMemo(
+    () => vehicles.find((v) => String(v.id) === vehicleId) || null,
+    [vehicles, vehicleId],
+  )
+
+  // Categorías de duración presentes en los slots disponibles (ordenadas)
+  const durationCats = useMemo(() => {
+    const set = new Set(slots.map((s) => durationCategory(s.duration)))
+    return DURATION_ORDER.filter((d) => set.has(d))
+  }, [slots])
+
+  // Slots de la categoría elegida (ordenados por hora de inicio)
+  const slotsForCat = useMemo(
+    () =>
+      slots
+        .filter((s) => durationCategory(s.duration) === durationCat)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    [slots, durationCat],
+  )
+
+  // --- Handlers de cascada: al cambiar un paso, se resetean los siguientes ---
+  const onBeachChange = (val: string) => {
+    setBeachId(val)
+    setVType("")
+    setLicense("")
+    setVehicleId("")
+  }
+  const onTypeChange = (val: string) => {
+    setVType(val)
+    setLicense("")
+    setVehicleId("")
+  }
+  const onLicenseChange = (val: string) => {
+    setLicense(val)
+    setVehicleId("")
+  }
+
   // Cargar horarios cuando hay vehículo + fecha
   useEffect(() => {
     setSlots([])
+    setDurationCat("")
     setSelectedSlotKey("")
     if (!vehicleId || !date) return
     setLoadingSlots(true)
@@ -108,7 +236,7 @@ export function CommercialHolds() {
     setError("")
     const slot = slots.find((s) => slotKey(s) === selectedSlotKey)
     if (!vehicleId || !date || !slot) {
-      setError("Selecciona barco, día y horario.")
+      setError("Completa todos los pasos: playa, tipo, licencia, vehículo, día y horario.")
       return
     }
     setCreating(true)
@@ -130,11 +258,15 @@ export function CommercialHolds() {
         setError(data.error || "No se pudo crear el bloqueo.")
         return
       }
-      // Reset y refrescar
+      // Reset completo y refrescar
       setSelectedSlotKey("")
+      setDurationCat("")
       setSlots([])
       setDate("")
       setVehicleId("")
+      setLicense("")
+      setVType("")
+      setBeachId("")
       await fetchHolds()
     } catch {
       setError("Error de conexión al crear el bloqueo.")
@@ -155,7 +287,11 @@ export function CommercialHolds() {
   }
 
   const handleUnblock = async (hold: Hold) => {
-    if (!confirm(`¿Desbloquear ${hold.vehicleName} del ${formatDate(hold.bookingDate)} ${hold.timeSlot}? Quedará libre para cualquiera.`)) {
+    if (
+      !confirm(
+        `¿Desbloquear ${hold.vehicleName} del ${formatDate(hold.bookingDate)} ${hold.timeSlot}? Quedará libre para cualquiera.`,
+      )
+    ) {
       return
     }
     try {
@@ -183,6 +319,10 @@ export function CommercialHolds() {
     }
   }
 
+  const typeLabel = (t: string) => (t === "jetski" ? "Moto de agua" : "Barco")
+  const TypeIcon = ({ t, className }: { t: string; className?: string }) =>
+    t === "jetski" ? <Zap className={className} /> : <Ship className={className} />
+
   return (
     <Card className="bg-white border-2 border-purple-100">
       <CardHeader>
@@ -193,46 +333,225 @@ export function CommercialHolds() {
       </CardHeader>
       <CardContent className="space-y-6">
         <p className="text-sm text-gray-600">
-          Bloquea un barco a una hora y día concretos para que nadie te lo quite. Pásale al cliente el enlace de pago para
-          que reserve, o desbloquéalo si al final no lo coge. Los bloqueos se liberan solos a las 8 horas.
+          Bloquea un vehículo a una hora y día concretos para que nadie te lo quite. Pásale al cliente el enlace de pago
+          para que reserve, o desbloquéalo si al final no lo coge. Los bloqueos se liberan solos a las 8 horas.
         </p>
 
-        {/* Formulario de bloqueo */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* ---------- Formulario de bloqueo paso a paso ---------- */}
+        <div className="space-y-4">
+          {/* Paso 1: Playa */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Barco / Moto</label>
-            <Select value={vehicleId} onValueChange={setVehicleId}>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                1
+              </span>
+              <MapPin className="h-4 w-4 text-purple-500" /> Playa
+            </label>
+            <Select value={beachId} onValueChange={onBeachChange}>
               <SelectTrigger className="bg-gray-50">
-                <SelectValue placeholder="Selecciona vehículo" />
+                <SelectValue placeholder="Selecciona la playa" />
               </SelectTrigger>
               <SelectContent>
-                {vehicles.map((v) => (
-                  <SelectItem key={v.id} value={String(v.id)}>
-                    {v.name}
+                {beachOptions.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Día</label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-gray-50" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Horario</label>
-            <Select value={selectedSlotKey} onValueChange={setSelectedSlotKey} disabled={!vehicleId || !date || loadingSlots}>
-              <SelectTrigger className="bg-gray-50">
-                <SelectValue placeholder={loadingSlots ? "Cargando..." : slots.length ? "Selecciona horario" : "Sin horarios"} />
-              </SelectTrigger>
-              <SelectContent>
-                {slots.map((s) => (
-                  <SelectItem key={slotKey(s)} value={slotKey(s)}>
-                    {s.startTime}-{s.endTime} · €{s.price} {s.label ? `(${s.label})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
+          {/* Paso 2: Tipo (barco / moto) */}
+          {beachId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                  2
+                </span>
+                ¿Barco o moto?
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {["boat", "jetski"]
+                  .filter((t) => typeOptions.includes(t))
+                  .map((t) => (
+                    <Button
+                      key={t}
+                      type="button"
+                      variant={vType === t ? "default" : "outline"}
+                      className={vType === t ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
+                      onClick={() => onTypeChange(t)}
+                    >
+                      <TypeIcon t={t} className="h-4 w-4 mr-2" />
+                      {typeLabel(t)}
+                    </Button>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Paso 3: Licencia */}
+          {beachId && vType && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                  3
+                </span>
+                <KeyRound className="h-4 w-4 text-purple-500" /> ¿Licencia?
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {licenseOptions.includes(true) && (
+                  <Button
+                    type="button"
+                    variant={license === "yes" ? "default" : "outline"}
+                    className={license === "yes" ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
+                    onClick={() => onLicenseChange("yes")}
+                  >
+                    Con licencia
+                  </Button>
+                )}
+                {licenseOptions.includes(false) && (
+                  <Button
+                    type="button"
+                    variant={license === "no" ? "default" : "outline"}
+                    className={license === "no" ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
+                    onClick={() => onLicenseChange("no")}
+                  >
+                    Sin licencia
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Paso 4: Vehículo + imagen de confirmación */}
+          {beachId && vType && license && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                  4
+                </span>
+                Vehículo
+              </label>
+              <Select value={vehicleId} onValueChange={setVehicleId}>
+                <SelectTrigger className="bg-gray-50">
+                  <SelectValue
+                    placeholder={filteredVehicles.length ? "Selecciona vehículo" : "No hay vehículos con estos criterios"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredVehicles.map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Confirmación visual del vehículo elegido */}
+              {selectedVehicle && (
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
+                  {selectedVehicle.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedVehicle.image}
+                      alt={selectedVehicle.name}
+                      className="h-20 w-28 rounded-md object-cover bg-white"
+                      onError={(e) => {
+                        ;(e.target as HTMLImageElement).style.display = "none"
+                      }}
+                    />
+                  ) : (
+                    <div className="h-20 w-28 rounded-md bg-white flex items-center justify-center text-purple-300">
+                      <TypeIcon t={selectedVehicle.type} className="h-8 w-8" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-black truncate">{selectedVehicle.name}</div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <Badge className="bg-white text-purple-700 border-purple-200">{typeLabel(selectedVehicle.type)}</Badge>
+                      <Badge className="bg-white text-purple-700 border-purple-200">
+                        {selectedVehicle.requiresLicense ? "Con licencia" : "Sin licencia"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Confirma que es el vehículo que quieres bloquear.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Paso 5: Día */}
+          {vehicleId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                  5
+                </span>
+                <Calendar className="h-4 w-4 text-purple-500" /> Día
+              </label>
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-gray-50 max-w-xs" />
+            </div>
+          )}
+
+          {/* Paso 6: Tramo de duración */}
+          {vehicleId && date && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                  6
+                </span>
+                <Clock className="h-4 w-4 text-purple-500" /> Duración
+              </label>
+              {loadingSlots ? (
+                <div className="flex items-center py-2 text-gray-500 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" /> Cargando horarios...
+                </div>
+              ) : durationCats.length === 0 ? (
+                <p className="text-sm text-gray-500">No hay horarios disponibles para ese día.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {durationCats.map((cat) => (
+                    <Button
+                      key={cat}
+                      type="button"
+                      variant={durationCat === cat ? "default" : "outline"}
+                      className={durationCat === cat ? "bg-purple-600 text-white hover:bg-purple-700" : ""}
+                      onClick={() => {
+                        setDurationCat(cat)
+                        setSelectedSlotKey("")
+                      }}
+                    >
+                      {durationLabel(cat)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Paso 7: Hora concreta */}
+          {vehicleId && date && durationCat && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xs font-bold">
+                  7
+                </span>
+                Hora
+              </label>
+              <Select value={selectedSlotKey} onValueChange={setSelectedSlotKey}>
+                <SelectTrigger className="bg-gray-50 max-w-md">
+                  <SelectValue placeholder="Selecciona la hora" />
+                </SelectTrigger>
+                <SelectContent>
+                  {slotsForCat.map((s) => (
+                    <SelectItem key={slotKey(s)} value={slotKey(s)}>
+                      {s.startTime} - {s.endTime} · €{s.price}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

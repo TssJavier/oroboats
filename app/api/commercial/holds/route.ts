@@ -24,6 +24,13 @@ async function getCommercial(request: NextRequest) {
   return user
 }
 
+// Normaliza una hora a "HH:MM" (la columna `time` de Postgres devuelve "HH:MM:SS",
+// pero los slots de disponibilidad usan "HH:MM"; si no coinciden, el formulario da
+// "Horario no disponible").
+function hhmm(t: string): string {
+  return typeof t === "string" ? t.slice(0, 5) : t
+}
+
 // Construye la URL de pago prerellenada con el token del bloqueo
 function buildPayUrl(
   origin: string,
@@ -38,8 +45,8 @@ function buildPayUrl(
 ) {
   const params = new URLSearchParams({
     date,
-    startTime,
-    endTime,
+    startTime: hhmm(startTime),
+    endTime: hhmm(endTime),
     duration,
     price: String(price),
     hold: token,

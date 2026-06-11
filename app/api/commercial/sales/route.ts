@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
       FROM bookings b
       LEFT JOIN vehicles v ON b.vehicle_id = v.id
       WHERE ${whereClause}${dateCondition}
+        AND (b.payment_status IS NULL OR b.payment_status != 'hold')
       ORDER BY b.created_at DESC
     `
 
