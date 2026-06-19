@@ -14,6 +14,7 @@ import {
   getSeasonRange,
   listSeasonYears,
 } from "@/lib/season"
+import { AdminFiscalReport } from "@/components/admin/admin-fiscal-report"
 
 interface BookingStats {
   totalBookings: number
@@ -91,39 +92,6 @@ export function AdminStatsDashboard() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="pb-2">
-              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="text-center text-red-500">
-        <p>Error: {error}</p>
-        <p>Por favor, revisa los logs del servidor y la conexión a la base de datos.</p>
-        <Button onClick={fetchStats} className="mt-4">
-          Reintentar
-        </Button>
-      </div>
-    )
-  }
-
-  if (!stats) {
-    return <div className="text-center text-gray-500">No hay datos disponibles</div>
-  }
-
   return (
     <div className="space-y-6">
       {/* ✅ NUEVO: Selector de temporada */}
@@ -152,95 +120,126 @@ export function AdminStatsDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Reservas</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalBookings}</div>
-            <p className="text-xs text-muted-foreground">Reservas reales</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">€{stats.totalRevenue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Ingresos de reservas completadas/confirmadas</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reservas Pendientes</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingBookings}</div>
-            <p className="text-xs text-muted-foreground">Esperando confirmación</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reservas Hoy</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.todayBookings}</div>
-            <p className="text-xs text-muted-foreground">Reservas para hoy</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Estadísticas generales */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-2">
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="text-center text-red-500">
+          <p>Error: {error}</p>
+          <p>Por favor, revisa los logs del servidor y la conexión a la base de datos.</p>
+          <Button onClick={fetchStats} className="mt-4">
+            Reintentar
+          </Button>
+        </div>
+      ) : stats ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Reservas</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalBookings}</div>
+                <p className="text-xs text-muted-foreground">Reservas reales</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">€{stats.totalRevenue.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">Ingresos de reservas completadas/confirmadas</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Reservas Pendientes</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.pendingBookings}</div>
+                <p className="text-xs text-muted-foreground">Esperando confirmación</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Reservas Hoy</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.todayBookings}</div>
+                <p className="text-xs text-muted-foreground">Reservas para hoy</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tipo de Reservas</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between p-2 bg-blue-50 rounded-md">
-              <span className="text-sm font-medium">Online</span>
-              <Badge className="bg-blue-600 text-white">{stats.onlineBookingsCount}</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-orange-50 rounded-md">
-              <span className="text-sm font-medium">Manuales</span>
-              <Badge className="bg-orange-600 text-white">{stats.manualBookingsCount}</Badge>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-purple-50 rounded-md">
-              <span className="text-sm font-medium">De Prueba</span>
-              <Badge className="bg-purple-600 text-white">{stats.testBookingsCount}</Badge>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tipo de Reservas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-blue-50 rounded-md">
+                  <span className="text-sm font-medium">Online</span>
+                  <Badge className="bg-blue-600 text-white">{stats.onlineBookingsCount}</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-orange-50 rounded-md">
+                  <span className="text-sm font-medium">Manuales</span>
+                  <Badge className="bg-orange-600 text-white">{stats.manualBookingsCount}</Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 bg-purple-50 rounded-md">
+                  <span className="text-sm font-medium">De Prueba</span>
+                  <Badge className="bg-purple-600 text-white">{stats.testBookingsCount}</Badge>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Últimas 10 Reservas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {stats.recentBookings.length === 0 ? (
-              <p className="text-gray-500 text-center">No hay reservas recientes.</p>
-            ) : (
-              <div className="space-y-3">
-                {stats.recentBookings.map((booking) => (
-                  <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <div className="font-semibold text-sm">{booking.customerName}</div>
-                      <div className="text-xs text-gray-600">
-                        €{booking.totalPrice} - {new Date(booking.createdAt).toLocaleDateString()}
+            <Card>
+              <CardHeader>
+                <CardTitle>Últimas 10 Reservas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recentBookings.length === 0 ? (
+                  <p className="text-gray-500 text-center">No hay reservas recientes.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {stats.recentBookings.map((booking) => (
+                      <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="font-semibold text-sm">{booking.customerName}</div>
+                          <div className="text-xs text-gray-600">
+                            €{booking.totalPrice} - {new Date(booking.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <Badge className={`${getStatusColor(booking.status)} text-xs`}>{booking.status}</Badge>
                       </div>
-                    </div>
-                    <Badge className={`${getStatusColor(booking.status)} text-xs`}>{booking.status}</Badge>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <div className="text-center text-gray-500">No hay datos disponibles</div>
+      )}
+
+      {/* ✅ NUEVO: Informe fiscal por tipo de vehículo (solo admin, con su propio selector de temporada) */}
+      <AdminFiscalReport />
     </div>
   )
 }
