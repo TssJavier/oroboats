@@ -24,24 +24,29 @@ export const viewport: Viewport = {
 
 // ✅ METADATA COMPLETA PARA SEO
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.oroboats.com"),
   // Básicos
   title: {
-    default: "OroBoats - Alquiler de Barcos y Motos de Agua en Granada",
-    template: "%s | OroBoats Granada",
+    default: "OroBoats - Alquiler de Barcos y Motos de Agua | La Herradura, Carboneras e Ibiza",
+    template: "%s | OroBoats",
   },
   description:
-    "Alquila barcos y motos de agua en Granada. Experiencias únicas en la costa mediterránea con OroBoats. Reserva online, precios competitivos, embarcaciones modernas y seguras.",
+    "Alquila barcos y motos de agua, con o sin licencia, en La Herradura (Granada), Carboneras (Almería) e Ibiza. Reserva online, precios competitivos y embarcaciones modernas y seguras con OroBoats.",
 
   // Keywords y categorización
   keywords: [
-    "alquiler barcos Granada",
-    "motos de agua Granada",
-    "charter náutico Granada",
-    "embarcaciones Granada",
-    "turismo náutico Andalucía",
-    "alquiler sin licencia Granada",
+    "alquiler de barcos",
+    "alquiler de motos de agua",
+    "alquiler barco sin licencia",
+    "alquiler barcos La Herradura",
+    "motos de agua La Herradura Granada",
+    "alquiler barco Carboneras Almería",
+    "Cabo de Gata en barco",
+    "alquiler barco Ibiza",
+    "moto de agua Ibiza Cala de Bou",
+    "Costa Tropical",
+    "turismo náutico",
     "excursiones marítimas",
-    "costa tropical Granada",
   ],
 
   // Autor y publisher
@@ -67,11 +72,11 @@ export const metadata: Metadata = {
     type: "website",
     locale: "es_ES",
     alternateLocale: ["en_US"],
-    url: "https://oroboats.com",
-    siteName: "OroBoats Granada",
-    title: "OroBoats - Alquiler de Barcos y Motos de Agua en Granada",
+    url: "https://www.oroboats.com",
+    siteName: "OroBoats",
+    title: "OroBoats - Alquiler de Barcos y Motos de Agua | La Herradura, Carboneras e Ibiza",
     description:
-      "Alquila barcos y motos de agua en Granada. Experiencias únicas en la costa mediterránea con OroBoats.",
+      "Alquila barcos y motos de agua, con o sin licencia, en La Herradura (Granada), Carboneras (Almería) e Ibiza.",
     images: [
       {
         url: "/og-image.jpg",
@@ -95,8 +100,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@oroboats",
     creator: "@oroboats",
-    title: "OroBoats - Alquiler de Barcos y Motos de Agua en Granada",
-    description: "Alquila barcos y motos de agua en Granada. Experiencias únicas en la costa mediterránea.",
+    title: "OroBoats - Alquiler de Barcos y Motos de Agua | La Herradura, Carboneras e Ibiza",
+    description: "Barcos y motos de agua, con o sin licencia, en La Herradura, Carboneras e Ibiza. Reserva online.",
     images: ["/twitter-image.jpg"],
   },
 
@@ -136,19 +141,16 @@ export const metadata: Metadata = {
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
-  "@id": "https://oroboats.com/#business",
-  name: "OroBoats Granada",
-  alternateName: "OroBoats",
-  description: "Empresa de alquiler de barcos y motos de agua en Granada, Costa Tropical",
-  url: "https://oroboats.com",
-  telephone: "+34-XXX-XXX-XXX",
+  "@id": "https://www.oroboats.com/#business",
+  name: "OroBoats",
+  alternateName: "OroBoats Granada",
+  description:
+    "Alquiler de barcos y motos de agua, con y sin licencia, en La Herradura (Granada), Carboneras (Almería) e Ibiza.",
+  url: "https://www.oroboats.com",
   email: "info@oroboats.com",
   address: {
     "@type": "PostalAddress",
-    streetAddress: "Puerto Deportivo de Granada",
-    addressLocality: "Granada",
     addressRegion: "Andalucía",
-    postalCode: "18000",
     addressCountry: "ES",
   },
   geo: {
@@ -156,7 +158,12 @@ const structuredData = {
     latitude: "36.7213028",
     longitude: "-3.4962736",
   },
-  openingHours: ["Mo-Su 10-21:00"],
+  areaServed: [
+    { "@type": "Place", name: "La Herradura, Granada" },
+    { "@type": "Place", name: "Carboneras, Almería" },
+    { "@type": "Place", name: "Cala de Bou, Ibiza" },
+  ],
+  openingHours: ["Mo-Su 10:00-21:00"],
   priceRange: "€€",
   currenciesAccepted: "EUR",
   paymentAccepted: "Cash, Credit Card, Bank Transfer",
@@ -218,13 +225,8 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="//www.google-analytics.com" />
         <link rel="dns-prefetch" href="//www.googletagmanager.com" />
 
-        {/* ✅ CANONICAL URL (se puede sobrescribir en páginas específicas) */}
-        <link rel="canonical" href="https://oroboats.com" />
-
-        {/* ✅ ALTERNATE LANGUAGES */}
-        <link rel="alternate" hrefLang="es" href="https://oroboats.com" />
-        <link rel="alternate" hrefLang="en" href="https://oroboats.com/en" />
-        <link rel="alternate" hrefLang="x-default" href="https://oroboats.com" />
+        {/* La URL canónica se define por página vía Metadata (alternates.canonical),
+            no aquí, para que cada página apunte a su propia URL y no a la home. */}
       </head>
 
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased`}>

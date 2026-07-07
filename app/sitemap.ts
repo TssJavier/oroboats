@@ -2,7 +2,7 @@ import { getPublishedBlogPosts } from '@/lib/db/blog-queries'
 import { MetadataRoute } from 'next'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-    const baseUrl = 'https://oroboats.com'
+    const baseUrl = 'https://www.oroboats.com'
 
     // Get all published blog posts in both languages
     const postsEs = await getPublishedBlogPosts('es')

@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: '/admin/',
     },
-    sitemap: 'https://oroboats.com/sitemap.xml',
+    sitemap: 'https://www.oroboats.com/sitemap.xml',
   }
 }

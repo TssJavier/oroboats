@@ -3,10 +3,11 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 
 export const metadata = {
-  metadataBase: new URL("https://oroboats.com"),
-  title: "Blog - Oro Boats | Consejos y Experiencias de Deportes Acuáticos",
+  metadataBase: new URL("https://www.oroboats.com"),
+  title: "Blog - OroBoats | Consejos y experiencias de deportes acuáticos",
   description:
-    "Descubre consejos, noticias y experiencias sobre deportes acuáticos, alquiler de barcos y motos de agua en nuestro blog.",
+    "Consejos, rutas y experiencias sobre alquiler de barcos y motos de agua en La Herradura, Carboneras e Ibiza. Descúbrelo en el blog de OroBoats.",
+  alternates: { canonical: "/blog" },
 }
 
 export default function BlogPage() {

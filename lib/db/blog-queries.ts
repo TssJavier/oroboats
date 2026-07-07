@@ -145,9 +145,12 @@ export async function deleteBlogPost(id: number) {
 export async function generateUniqueSlug(title: string, language: string, excludeId?: number) {
   const baseSlug = title
     .toLowerCase()
+    .normalize("NFD") // Separa las tildes de las letras (á -> a + ´)
+    .replace(/[̀-ͯ]/g, "") // Elimina los acentos/diacríticos (á->a, é->e, ñ->n, ü->u)
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") // Quita guiones sobrantes al principio/final
     .trim()
 
   let slug = baseSlug
