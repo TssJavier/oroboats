@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Eye, User, ArrowLeft, Share2, Star } from "lucide-react"
+import { Calendar, Clock, Eye, User, ArrowLeft, Share2, Star, Ship, ArrowRight } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useApp } from "@/components/providers"
@@ -24,6 +24,11 @@ const translations = {
     share: "Compartir",
     featured: "Destacado",
     relatedPosts: "Artículos Relacionados",
+    ctaTitle: "¿List@ para lanzarte al agua?",
+    ctaText:
+      "Barcos y motos de agua, con o sin licencia, en La Herradura, Carboneras e Ibiza. Reserva online en un par de minutos.",
+    ctaButton: "Alquilar barco o moto de agua",
+    floatingCta: "Alquila tu barco o moto",
   },
   en: {
     backToBlog: "Back to Blog",
@@ -34,6 +39,11 @@ const translations = {
     share: "Share",
     featured: "Featured",
     relatedPosts: "Related Articles",
+    ctaTitle: "Ready to hit the water?",
+    ctaText:
+      "Boats and jet skis, with or without a licence, in La Herradura, Carboneras and Ibiza. Book online in a couple of minutes.",
+    ctaButton: "Rent a boat or jet ski",
+    floatingCta: "Rent a boat or jet ski",
   },
 }
 
@@ -156,8 +166,20 @@ export function BlogPostContent({ post }: BlogPostContentProps) {
         </header>
 
         {/* Post Content */}
-        <div className="prose prose-lg max-w-none mb-16">
-          <div dangerouslySetInnerHTML={{ __html: post.content }} className="text-gray-800 leading-relaxed" />
+        <div className="max-w-none mb-12">
+          <div dangerouslySetInnerHTML={{ __html: post.content }} className="blog-content" />
+        </div>
+
+        {/* CTA de reserva al final del artículo */}
+        <div className="my-12 rounded-2xl bg-black text-white p-8 md:p-10 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
+          <p className="text-gray-300 mb-6 max-w-xl mx-auto">{t.ctaText}</p>
+          <Link href="/boats">
+            <Button className="bg-gold text-black hover:bg-yellow-400 font-bold text-base md:text-lg px-8 py-6 h-auto">
+              <Ship className="h-5 w-5 mr-2" />
+              {t.ctaButton}
+            </Button>
+          </Link>
         </div>
 
         {/* Related Posts */}
@@ -191,6 +213,21 @@ export function BlogPostContent({ post }: BlogPostContentProps) {
             </div>
           </section>
         )}
+
+        {/* Espaciador para que la barra flotante no tape el contenido en móvil */}
+        <div className="h-24 sm:h-0" />
+      </div>
+
+      {/* Banner flotante CTA: barra inferior en móvil, botón flotante en escritorio */}
+      <div className="fixed z-40 inset-x-0 bottom-0 sm:inset-x-auto sm:right-6 sm:bottom-6 print:hidden">
+        <Link
+          href="/boats"
+          className="flex items-center justify-center gap-2 bg-gold text-black font-bold shadow-2xl px-5 py-4 hover:bg-yellow-400 transition-colors sm:rounded-full sm:px-6 sm:py-3"
+        >
+          <Ship className="h-5 w-5 shrink-0" />
+          <span>{t.floatingCta}</span>
+          <ArrowRight className="h-5 w-5 shrink-0" />
+        </Link>
       </div>
     </article>
   )
