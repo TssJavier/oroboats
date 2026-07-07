@@ -3,6 +3,7 @@ import stripe from "@/lib/stripe-config" // Asumo que este es tu cliente Stripe 
 import { sendAdminNotification, sendCustomerConfirmation, sendCommercialNotification } from "@/lib/email"
 import { supabaseAdmin } from "@/lib/db-supabase"
 import { verifyHoldToken, releaseHoldById } from "@/lib/holds"
+import { sendBookingPushNotification } from "@/lib/ntfy"
 
 const supabase = supabaseAdmin
 
@@ -325,6 +326,22 @@ export async function POST(request: NextRequest) {
     } catch (emailError) {
       console.error("⚠️ Error sending emails:", emailError)
     }
+
+    // ✅ NUEVO: notificación push al equipo (ntfy)
+    await sendBookingPushNotification({
+      bookingId: Number(newBooking.id),
+      vehicleName: bookingData.vehicle_name,
+      beachLocationName: bookingData.beach_location_name,
+      bookingDate: bookingData.booking_date,
+      timeRange: `${bookingData.start_time || ""}-${bookingData.end_time || ""}`.replace(/^-|-$/g, ""),
+      customerName: bookingData.customer_name,
+      customerPhone: bookingData.customer_phone,
+      totalPrice: Number(bookingData.total_price),
+      paymentLabel:
+        paymentType === "partial_payment"
+          ? `Parcial (${Number(actualAmountPaid)}€ online + ${Number(actualAmountPending)}€ en mano)`
+          : "Online (pagado)",
+    })
 
     return NextResponse.json({
       success: true,

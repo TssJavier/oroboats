@@ -3,6 +3,7 @@ import { db } from "@/lib/db"
 import { sql } from "drizzle-orm"
 import { jwtVerify } from "jose"
 import { renderAdminBookingNotification, renderCustomerBookingConfirmation } from "@/lib/email-templates"
+import { sendBookingPushNotification } from "@/lib/ntfy"
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "tu-secreto-super-seguro-cambiar-en-produccion")
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL_RESEND || "info@oroboats.com"
@@ -326,6 +327,19 @@ export async function POST(request: NextRequest) {
       } catch (emailError) {
         console.error("❌ Error sending confirmation emails:", emailError)
       }
+
+      // ✅ NUEVO: notificación push al equipo (ntfy)
+      await sendBookingPushNotification({
+        bookingId: Number(bookingId),
+        vehicleName: vehicleName || vehicle.name,
+        beachLocationName: beachLocationName,
+        bookingDate: bookingDate,
+        timeRange: timeSlot,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        totalPrice: Number(totalPrice),
+        paymentLabel: `Manual (${paymentMethodValue === "card" ? "tarjeta" : "efectivo"})`,
+      })
 
       console.log("✅ Manual booking created successfully!")
       console.log(`   - Booking ID: ${bookingId}`)
