@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server"
 import { createBooking } from "@/lib/db/queries"
 import { sendAdminNotification, sendCustomerConfirmation, sendCommercialNotification } from "@/lib/email"
 import { vehicles, locations, hotels } from "@/lib/db/schema"
+import { sendBookingPushNotification } from "@/lib/ntfy"
 
 export async function GET(request: NextRequest) {
   try {
@@ -305,6 +306,26 @@ export async function POST(request: NextRequest) {
     } catch (emailError) {
       console.error("⚠️ Error sending emails (booking still created):", emailError)
     }
+
+    // ✅ NUEVO: notificación push al equipo (ntfy) — cubre también reservas gratis (free_booking)
+    const isFree =
+      finalBookingData.paymentStatus === "free_booking" ||
+      Number(finalBookingData.finalAmount ?? finalBookingData.totalPrice ?? 0) === 0
+    await sendBookingPushNotification({
+      bookingId: Number(booking[0].id),
+      vehicleName: finalBookingData.vehicleName,
+      beachLocationName: finalBookingData.beachLocationName,
+      bookingDate: finalBookingData.bookingDate,
+      timeRange: `${finalBookingData.startTime || ""}-${finalBookingData.endTime || ""}`.replace(/^-|-$/g, ""),
+      customerName: finalBookingData.customerName,
+      customerPhone: finalBookingData.customerPhone,
+      totalPrice: finalBookingData.totalPrice || finalBookingData.finalAmount,
+      paymentLabel: isFree
+        ? `Gratis${finalBookingData.discountCode ? " (" + finalBookingData.discountCode + ")" : ""}`
+        : finalBookingData.paymentType === "partial_payment"
+          ? "Parcial"
+          : "Online",
+    })
 
     return NextResponse.json({
       success: true,
