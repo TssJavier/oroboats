@@ -43,6 +43,9 @@ yarn-error.log*
 promptsprivateOROBOATS.txt
 *private*.txt
 
+# instrucciones de comerciales (contienen credenciales) - NUNCA subir al repo publico
+docs/instrucciones-comercial-*.md
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
