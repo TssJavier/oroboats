@@ -288,3 +288,22 @@ html {
     font-size: 1.4rem;
   }
 }
+
+/* ===== Reserva 100% gratis: tarjeta negra legible (panel de admin) ===== */
+.booking-card-free {
+  color: #f3f4f6;
+}
+.booking-card-free .text-black,
+.booking-card-free .text-gray-700,
+.booking-card-free .text-gray-600,
+.booking-card-free .text-gray-500 {
+  color: #e5e7eb !important;
+}
+.booking-card-free .text-gold {
+  color: #ffd700 !important;
+}
+/* Cajas internas claras (notas, danos): mantener el texto oscuro y legible */
+.booking-card-free .bg-gray-50 .text-gray-700,
+.booking-card-free .bg-gray-50 .text-gray-600 {
+  color: #374151 !important;
+}

@@ -945,24 +945,23 @@ export function BookingManagement() {
             const isFree =
               booking.booking.paymentStatus === "free_booking" || Number(booking.booking.totalPrice) === 0
 
-            // Tarjeta limpia: fondo blanco + una franja lateral de color según el estado
-            // (mucho menos ruido visual que pintar toda la tarjeta de un color).
-            let accentClass = "border-l-blue-500" // pago online completo (por defecto)
-            if (booking.booking.status === "cancelled") accentClass = "border-l-red-500"
-            else if (booking.booking.status === "completed") accentClass = "border-l-green-500"
-            else if (isPartialPayment) accentClass = "border-l-amber-500"
-            else if (isManual) accentClass = "border-l-slate-400"
+            // Tarjeta coloreada por completo según el estado (identificación rápida de un vistazo).
+            // La reserva 100% gratis es una tarjeta NEGRA para que destaque sobre las demás.
+            let cardTone = "bg-blue-100 border-blue-300" // pago online completo (por defecto)
+            if (isFree) cardTone = "booking-card-free bg-black border-black"
+            else if (booking.booking.status === "cancelled") cardTone = "bg-red-100 border-red-300"
+            else if (booking.booking.status === "completed") cardTone = "bg-green-100 border-green-300"
+            else if (isPartialPayment) cardTone = "bg-slate-100 border-slate-300"
+            else if (isManual) cardTone = "bg-orange-100 border-orange-300"
 
             return (
               <Card
                 key={booking.booking.id}
-                className={`overflow-hidden border border-gray-200 border-l-4 bg-white transition-shadow hover:shadow-md ${accentClass} ${
-                  isFree ? "!border-black !border-l-black ring-1 ring-black" : ""
-                } ${booking.booking.status === "cancelled" ? "opacity-75" : ""}`}
+                className={`overflow-hidden border transition-shadow hover:shadow-lg ${cardTone}`}
               >
                 <CardHeader>
                   {isFree && (
-                    <div className="-mx-6 -mt-6 mb-4 flex items-center justify-center gap-2 bg-black py-2.5 text-sm font-extrabold uppercase tracking-wider text-yellow-400">
+                    <div className="-mx-6 -mt-6 mb-4 flex items-center justify-center gap-2 bg-yellow-400 py-2.5 text-sm font-extrabold uppercase tracking-wider text-black">
                       <Gift className="h-4 w-4" />
                       Código 100% gratis
                     </div>
@@ -1095,7 +1094,7 @@ export function BookingManagement() {
                       </h4>
                       <div className="text-xl sm:text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
                       {isFree && (
-                        <div className="inline-flex items-center gap-1 rounded bg-black px-2 py-0.5 text-xs font-bold text-yellow-400">
+                        <div className="inline-flex items-center gap-1 rounded border border-yellow-400 px-2 py-0.5 text-xs font-bold text-yellow-400">
                           <Gift className="h-3 w-3" /> Gratis con código 100%
                         </div>
                       )}
