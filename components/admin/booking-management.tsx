@@ -31,6 +31,7 @@ import {
   MapPin,
   Hotel,
   Search,
+  Gift,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -516,34 +517,34 @@ export function BookingManagement() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "confirmed":
-        return "bg-green-600 text-white"
+        return "bg-green-100 text-green-800 border border-green-200"
       case "pending":
-        return "bg-yellow-600 text-white"
+        return "bg-amber-100 text-amber-800 border border-amber-200"
       case "cancelled":
-        return "bg-red-700 text-white" // Stronger red for cancelled status badge
+        return "bg-red-100 text-red-800 border border-red-200"
       case "completed":
-        return "bg-green-700 text-white" // Stronger green for completed status badge
+        return "bg-green-100 text-green-800 border border-green-200"
       default:
-        return "bg-gray-600 text-white"
+        return "bg-gray-100 text-gray-700 border border-gray-200"
     }
   }
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-700 text-white" // Stronger green for paymentStatus completed badge
+        return "bg-green-100 text-green-800 border border-green-200"
       case "pending":
-        return "bg-yellow-600 text-white"
+        return "bg-amber-100 text-amber-800 border border-amber-200"
       case "failed":
-        return "bg-red-600 text-white"
+        return "bg-red-100 text-red-800 border border-red-200"
       case "free_booking":
-        return "bg-purple-600 text-white"
+        return "bg-black text-yellow-400"
       case "manual":
-        return "bg-orange-600 text-white" // Stronger orange for manual payment badge
+        return "bg-slate-100 text-slate-700 border border-slate-200"
       case "partial_payment":
-        return "bg-gray-600 text-white" // Gray for partial payment badge
+        return "bg-slate-100 text-slate-700 border border-slate-200"
       default:
-        return "bg-gray-600 text-white"
+        return "bg-gray-100 text-gray-700 border border-gray-200"
     }
   }
 
@@ -940,27 +941,32 @@ export function BookingManagement() {
             const salesPersonName = getSalesPersonName(booking.booking.salesPerson)
             const paymentTypeInfo = getPaymentTypeDisplay(booking)
             const paymentMethodInfo = getPaymentMethodDisplay(booking)
-            let cardBackgroundColorClass = "bg-white border-gray-200" // Default white
-            if (booking.booking.status === "cancelled") {
-              cardBackgroundColorClass = "bg-red-100 border-red-300" // Stronger red for cancelled booking
-            } else if (booking.booking.status === "completed") {
-              cardBackgroundColorClass = "bg-green-100 border-green-300" // Stronger green for completed booking
-            } else if (isPartialPayment) {
-              cardBackgroundColorClass = "bg-gray-100 border-gray-300" // Gray for partial payment
-            } else if (isManual) {
-              cardBackgroundColorClass = "bg-orange-100 border-orange-300" // Stronger orange for manual payment
-            } else {
-              // This 'else' now covers 'full online payment' when not cancelled, completed, partial, or manual
-              cardBackgroundColorClass = "bg-blue-100 border-blue-300" // Blue for full online payment
-            }
+            // ✅ Reserva 100% gratis (código T3STQ41): se identifica de forma destacada.
+            const isFree =
+              booking.booking.paymentStatus === "free_booking" || Number(booking.booking.totalPrice) === 0
+
+            // Tarjeta limpia: fondo blanco + una franja lateral de color según el estado
+            // (mucho menos ruido visual que pintar toda la tarjeta de un color).
+            let accentClass = "border-l-blue-500" // pago online completo (por defecto)
+            if (booking.booking.status === "cancelled") accentClass = "border-l-red-500"
+            else if (booking.booking.status === "completed") accentClass = "border-l-green-500"
+            else if (isPartialPayment) accentClass = "border-l-amber-500"
+            else if (isManual) accentClass = "border-l-slate-400"
+
             return (
               <Card
                 key={booking.booking.id}
-                className={`border hover:shadow-lg transition-all ${cardBackgroundColorClass} ${
-                  booking.booking.isTestBooking ? "border-l-4 border-l-purple-500" : ""
-                }`}
+                className={`overflow-hidden border border-gray-200 border-l-4 bg-white transition-shadow hover:shadow-md ${accentClass} ${
+                  isFree ? "!border-black !border-l-black ring-1 ring-black" : ""
+                } ${booking.booking.status === "cancelled" ? "opacity-75" : ""}`}
               >
                 <CardHeader>
+                  {isFree && (
+                    <div className="-mx-6 -mt-6 mb-4 flex items-center justify-center gap-2 bg-black py-2.5 text-sm font-extrabold uppercase tracking-wider text-yellow-400">
+                      <Gift className="h-4 w-4" />
+                      Código 100% gratis
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                     <div className="flex-1">
                       <CardTitle className="text-lg sm:text-xl font-bold text-black flex flex-wrap items-center gap-2">
@@ -1088,6 +1094,11 @@ export function BookingManagement() {
                         Información de Pago
                       </h4>
                       <div className="text-xl sm:text-2xl font-bold text-gold">€{booking.booking.totalPrice}</div>
+                      {isFree && (
+                        <div className="inline-flex items-center gap-1 rounded bg-black px-2 py-0.5 text-xs font-bold text-yellow-400">
+                          <Gift className="h-3 w-3" /> Gratis con código 100%
+                        </div>
+                      )}
                       {Number(booking.booking.securityDeposit) > 0 && (
                         <div className="text-xs sm:text-sm text-gray-600">
                           <Shield className="h-3 w-3 inline mr-1" />
