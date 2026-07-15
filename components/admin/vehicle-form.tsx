@@ -594,10 +594,8 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
         includes: formData.includes || [],
         pricing: formData.pricing || [],
         // ✅ CORREGIDO: Enviar null si el campo está vacío, de lo contrario, parsear a float
-        securityDeposit:
-          formData.securityDeposit === undefined || formData.securityDeposit === null
-            ? null
-            : Number.parseFloat(String(formData.securityDeposit)),
+        // ✅ Fianza online desactivada: siempre null. Solo se usa la fianza manual (en persona).
+        securityDeposit: null,
         manualDeposit:
           formData.manualDeposit === undefined || formData.manualDeposit === null
             ? null
@@ -1102,32 +1100,11 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                 <Euro className="h-5 w-5 text-gold mr-3" />
                 Fianza
               </CardTitle>
-              <CardDescription>Cantidad de fianza requerida para este producto</CardDescription>
+              <CardDescription>Fianza que se cobra y gestiona en persona (no se cobra online)</CardDescription>
             </CardHeader>
             <CardContent>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Importe de la fianza (€)</label>
-                <Input
-                  type="number"
-                  value={formData.securityDeposit ?? ""} // Display empty string if undefined/null
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      securityDeposit: e.target.value === "" ? undefined : Number.parseFloat(e.target.value),
-                    })
-                  }
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  className="bg-gray-50 border-gray-200"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  La fianza se retiene temporalmente y se devuelve tras la devolución del vehículo en buen estado
-                </p>
-              </div>
-
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Fianza manual en sitio (€)</label>
                 <Input
                   type="number"
                   value={formData.manualDeposit ?? ""} // Display empty string if undefined/null
@@ -1143,7 +1120,8 @@ export function VehicleForm({ vehicle, onSuccess, onCancel }: VehicleFormProps) 
                   className="bg-gray-50 border-gray-200"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Esta fianza se paga en el sitio y no se incluye en el precio online
+                  La fianza se cobra y se gestiona en persona (efectivo o tarjeta) a pie de playa. No se cobra ni
+                  retiene online.
                 </p>
               </div>
             </CardContent>
