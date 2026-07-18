@@ -161,32 +161,69 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 })
     }
 
-    console.log("✅ Vehicle exists, proceeding with cascade deletion...")
+    const vehicle = existingVehicle[0]
+    const force = new URL(request.url).searchParams.get("force") === "true"
 
-    // PASO 1: Borrar referencias en vehicle_availability
-    console.log("🔄 Step 1: Deleting vehicle_availability references...")
+    // ⚠️ AVISO: ¿tiene reservas FUTURAS (de hoy en adelante, no canceladas)?
+    const futureRows = (await db.execute(sql`
+      SELECT COUNT(*)::int AS n, MIN(booking_date)::text AS proxima
+      FROM bookings
+      WHERE vehicle_id = ${id}
+        AND booking_date >= CURRENT_DATE
+        AND (status IS NULL OR status <> 'cancelled')
+    `)) as any[]
+    const futureCount = Number(futureRows?.[0]?.n || 0)
+    const nextDate = futureRows?.[0]?.proxima || null
+
+    if (futureCount > 0 && !force) {
+      console.log(`⚠️ Vehicle ${id} has ${futureCount} future booking(s). Confirmation required.`)
+      return NextResponse.json(
+        {
+          requiresConfirmation: true,
+          futureBookings: futureCount,
+          nextBookingDate: nextDate,
+          message:
+            `¿Estás seguro? Vas a borrar "${vehicle.name}", que tiene ${futureCount} reserva(s) próximas` +
+            (nextDate ? ` (la primera el ${nextDate})` : "") +
+            `. Las reservas NO se borrarán, pero el producto dejará de estar disponible.`,
+        },
+        { status: 409 },
+      )
+    }
+
+    console.log("✅ Vehicle exists, proceeding with SAFE deletion (bookings are preserved)...")
+
+    // PASO 1: Borrar la disponibilidad (es solo configuración, no histórico)
     const deletedAvailability = await db
       .delete(vehicleAvailability)
       .where(eq(vehicleAvailability.vehicleId, id))
       .returning()
     console.log(`✅ Deleted ${deletedAvailability.length} availability records`)
 
-    // PASO 2: Borrar referencias en bookings
-    console.log("🔄 Step 2: Deleting booking references...")
-    const deletedBookings = await db.delete(bookings).where(eq(bookings.vehicleId, id)).returning()
-    console.log(`✅ Deleted ${deletedBookings.length} booking records`)
+    // PASO 2: ✅ NUNCA se borran las reservas. Se conserva el histórico:
+    //   - se guarda el nombre/tipo del vehículo en la propia reserva (por si faltaba)
+    //   - se desvincula el vehículo (vehicle_id = NULL) para poder borrarlo sin perder datos
+    const preserved = (await db.execute(sql`
+      UPDATE bookings
+      SET vehicle_name = COALESCE(vehicle_name, ${vehicle.name}),
+          vehicle_type = COALESCE(vehicle_type, ${vehicle.type}),
+          vehicle_id   = NULL,
+          updated_at   = now()
+      WHERE vehicle_id = ${id}
+      RETURNING id
+    `)) as any[]
+    console.log(`🛟 Preserved ${preserved.length} booking(s) (unlinked, NOT deleted)`)
 
     // PASO 3: Borrar el vehículo
-    console.log("🔄 Step 3: Deleting vehicle...")
     const deletedVehicle = await db.delete(vehicles).where(eq(vehicles.id, id)).returning()
     console.log("✅ Vehicle deleted successfully:", deletedVehicle[0])
 
     return NextResponse.json({
       message: "Vehicle deleted successfully",
       id: deletedVehicle[0]?.id,
+      preservedBookings: preserved.length,
       deletedReferences: {
         availability: deletedAvailability.length,
-        bookings: deletedBookings.length,
       },
     })
   } catch (error) {

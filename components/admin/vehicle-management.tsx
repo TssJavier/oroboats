@@ -143,16 +143,16 @@ export function VehicleManagement() {
     setShowManualBooking(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de que quieres eliminar este vehículo?")) {
+  const handleDelete = async (id: number, force = false) => {
+    if (!force && !confirm("¿Estás seguro de que quieres eliminar este vehículo?")) {
       return
     }
 
     setDeletingId(id)
-    console.log("🗑️ Attempting to delete vehicle with ID:", id)
+    console.log("🗑️ Attempting to delete vehicle with ID:", id, "force:", force)
 
     try {
-      const response = await fetch(`/api/vehicles/${id}`, {
+      const response = await fetch(`/api/vehicles/${id}${force ? "?force=true" : ""}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -160,6 +160,18 @@ export function VehicleManagement() {
       })
 
       console.log("🔄 Delete response status:", response.status)
+
+      // ⚠️ El producto tiene reservas FUTURAS: pedir confirmación extra antes de borrar
+      if (response.status === 409) {
+        const data = await response.json().catch(() => ({}))
+        if (data.requiresConfirmation) {
+          setDeletingId(null)
+          if (confirm(`${data.message}\n\n¿Quieres continuar?`)) {
+            return handleDelete(id, true)
+          }
+          return
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
@@ -177,7 +189,12 @@ export function VehicleManagement() {
       const result = await response.json()
       console.log("✅ Vehicle deleted successfully:", result)
 
-      toast.success("Vehículo eliminado correctamente")
+      const preserved = Number(result?.preservedBookings || 0)
+      toast.success(
+        preserved > 0
+          ? `Vehículo eliminado. Se han conservado ${preserved} reserva(s) en el historial.`
+          : "Vehículo eliminado correctamente",
+      )
       await fetchData() // ✅ Recargar todos los datos
     } catch (error) {
       console.error("❌ Error deleting vehicle:", error)
