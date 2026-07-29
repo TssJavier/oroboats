@@ -257,6 +257,41 @@ export async function POST(request: NextRequest) {
       hotelCode: finalBookingData.hotelCode,
     })
 
+    // ✅ NUEVO: comprobación anti-overbooking también en las reservas gratis / código 100%.
+    try {
+      const vehId = Number(finalBookingData.vehicleId)
+      const bDate = finalBookingData.bookingDate
+      const sTime = finalBookingData.startTime
+      const eTime = finalBookingData.endTime
+      if (vehId && bDate && sTime && eTime) {
+        const conflictRows = (await db.execute(sql`
+          SELECT COUNT(*)::int AS n,
+                 (SELECT COALESCE(stock, 1) FROM vehicles WHERE id = ${vehId}) AS stock
+          FROM bookings
+          WHERE vehicle_id = ${vehId}
+            AND booking_date = ${bDate}
+            AND (status IS NULL OR status <> 'cancelled')
+            AND (payment_status IS NULL OR payment_status <> 'hold')
+            AND start_time::time < ${eTime}::time
+            AND end_time::time > ${sTime}::time
+        `)) as any[]
+        const n = Number(conflictRows?.[0]?.n || 0)
+        const stock = Number(conflictRows?.[0]?.stock || 1)
+        if (n >= stock) {
+          console.error(`🚫 OVERBOOKING evitado (reserva gratis): vehículo ${vehId} ${bDate} ${sTime}-${eTime} (${n}/${stock})`)
+          return NextResponse.json(
+            {
+              error: "overbooking",
+              message: "Ese horario acaba de ser reservado. Por favor, elige otro horario.",
+            },
+            { status: 409 },
+          )
+        }
+      }
+    } catch (e) {
+      console.error("⚠️ Error en comprobación de disponibilidad (reserva gratis):", e)
+    }
+
     const booking = await createBooking(finalBookingData)
     console.log("✅ Booking created successfully:", booking[0])
 

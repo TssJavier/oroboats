@@ -7,6 +7,13 @@ import { sendBookingPushNotification } from "@/lib/ntfy"
 
 const supabase = supabaseAdmin
 
+// Convierte "HH:MM" o "HH:MM:SS" a minutos desde medianoche
+function toMin(t?: string | null): number {
+  if (!t) return 0
+  const [h, m] = String(t).split(":")
+  return (Number.parseInt(h) || 0) * 60 + (Number.parseInt(m) || 0)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -142,6 +149,7 @@ export async function POST(request: NextRequest) {
     // --- NUEVA LÓGICA PARA OBTENER BEACH_LOCATION_ID Y NAME CON SUPABASE ---
     let beachLocationId: string | null = null
     let beachLocationName: string | null = null
+    let vehicleStock = 1
 
     const vehicleId = Number(metadata.vehicleId || "0") // Asegúrate de que vehicleId sea un número
     console.log("🔍 Attempting to get beach location for vehicleId from metadata:", vehicleId)
@@ -149,13 +157,16 @@ export async function POST(request: NextRequest) {
     if (vehicleId && vehicleId > 0) {
       const { data: vehicleData, error: vehicleError } = await supabase
         .from("vehicles")
-        .select("beach_location_id")
+        .select("beach_location_id, stock")
         .eq("id", vehicleId)
         .single()
 
       console.log("🔍 Supabase vehicle lookup result:", vehicleData)
       if (vehicleError) {
         console.error("❌ Supabase error fetching vehicle:", vehicleError.message)
+      }
+      if (vehicleData && vehicleData.stock != null) {
+        vehicleStock = Number(vehicleData.stock) || 1
       }
 
       if (vehicleData && vehicleData.beach_location_id) {
@@ -186,6 +197,60 @@ export async function POST(request: NextRequest) {
       console.warn("⚠️ No valid vehicleId provided in payment metadata. Cannot fetch beach location.")
     }
     // --- FIN NUEVA LÓGICA ---
+
+    // ✅ NUEVO: comprobación FINAL de disponibilidad antes de crear la reserva.
+    //    Evita el overbooking (dos clientes pagando el mismo hueco a la vez).
+    //    Si el hueco ya está ocupado por otra reserva real -> NO se crea duplicado y se DEVUELVE el pago.
+    if (vehicleId && vehicleId > 0 && metadata.bookingDate && metadata.startTime && metadata.endTime) {
+      const startMin = toMin(metadata.startTime)
+      const endMin = toMin(metadata.endTime)
+
+      const { data: sameDay } = await supabase
+        .from("bookings")
+        .select("id, start_time, end_time, status, payment_status")
+        .eq("vehicle_id", vehicleId)
+        .eq("booking_date", metadata.bookingDate)
+
+      const overlapping = (sameDay || []).filter((b: any) => {
+        if (b.status === "cancelled") return false
+        if (b.payment_status === "hold") return false // los bloqueos comerciales no cuentan como ocupación
+        const s = toMin(b.start_time)
+        const e = toMin(b.end_time)
+        return startMin < e && endMin > s // se solapan en el tiempo
+      })
+
+      if (overlapping.length >= vehicleStock) {
+        console.error(
+          `🚫 OVERBOOKING evitado: vehículo ${vehicleId} ya ocupado el ${metadata.bookingDate} ${metadata.startTime}-${metadata.endTime}. Solapadas: ${overlapping.length}/${vehicleStock}. Devolviendo el pago ${paymentIntentId}.`,
+        )
+        // Devolver el importe cobrado del alquiler
+        try {
+          await stripe.refunds.create({ payment_intent: paymentIntentId })
+          console.log("💸 Pago del alquiler devuelto automáticamente por overbooking")
+        } catch (refErr) {
+          console.error("❌ No se pudo devolver el pago automáticamente (revisar manualmente):", refErr)
+        }
+        // Cancelar/devolver la fianza si la hubiera
+        if (depositPaymentIntentId) {
+          try {
+            const dep = await stripe.paymentIntents.retrieve(depositPaymentIntentId)
+            if (dep.status === "requires_capture") await stripe.paymentIntents.cancel(depositPaymentIntentId)
+            else if (dep.status === "succeeded") await stripe.refunds.create({ payment_intent: depositPaymentIntentId })
+          } catch (e) {
+            console.error("⚠️ No se pudo liberar la fianza tras overbooking:", e)
+          }
+        }
+        return NextResponse.json(
+          {
+            error: "overbooking",
+            message:
+              "Lo sentimos, ese horario acaba de ser reservado por otro cliente. Tu pago se ha devuelto automáticamente. Por favor, elige otro horario o contacta con nosotros.",
+            refunded: true,
+          },
+          { status: 409 },
+        )
+      }
+    }
 
     const bookingData = {
       customer_name: metadata.customerName || "Unknown",
