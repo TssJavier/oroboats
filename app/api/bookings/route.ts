@@ -51,7 +51,9 @@ export async function GET(request: NextRequest) {
       b.beach_location_id, -- Asegurarse de seleccionar beach_location_id de bookings
       l.name as beach_location_name, -- Seleccionar el nombre de la playa de locations
       v.name as vehicle_current_name,
-      v.type as vehicle_current_type
+      v.type as vehicle_current_type,
+      v.requires_license as vehicle_requires_license,
+      v.category as vehicle_category
     FROM bookings b
     LEFT JOIN vehicles v ON b.vehicle_id = v.id
     LEFT JOIN locations l ON b.beach_location_id = l.id -- Unir con locations
@@ -139,6 +141,9 @@ export async function GET(request: NextRequest) {
         beachLocationId: row.beach_location_id,
         beachLocationName: row.beach_location_name, // Ahora se obtiene de la unión
         hotelCode: row.hotel_code,
+        // ✅ NUEVO: info de licencia del vehículo (para marcar reservas SIN LICENCIA)
+        requiresLicense: row.vehicle_requires_license,
+        vehicleCategory: row.vehicle_category,
       },
       vehicle: row.vehicle_current_name
         ? {

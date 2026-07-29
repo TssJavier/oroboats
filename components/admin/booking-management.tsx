@@ -32,6 +32,7 @@ import {
   Hotel,
   Search,
   Gift,
+  LifeBuoy,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -77,6 +78,8 @@ interface Booking {
     beachLocationId?: string
     beachLocationName?: string
     hotelCode?: string // ✅ NUEVO: Añadir hotelCode
+    requiresLicense?: boolean | null // ✅ NUEVO: si el vehículo requiere licencia
+    vehicleCategory?: string | null // ✅ NUEVO: categoría (boat_no_license, jetski_with_license...)
   }
   vehicle: {
     name: string
@@ -945,6 +948,14 @@ export function BookingManagement() {
             const isFree =
               booking.booking.paymentStatus === "free_booking" || Number(booking.booking.totalPrice) === 0
 
+            // ✅ SIN LICENCIA: en estos casos Jose Carlos debe salir con el cliente para guiarlo.
+            //    Se detecta por la categoría del vehículo (..._no_license) o requires_license = false.
+            //    Si el vehículo fue borrado no hay dato (cat null) → no se marca.
+            const cat = booking.booking.vehicleCategory
+            const isSinLicencia = cat
+              ? cat.includes("no_license")
+              : booking.booking.requiresLicense === false
+
             // Tarjeta coloreada por completo según el estado (identificación rápida de un vistazo).
             // La reserva 100% gratis es una tarjeta NEGRA para que destaque sobre las demás.
             let cardTone = "bg-blue-100 border-blue-300" // pago online completo (por defecto)
@@ -974,6 +985,12 @@ export function BookingManagement() {
                           <span className="text-sm font-normal text-gray-600">({booking.booking.customerDni})</span>
                         )}
                         <span className="break-words">{booking.booking.customerName}</span>
+                        {isSinLicencia && (
+                          <Badge className="bg-red-600 text-white text-xs font-bold border border-red-700 shadow-sm">
+                            <LifeBuoy className="h-3.5 w-3.5 mr-1" />
+                            SIN LICENCIA · SALE JOSE CARLOS
+                          </Badge>
+                        )}
                         {booking.booking.isTestBooking && (
                           <Badge className="bg-purple-600 text-white text-xs">
                             <Beaker className="h-3 w-3 mr-1" />
