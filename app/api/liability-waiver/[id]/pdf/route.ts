@@ -343,7 +343,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           <div class="footer">
             <p><strong>🚤 OroBoats</strong> - Alquiler de Embarcaciones y Motos Acuáticas</p>
             <p>Documento generado automáticamente el ${new Date().toLocaleString("es-ES")}</p>
-            <p>📧 Contacto: info@oroboats.com | 📞 Teléfono: +34 655 52 79 88</p>
+            <p>📧 Contacto: info@oroboats.com | 📞 Teléfono: +34 694 26 62 49</p>
             <p style="margin-top: 10px; font-size: 9px;">
               Este documento constituye un acuerdo legal vinculante entre el cliente y OroBoats.<br>
               Conserve una copia para sus registros.

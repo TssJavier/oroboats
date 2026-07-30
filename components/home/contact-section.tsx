@@ -49,9 +49,9 @@ const translations = {
 export function ContactSection() {
   const { language, settings } = useApp()
   const t = translations[language]
-  const contactPhone = settings.contact_phone || "+34 655 52 79 88"
+  const contactPhone = settings.contact_phone || "+34 694 26 62 49"
   const contactEmail = settings.contact_email || "info@oroboats.com"
-  const contactWhatsapp = settings.contact_whatsapp || "+34 643 44 23 64"
+  const contactWhatsapp = settings.contact_whatsapp || "+34 694 26 62 49"
 
   const [formData, setFormData] = useState({
     name: "",

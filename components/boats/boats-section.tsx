@@ -649,8 +649,8 @@ function FloatingContactWidget({ t }: { t: Translations }) {
   const { settings } = useApp()
   const [isOpen, setIsOpen] = useState(false)
 
-  const contactPhone = settings.contact_phone || "+34 655 52 79 88"
-  const contactWhatsapp = settings.contact_whatsapp || "+34 643 44 23 64"
+  const contactPhone = settings.contact_phone || "+34 694 26 62 49"
+  const contactWhatsapp = settings.contact_whatsapp || "+34 694 26 62 49"
   const contactEmail = settings.contact_email || "info@oroboats.com"
   const cleanPhone = contactPhone.replace(/\s+/g, "")
   const cleanWhatsapp = contactWhatsapp.replace(/\s+/g, "").replace(/^\+/, "")

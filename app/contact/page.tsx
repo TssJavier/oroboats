@@ -36,9 +36,9 @@ const translations = {
       error: "Error al enviar el mensaje",
     },
     info: {
-      phone: "+34 655 52 79 88",
+      phone: "+34 694 26 62 49",
       email: "info@oroboats.com",
-      whatsapp: "+34 643 44 23 64",
+      whatsapp: "+34 694 26 62 49",
       address: "Paseo Andrés Segovia, 62",
       city: "La Herradura, Granada",
       hours: "Abierto todos los días: 9:00 - 21:00",
@@ -68,9 +68,9 @@ const translations = {
       error: "Error sending message",
     },
     info: {
-      phone: "+34 655 52 79 88",
+      phone: "+34 694 26 62 49",
       email: "info@oroboats.com",
-      whatsapp: "+34 643 44 23 64",
+      whatsapp: "+34 694 26 62 49",
       address: "Paseo Andrés Segovia, 62",
       city: "La Herradura, Granada",
       hours: "Open every day: 9:00 - 21:00",

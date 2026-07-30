@@ -38,7 +38,7 @@ const translations = {
     section6: {
       title: "6. Contacto",
       content:
-        "Si tiene preguntas sobre esta política de privacidad, puede contactarnos en info@oroboats.com o llamar al +34 655 52 79 88.",
+        "Si tiene preguntas sobre esta política de privacidad, puede contactarnos en info@oroboats.com o llamar al +34 694 26 62 49.",
     },
   },
   en: {
@@ -74,7 +74,7 @@ const translations = {
     section6: {
       title: "6. Contact",
       content:
-        "If you have questions about this privacy policy, you can contact us at info@oroboats.com or call +34 655 52 79 88.",
+        "If you have questions about this privacy policy, you can contact us at info@oroboats.com or call +34 694 26 62 49.",
     },
   },
 }

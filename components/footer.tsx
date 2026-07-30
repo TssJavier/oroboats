@@ -48,7 +48,7 @@ export function Footer() {
   const logoSrc = settings.logo_url || "/assets/logo.png"
   const tagline = settings.tagline || t.tagline
   const contactEmail = settings.contact_email || "info@oroboats.com"
-  const contactPhone = settings.contact_phone || "+34 655 52 79 88"
+  const contactPhone = settings.contact_phone || "+34 694 26 62 49"
 
   const handleNavigation = (path: string) => {
     startLoading()

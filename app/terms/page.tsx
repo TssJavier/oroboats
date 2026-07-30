@@ -48,7 +48,7 @@ const translations = {
     section8: {
       title: "8. Contacto",
       content:
-        "Para cualquier consulta sobre estos términos, contacte con nosotros en info@oroboats.com o llame al +34 655 52 79 88.",
+        "Para cualquier consulta sobre estos términos, contacte con nosotros en info@oroboats.com o llame al +34 694 26 62 49.",
     },
   },
   en: {
@@ -93,7 +93,7 @@ const translations = {
     },
     section8: {
       title: "8. Contact",
-      content: "For any questions about these terms, contact us at info@oroboats.com or call +34 655 52 79 88.",
+      content: "For any questions about these terms, contact us at info@oroboats.com or call +34 694 26 62 49.",
     },
   },
 }
