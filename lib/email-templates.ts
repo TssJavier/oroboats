@@ -154,8 +154,8 @@ export const bookingConfirmationTemplate = (data: {
         <div style="text-align: center; margin: 30px 0;">
           <p style="color: #666;">¿Tienes alguna pregunta?</p>
           <p style="margin: 10px 0;">
-            <strong>Teléfono:</strong> +34 655 52 79 88<br>
-            <strong>WhatsApp:</strong> +34 643 44 23 64<br>
+            <strong>Teléfono:</strong> +34 694 26 62 49<br>
+            <strong>WhatsApp:</strong> +34 694 26 62 49<br>
             <strong>Email:</strong> info@oroboats.com
           </p>
         </div>
@@ -337,8 +337,8 @@ export const renderContactConfirmation = (data: {
         <div style="text-align: center; margin: 30px 0;">
           <p style="color: #666;">¿Necesitas una respuesta inmediata?</p>
           <p style="margin: 10px 0;">
-            <strong>Teléfono:</strong> +34 655 52 79 88<br>
-            <strong>WhatsApp:</strong> +34 643 44 23 64<br>
+            <strong>Teléfono:</strong> +34 694 26 62 49<br>
+            <strong>WhatsApp:</strong> +34 694 26 62 49<br>
             <strong>Email:</strong> info@oroboats.com
           </p>
         </div>
