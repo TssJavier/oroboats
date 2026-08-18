@@ -65,6 +65,7 @@ interface Vehicle {
   manualDeposit?: number | null // Allow null
   stock?: number
   beachLocationId?: string // ✅ Añadir beachLocationId, hacemos opcional
+  hasFutureBookings?: boolean // ✅ Si tiene reservas futuras, no se puede borrar (solo desactivar)
 }
 
 interface BeachLocation {
@@ -143,16 +144,16 @@ export function VehicleManagement() {
     setShowManualBooking(true)
   }
 
-  const handleDelete = async (id: number, force = false) => {
-    if (!force && !confirm("¿Estás seguro de que quieres eliminar este vehículo?")) {
+  const handleDelete = async (id: number) => {
+    if (!confirm("¿Estás seguro de que quieres eliminar este vehículo?")) {
       return
     }
 
     setDeletingId(id)
-    console.log("🗑️ Attempting to delete vehicle with ID:", id, "force:", force)
+    console.log("🗑️ Attempting to delete vehicle with ID:", id)
 
     try {
-      const response = await fetch(`/api/vehicles/${id}${force ? "?force=true" : ""}`, {
+      const response = await fetch(`/api/vehicles/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -161,14 +162,12 @@ export function VehicleManagement() {
 
       console.log("🔄 Delete response status:", response.status)
 
-      // ⚠️ El producto tiene reservas FUTURAS: pedir confirmación extra antes de borrar
+      // 🚫 El producto tiene reservas FUTURAS: el borrado está bloqueado, hay que desactivarlo en su lugar
       if (response.status === 409) {
         const data = await response.json().catch(() => ({}))
-        if (data.requiresConfirmation) {
+        if (data.error === "vehicle_has_future_bookings") {
           setDeletingId(null)
-          if (confirm(`${data.message}\n\n¿Quieres continuar?`)) {
-            return handleDelete(id, true)
-          }
+          alert(data.message)
           return
         }
       }
@@ -495,6 +494,11 @@ export function VehicleManagement() {
             onClick={() => toggleAvailability(vehicle)}
             variant="outline"
             size="sm"
+            title={
+              vehicle.hasFutureBookings
+                ? "Desactivar: oculta el producto sin afectar a sus reservas futuras"
+                : undefined
+            }
             className={`border-gray-300 ${
               vehicle.available
                 ? "hover:border-gray-500 hover:text-gray-700"
@@ -504,19 +508,24 @@ export function VehicleManagement() {
             {vehicle.available ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
 
-          <Button
-            onClick={() => handleDelete(vehicle.id)}
-            variant="outline"
-            size="sm"
-            disabled={deletingId === vehicle.id}
-            className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
-          >
-            {deletingId === vehicle.id ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
+          {/* 🚫 El botón de Borrar solo se muestra si NO tiene reservas futuras.
+              Si las tiene, borrar desvincularía esas reservas (vehicle_id = NULL) y las
+              volvería invisibles para la detección de dobles reservas. Usar "desactivar". */}
+          {!vehicle.hasFutureBookings && (
+            <Button
+              onClick={() => handleDelete(vehicle.id)}
+              variant="outline"
+              size="sm"
+              disabled={deletingId === vehicle.id}
+              className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400"
+            >
+              {deletingId === vehicle.id ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

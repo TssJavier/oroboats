@@ -134,14 +134,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`🔍 Checking availability for slot: ${timeSlot} on ${bookingDate}`)
+    console.log(`🔍 Checking availability for slot: ${startTime}-${endTime} on ${bookingDate}`)
 
+    // ✅ Comprobación por SOLAPAMIENTO de horas (no por igualdad exacta de time_slot).
+    //    Dos reservas con horarios distintos pero que se cruzan (p.ej. 10:00-21:00 y 11:00-13:00)
+    //    deben detectarse como conflicto igual que en /api/vehicles/time-slots.
     const existingBookingsResult = await db.execute(sql`
-      SELECT COUNT(*) as count FROM bookings 
-      WHERE vehicle_id = ${vehicleId} 
+      SELECT COUNT(*) as count FROM bookings
+      WHERE vehicle_id = ${vehicleId}
       AND booking_date = ${bookingDate}
-      AND time_slot = ${timeSlot}
       AND status IN ('confirmed', 'completed', 'pending')
+      AND start_time::time < ${endTime}::time
+      AND end_time::time > ${startTime}::time
     `)
 
     const bookingsCount = Number(existingBookingsResult[0]?.count || 0)

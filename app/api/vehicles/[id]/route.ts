@@ -162,9 +162,11 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     }
 
     const vehicle = existingVehicle[0]
-    const force = new URL(request.url).searchParams.get("force") === "true"
 
-    // ⚠️ AVISO: ¿tiene reservas FUTURAS (de hoy en adelante, no canceladas)?
+    // 🚫 BLOQUEADO: si tiene reservas FUTURAS (de hoy en adelante, no canceladas), no se puede borrar.
+    //    Borrar desvincula esas reservas (vehicle_id = NULL) y las vuelve invisibles para las
+    //    comprobaciones de disponibilidad/solapamiento de cualquier vehículo que se cree después
+    //    con el mismo nombre — eso fue lo que causó una doble reserva real. Usar "desactivar" en su lugar.
     const futureRows = (await db.execute(sql`
       SELECT COUNT(*)::int AS n, MIN(booking_date)::text AS proxima
       FROM bookings
@@ -175,17 +177,18 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     const futureCount = Number(futureRows?.[0]?.n || 0)
     const nextDate = futureRows?.[0]?.proxima || null
 
-    if (futureCount > 0 && !force) {
-      console.log(`⚠️ Vehicle ${id} has ${futureCount} future booking(s). Confirmation required.`)
+    if (futureCount > 0) {
+      console.log(`🚫 Vehicle ${id} has ${futureCount} future booking(s). Deletion blocked.`)
       return NextResponse.json(
         {
-          requiresConfirmation: true,
+          error: "vehicle_has_future_bookings",
           futureBookings: futureCount,
           nextBookingDate: nextDate,
           message:
-            `¿Estás seguro? Vas a borrar "${vehicle.name}", que tiene ${futureCount} reserva(s) próximas` +
+            `No se puede borrar "${vehicle.name}": tiene ${futureCount} reserva(s) próxima(s)` +
             (nextDate ? ` (la primera el ${nextDate})` : "") +
-            `. Las reservas NO se borrarán, pero el producto dejará de estar disponible.`,
+            `. Usa el botón de "desactivar" (ocultar) en vez de borrar, así las reservas ya hechas ` +
+            `siguen contando para evitar dobles reservas. Solo se puede borrar cuando no queden reservas futuras.`,
         },
         { status: 409 },
       )

@@ -116,9 +116,18 @@ export function BookingManagement() {
   // ✅ NUEVO: temporada seleccionada (por defecto, la temporada actual)
   const [selectedSeason, setSelectedSeason] = useState<string>(String(getCurrentSeasonYear()))
   const seasonYears = listSeasonYears()
+  // ✅ NUEVO: reservas futuras cuyo vehículo fue borrado (vehicle_id NULL) y quedaron "invisibles"
+  // para las comprobaciones de disponibilidad. Ver /api/admin/orphaned-bookings.
+  const [orphanedBookings, setOrphanedBookings] = useState<
+    { id: number; customer_name: string; vehicle_name: string; booking_date: string; time_slot: string }[]
+  >([])
 
   useEffect(() => {
     fetchBeachLocations()
+    fetch("/api/admin/orphaned-bookings")
+      .then((res) => (res.ok ? res.json() : { bookings: [] }))
+      .then((data) => setOrphanedBookings(data.bookings || []))
+      .catch(() => {})
   }, [])
 
   // MODIFICADO: El useEffect ahora calcula la fecha a enviar a la API
@@ -636,6 +645,28 @@ export function BookingManagement() {
         <h2 className="text-3xl font-bold text-black">Gestión de Reservas</h2>
         <p className="text-gray-600">Administra todas las reservas de clientes</p>
       </div>
+      {/* ⚠️ Aviso discreto: reservas futuras sin vehículo vinculado (riesgo de doble reserva) */}
+      {orphanedBookings.length > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
+          <div>
+            <span className="font-medium">
+              ¡AVISAD A JAVI GUAPO INFORMÁTICO! — {orphanedBookings.length} reserva
+              {orphanedBookings.length > 1 ? "s" : ""} futura{orphanedBookings.length > 1 ? "s" : ""} sin vehículo
+              vinculado
+            </span>
+            <span className="text-amber-800">
+              {" "}
+              — no cuentan en las comprobaciones de disponibilidad. Revisa y re-vincula:{" "}
+              {orphanedBookings
+                .slice(0, 3)
+                .map((b) => `${b.customer_name} (${b.vehicle_name}, ${b.booking_date})`)
+                .join(", ")}
+              {orphanedBookings.length > 3 ? ` y ${orphanedBookings.length - 3} más` : ""}.
+            </span>
+          </div>
+        </div>
+      )}
       {/* Leyenda de Estados */}
       <Card className="bg-gray-50 border border-gray-200">
         <CardHeader className="pb-3">

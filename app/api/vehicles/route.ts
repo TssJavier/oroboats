@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { vehicles } from "@/lib/db/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, sql } from "drizzle-orm"
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +37,21 @@ export async function GET(request: NextRequest) {
 
     console.log(`✅ DB: Found ${vehicleResults.length} vehicles`)
 
+    // ✅ Para el panel de admin: qué vehículos tienen reservas futuras activas.
+    //    Se usa para bloquear/ocultar el borrado (borrar desvincularía esas reservas y
+    //    las dejaría invisibles para las comprobaciones de disponibilidad).
+    let futureBookingVehicleIds = new Set<number>()
+    if (includeUnavailable) {
+      const futureRows = (await db.execute(sql`
+        SELECT DISTINCT vehicle_id
+        FROM bookings
+        WHERE vehicle_id IS NOT NULL
+          AND booking_date >= CURRENT_DATE
+          AND (status IS NULL OR status <> 'cancelled')
+      `)) as any[]
+      futureBookingVehicleIds = new Set(futureRows.map((r) => Number(r.vehicle_id)))
+    }
+
     // Process the results
     const processedVehicles = vehicleResults.map((vehicle) => {
       try {
@@ -55,6 +70,7 @@ export async function GET(request: NextRequest) {
           // ✅ CORREGIDO: Asegurar que securityDeposit y manualDeposit se parsean correctamente
           securityDeposit: vehicle.securityDeposit !== null ? Number(vehicle.securityDeposit) : null,
           manualDeposit: vehicle.manualDeposit !== null ? Number(vehicle.manualDeposit) : null,
+          hasFutureBookings: futureBookingVehicleIds.has(vehicle.id),
         }
       } catch (error) {
         console.error(`❌ Error processing vehicle ${vehicle.id}:`, error)
@@ -68,6 +84,7 @@ export async function GET(request: NextRequest) {
           extraFeatures: [],
           securityDeposit: null, // Default to null on error
           manualDeposit: null, // Default to null on error
+          hasFutureBookings: futureBookingVehicleIds.has(vehicle.id),
         }
       }
     })
